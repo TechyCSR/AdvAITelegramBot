@@ -7,7 +7,9 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from modules.user.start import start , start_inline
 from modules.user.help import help ,help_inline
 from modules.user.commands import command_inline
-from modules.user.settings import settings_inline
+from modules.user.settings import settings_inline,settings_language_callback,change_voice_setting 
+from modules.user.settings import settings_voice_inlines
+
 
 
 import config
@@ -35,6 +37,12 @@ async def callback_query(client, callback_query):
         await command_inline(client, callback_query)
     elif callback_query.data == "settings":
         await settings_inline(client, callback_query)
+    elif callback_query.data == "settings_language":
+        await settings_language_callback(client, callback_query)
+    elif callback_query.data in ["settings_voice", "settings_text"]:
+        await change_voice_setting(client, callback_query)
+    elif callback_query.data == "settings_back":
+        await settings_voice_inlines(client, callback_query)
     else:
         pass
 

@@ -40,6 +40,5 @@ async def command_inline(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-    await channel_log(client, callback, "/commands")
 
 
