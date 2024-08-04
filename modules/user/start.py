@@ -3,6 +3,11 @@
 import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import Message
+from pyrogram.types import CallbackQuery
+from pyrogram.types import InlineQuery
+
+from modules.lang import translate_to_lang, default_lang
 
 global welcome_text
 global LOGO
@@ -24,19 +29,24 @@ Let's get started and experience the future of AI-powered conversations! 🚀
 
 """
 
+welcome_text = translate_to_lang(welcome_text, 'hi')
+print(welcome_text)
+
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"
+
 
 
 
 async def start(client, message):
     global welcome_text
     global LOGO
+
     fstname = message.from_user.first_name
     welcome_text = welcome_text.format(first_name=fstname)
 
     # Create the inline keyboard buttons
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Advance AI Chatbot", alert="AI ChatBot")],
+        [InlineKeyboardButton("Advance AI Chatbot", callback_data="alert"),],
         [InlineKeyboardButton("Feature 1", callback_data="feature_1"),
          InlineKeyboardButton("Feature 2", callback_data="feature_2")],
         [InlineKeyboardButton("Feature 3", callback_data="feature_3"),

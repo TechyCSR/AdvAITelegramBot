@@ -10,7 +10,10 @@ import time
 import datetime
 from dotenv import load_dotenv
 
+# Load the environment variables
 load_dotenv()
+
+#Preferences os >> env >> default
 
 API_KEY = os.environ.get('API_KEY') or os.getenv('API_ID') or "API_KEY"
 API_HASH = os.environ.get('API_HASH') or os.getenv("API_HASH")   or "API_HASH"
@@ -19,6 +22,7 @@ ADMINS=[]
 ADMINS = os.environ.get('ADMINS') or os.getenv("ADMIN_IDS") or "123456789"
 ADMINS = ADMINS.split(",") # Split the string and convert it to list
 OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # Owner ID
+LOG_CHANNEL = os.environ.get('LOG_CHANNEL') or os.getenv("LOG_CHANNEL") or "123456789" # Log Channel ID
 
 
 #check if all ids are int or not

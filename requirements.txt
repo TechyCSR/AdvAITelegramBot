@@ -1,3 +1,7 @@
 pyrogram 
 tgcrypto
 g4f[all]
+googletrans==4.0.0-rc1
+
+
+#export PYTHONPATH=/home/csr/Documents/WebD/AdvAITelegramBot
