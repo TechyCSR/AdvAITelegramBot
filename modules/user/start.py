@@ -4,7 +4,6 @@ import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
-from pyrogram.types import CallbackQuery
 from pyrogram.types import InlineQuery
 
 from modules.lang import translate_to_lang, default_lang
@@ -45,7 +44,6 @@ button_list = [
 
 
 
-
 async def start(client, message):
     global welcome_text
     global LOGO
@@ -58,12 +56,12 @@ async def start(client, message):
     # Create the inline keyboard buttons
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(button_list[0], callback_data="alert")],
-        [InlineKeyboardButton( button_list[1], callback_data="feature_1"),
-         InlineKeyboardButton(button_list[2], callback_data="feature_2")],
-        [InlineKeyboardButton(button_list[3], callback_data="feature_3"),
-         InlineKeyboardButton(button_list[4], callback_data="feature_4")],
-        [InlineKeyboardButton(button_list[5], url="https://example.com")]
+        [InlineKeyboardButton(button_list[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
+        [InlineKeyboardButton( button_list[1], callback_data="commands"),
+         InlineKeyboardButton(button_list[2], callback_data="help")],
+        [InlineKeyboardButton(button_list[3], callback_data="settings"),
+         InlineKeyboardButton(button_list[4], callback_data="support")],
+        [InlineKeyboardButton(button_list[5], callback_data="info")]
     ])
     # Send the welcome message with the GIF and the keyboard
     await client.send_animation(
@@ -71,8 +69,37 @@ async def start(client, message):
         animation=LOGO,
         caption=welcome_text,
         reply_markup=keyboard
-        
+    
     )
     await channel_log(client, message, "/start")
 
+
+
+async def start_inline(bot, callback):
+    global welcome_text
+    global LOGO
+    mention = callback.from_user.mention
+    welcome_text = welcome_text.format(user_mention=mention)
+
+    # for i in button_list:
+    #     if default_lang !="en":
+    #         button_list[button_list.index(i)] = translate_to_lang(i, default_lang )
+    # Create the inline keyboard buttons
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(button_list[0], url=f"https://t.me/{bot.me.username}?startgroup=true")],
+        [InlineKeyboardButton(button_list[1], callback_data="commands"),
+         InlineKeyboardButton(button_list[2], callback_data="help")],
+        [InlineKeyboardButton(button_list[3], callback_data="settings"),
+         InlineKeyboardButton(button_list[4], callback_data="support")],
+        [InlineKeyboardButton(button_list[5], callback_data="info")]
+    ])
+    # Send the welcome message with the GIF and the keyboard
+    await bot.edit_message_caption(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        caption=welcome_text,
+        reply_markup=keyboard
+    )
+    await channel_log(bot, callback.message, "/start")
 
