@@ -2,9 +2,6 @@
 
 import os
 import sys
-import logging
-import logging.config
-import json
 
 import time
 import datetime
@@ -23,6 +20,7 @@ ADMINS = os.environ.get('ADMINS') or os.getenv("ADMIN_IDS") or "123456789"
 ADMINS = ADMINS.split(",") # Split the string and convert it to list
 OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # Owner ID
 LOG_CHANNEL = os.environ.get('LOG_CHANNEL') or os.getenv("LOG_CHANNEL") or "123456789" # Log Channel ID
+
 
 
 #check if all ids are int or not
