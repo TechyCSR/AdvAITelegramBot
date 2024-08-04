@@ -1,0 +1,59 @@
+import os
+import pydub
+import speech_recognition as sr
+from pyrogram import Client, filters
+
+# Define the bot token and API credentials
+api_id = '26793430'
+api_hash = '0ed89e64cd2a21a75eae5c4d216f2286'
+bot_token = '6374635745:AAEvVdIDmsdWbwk8e2JV34FljCEFDxn6PLQ'
+
+# Initialize the Pyrogram client
+bot = Client("audio_recognizer_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
+
+def ogg_to_wav(ogg_path, wav_path):
+    """Convert OGG file to WAV format."""
+    try:
+        audio = pydub.AudioSegment.from_ogg(ogg_path)
+        audio.export(wav_path, format="wav")
+    except Exception as e:
+        print(f"Error converting OGG to WAV: {e}")
+
+def process_audio_file(voice_path):
+    """Process the audio file: convert to WAV and extract text using Google Speech Recognition."""
+    wav_path = os.path.splitext(voice_path)[0] + ".wav"
+    ogg_to_wav(voice_path, wav_path)
+
+    recognizer = sr.Recognizer()
+    try:
+        with sr.AudioFile(wav_path) as source:
+            audio = recognizer.record(source)
+        text = recognizer.recognize_google(audio, language='en-US')
+        return text
+    except sr.UnknownValueError:
+        return "Could not understand the audio"
+    except sr.RequestError as e:
+        return f"Could not request results from Google Speech Recognition service; {e}"
+    except Exception as e:
+        return f"Error processing audio file: {e}"
+
+@bot.on_message(filters.voice)
+def handle_voice_message(client, message):
+    voice = message.voice
+    file_path = client.download_media(voice)
+
+    if file_path:
+        text = process_audio_file(file_path)
+        message.reply_text(text)
+    else:
+        message.reply_text("Failed to download the voice message")
+
+@bot.on_message(filters.command("start"))
+def start(client, message):
+    message.reply_text("Send me a voice message and I'll convert it to text!")
+
+if __name__ == "__main__":
+    local_ogg_path = 'speech_to_text/6159151379282661658.ogg'
+    print(process_audio_file(local_ogg_path))
+
+bot.run()
