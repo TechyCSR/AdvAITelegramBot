@@ -6,6 +6,10 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from modules.user.start import start , start_inline
 from modules.user.help import help ,help_inline
+from modules.user.commands import command_inline
+from modules.user.settings import settings_inline
+
+
 import config
 from datetime import datetime
 
@@ -27,6 +31,10 @@ async def callback_query(client, callback_query):
         await help_inline(client, callback_query)
     elif callback_query.data == "back":
         await start_inline(client, callback_query)
+    elif callback_query.data == "commands":
+        await command_inline(client, callback_query)
+    elif callback_query.data == "settings":
+        await settings_inline(client, callback_query)
     else:
         pass
 
