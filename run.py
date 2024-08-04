@@ -9,7 +9,9 @@ from modules.user.help import help ,help_inline
 from modules.user.commands import command_inline
 from modules.user.settings import settings_inline,settings_language_callback,change_voice_setting 
 from modules.user.settings import settings_voice_inlines
+from modules.user.assistant import settings_assistant_callback,change_mode_setting
 
+from modules.maintenance import settings_others_callback
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 
 
@@ -48,7 +50,12 @@ async def callback_query(client, callback_query):
         await settings_langs_callback(client, callback_query)
     elif callback_query.data in ["language_hi", "language_en", "language_zh", "language_ar", "language_fr", "language_ru"]:
         await change_language_setting(client, callback_query)
-
+    elif callback_query.data=="settings_assistant":
+        await settings_assistant_callback(client, callback_query)
+    elif callback_query.data in ["mode_chatbot", "mode_coder", "mode_professional", "mode_teacher", "mode_therapist", "mode_assistant", "mode_gamer", "mode_translator"]:
+        await change_mode_setting(client, callback_query)
+    elif callback_query.data=="settings_others":
+        await settings_others_callback(client, callback_query)
     else:
         pass
 
