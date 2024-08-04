@@ -36,6 +36,7 @@ async def start(client, message):
 
     # Create the inline keyboard buttons
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Advance AI Chatbot", alert="AI ChatBot")],
         [InlineKeyboardButton("Feature 1", callback_data="feature_1"),
          InlineKeyboardButton("Feature 2", callback_data="feature_2")],
         [InlineKeyboardButton("Feature 3", callback_data="feature_3"),
