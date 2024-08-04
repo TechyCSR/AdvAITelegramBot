@@ -4,6 +4,8 @@
 # max 3 image generate
 # give the url of the images instead of saving them
 
+# under load testing.................
+
 import os
 from g4f.client import Client
 from g4f.Provider import BingCreateImages
