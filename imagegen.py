@@ -8,32 +8,26 @@
 
 # under load testing.................
 
+
 import os
+import random
 from g4f.client import Client
 from g4f.Provider import BingCreateImages
 from g4f.cookies import set_cookies
-import random
-
-COOKIES = [
-    "1-7f5gYThNbKgdNojOXHHoXMJpxPY4jWyDaQ5aoKbUM5uZXWizWY0SuVABgNF4v9GgihUJwq99UQbVJV2X1U0LWvyRLYcF1NiXgCuuH6zQXV3lmHlA5HKlXSdK-KfjzMf1q_mckrehIhfgJ7tLxc1R1lVgHrnEHQmxBRUW8w8_fhgaAJKNjWRb11LKr3D2qmoL9Mp_TvaTcM04KNOTMrCdw",
-    # Add more cookies here
-]
-
-def get_random_cookie():
-    return random.choice(COOKIES)
+from config import BING_COOKIE, MAX_EDITS, MAX_IMAGES
 
  
-message_prompts = {}
+message_data = {}
 
-def generate_images(prompt, max_images=3):
+def generate_images(prompt, max_images=MAX_IMAGES):
     generated_images = 0
     total_attempts = 0
-    max_attempts = len(COOKIES) * 2
+    max_attempts = 2  
     image_urls = []
 
     while generated_images < max_images and total_attempts < max_attempts:
         set_cookies(".bing.com", {
-            "_U": get_random_cookie()
+            "_U": BING_COOKIE
         })
 
         client = Client(image_provider=BingCreateImages)
@@ -53,7 +47,7 @@ def generate_images(prompt, max_images=3):
                     break
 
         except Exception as e:
-            print(f"Error with current cookie: {str(e)}")
+            print(f"Error generating image: {str(e)}")
 
         total_attempts += 1
 
@@ -63,10 +57,16 @@ def generate_images(prompt, max_images=3):
     return image_urls
 
 def edit_image(message_id, edit_prompt):
-    if message_id in message_prompts:
-        original_prompt = message_prompts[message_id]
+    if message_id in message_data:
+        original_prompt, edit_count = message_data[message_id]
+        if edit_count >= MAX_EDITS:
+            return f"Edit limit reached. You cannot edit this image more than {MAX_EDITS} times."
+        
         new_prompt = f"{original_prompt}. Edit: {edit_prompt}"
-        return generate_images(new_prompt, max_images=1)[0]
+        edited_url = generate_images(new_prompt, max_images=1)[0]
+        
+        message_data[message_id] = (new_prompt, edit_count + 1)
+        return edited_url
     else:
         return "Message ID not found."
 
@@ -77,8 +77,8 @@ while True:
     if command == 'generate':
         prompt = input("Your Prompt: ")
         urls = generate_images(prompt)
-        message_id = random.randint(1000, 9999)  # Simulating a message ID
-        message_prompts[message_id] = prompt
+        message_id = random.randint(1000, 9999)   
+        message_data[message_id] = (prompt, 0)   
         print(f"Generated images (Message ID: {message_id}):")
         for url in urls:
             print(url)
@@ -86,8 +86,11 @@ while True:
     elif command == 'edit':
         message_id = int(input("Enter the Message ID of the image to edit: "))
         edit_prompt = input("Enter edit instructions: ")
-        new_url = edit_image(message_id, edit_prompt)
-        print(f"Edited image URL: {new_url}")
+        result = edit_image(message_id, edit_prompt)
+        if result.startswith("http"):
+            print(f"Edited image URL: {result}")
+        else:
+            print(result)
     
     elif command == 'quit':
         break
