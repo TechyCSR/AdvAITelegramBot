@@ -1,8 +1,10 @@
 
-# added new fetures
-# the genrate/edit/quit feature
-# max 3 image generate
-# give the url of the images instead of saving them
+# added new features :
+
+# the generate/edit/quit feature
+# max 3 image generation
+# give the url of the images instead of saving them directly to save storage
+# multiple cookies to remove any delay or restrictions (it chooses randomly)
 
 # under load testing.................
 
