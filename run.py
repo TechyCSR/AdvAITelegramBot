@@ -10,6 +10,7 @@ from modules.user.commands import command_inline
 from modules.user.settings import settings_inline,settings_language_callback,change_voice_setting 
 from modules.user.settings import settings_voice_inlines
 
+from modules.user.lang_settings import settings_langs_callback,change_language_setting
 
 
 import config
@@ -43,6 +44,11 @@ async def callback_query(client, callback_query):
         await change_voice_setting(client, callback_query)
     elif callback_query.data == "settings_back":
         await settings_voice_inlines(client, callback_query)
+    elif callback_query.data == "settings_lans":
+        await settings_langs_callback(client, callback_query)
+    elif callback_query.data in ["language_hi", "language_en", "language_zh", "language_ar", "language_fr", "language_ru"]:
+        await change_language_setting(client, callback_query)
+
     else:
         pass
 

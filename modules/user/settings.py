@@ -33,7 +33,7 @@ async def settings_inline(client, callback):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🌐 Language", callback_data="settings_language"),
+                InlineKeyboardButton("🌐 Language", callback_data="settings_lans"),
                 InlineKeyboardButton("🎙️ Voice", callback_data="settings_voice")
             ],
             [
@@ -115,10 +115,14 @@ async def change_voice_setting(client, callback):
 # Function to handle settings inline
 async def settings_voice_inlines(client, callback):
     global settings_text
+    settings_text = settings_text.format(
+        mention=callback.from_user.mention,
+        default_lang=default_lang
+    )
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🌐 Language", callback_data="settings_language"),
+                InlineKeyboardButton("🌐 Language", callback_data="settings_lans"),
                 InlineKeyboardButton("🎙️ Voice", callback_data="settings_voice")
             ],
             [
