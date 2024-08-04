@@ -14,8 +14,7 @@ global welcome_text
 global LOGO
 
 welcome_text = """
-
-👋 **Hey {first_name}!** 
+**Hey {user_mention}!** 
 
 Welcome to the **Telegram Advanced AI ChatBot**! 🌟
 
@@ -33,31 +32,46 @@ Let's get started and experience the future of AI-powered conversations! 🚀
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"
 
 
+button_list = [
+    "➕ Add Me To Your Group ➕",
+    "💬 Commands",
+    "❓ Help",
+    "⚙️ Settings",
+    "🛠️ Support",
+    "ℹ️ More Info"
+]
+
+
+
+
 
 
 async def start(client, message):
     global welcome_text
     global LOGO
+    mention = message.from_user.mention
+    welcome_text = welcome_text.format(user_mention=mention)
 
-    fstname = message.from_user.first_name
-    welcome_text = welcome_text.format(first_name=fstname)
-
+    # for i in button_list:
+    #     if default_lang !="en":
+    #         button_list[button_list.index(i)] = translate_to_lang(i, default_lang )
     # Create the inline keyboard buttons
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Advance AI Chatbot", callback_data="alert"),],
-        [InlineKeyboardButton("", callback_data="feature_1"),
-         InlineKeyboardButton("Feature 2", callback_data="feature_2")],
-        [InlineKeyboardButton("Feature 3", callback_data="feature_3"),
-         InlineKeyboardButton("Feature 4", callback_data="feature_4")],
-        [InlineKeyboardButton("More Info", url="https://example.com")]
-    ])
 
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(button_list[0], callback_data="alert")],
+        [InlineKeyboardButton( button_list[1], callback_data="feature_1"),
+         InlineKeyboardButton(button_list[2], callback_data="feature_2")],
+        [InlineKeyboardButton(button_list[3], callback_data="feature_3"),
+         InlineKeyboardButton(button_list[4], callback_data="feature_4")],
+        [InlineKeyboardButton(button_list[5], url="https://example.com")]
+    ])
     # Send the welcome message with the GIF and the keyboard
     await client.send_animation(
         chat_id=message.chat.id,
         animation=LOGO,
         caption=welcome_text,
         reply_markup=keyboard
+        
     )
     await channel_log(client, message, "/start")
 
