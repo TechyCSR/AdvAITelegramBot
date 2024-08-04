@@ -9,6 +9,7 @@ default_lang = 'en'
 
 
 
+
 def translate_to_lang(text,lang=None):
     if lang is None:
         lang = default_lang

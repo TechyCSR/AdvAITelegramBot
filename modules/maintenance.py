@@ -6,9 +6,10 @@ global maintenance_text
 maintenance_text = """
 🚧 This section is under development.
 Please check back later.
-Team  @AdvanceAIBot
+~@AdvanceAIBot
 """
     
+
 
 # Function to handle settings_others callback
 async def settings_others_callback(client, callback: CallbackQuery):
