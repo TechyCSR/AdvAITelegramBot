@@ -15,6 +15,7 @@ from modules.maintenance import settings_others_callback
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
+from modules.speech.voice_to_text import  handle_voice_message
 
 import config
 from datetime import datetime
@@ -63,12 +64,12 @@ async def callback_query(client, callback_query):
         await support_admins_callback(client, callback_query)
     elif callback_query.data=="support_developers":
         await support_developers_callback(client, callback_query)
-    
-
-    
-        
     else:
         pass
+
+@advAiBot.on_message(filters.voice)
+async def voice(bot, message):
+    await handle_voice_message(bot, message)
 
 advAiBot.run()
 

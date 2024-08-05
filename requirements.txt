@@ -1,7 +1,13 @@
 pyrogram 
 tgcrypto
 g4f[all]
-googletrans==4.0.0-rc1
+pytz
+# py3langid>=0.2.2
+soundfile==0.12.1
+SpeechRecognition== 3.10.0
+gTTS==2.3.2
+pydub
+numpy
 
 
 #export PYTHONPATH=/home/csr/Documents/WebD/AdvAITelegramBot
