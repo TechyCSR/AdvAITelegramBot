@@ -15,8 +15,9 @@ from modules.maintenance import settings_others_callback
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
-from modules.speech.voice_to_text import  handle_voice_message
+from modules.speech import  text_to_voice,voice_to_text
 
+import os
 import config
 from datetime import datetime
 
@@ -69,7 +70,11 @@ async def callback_query(client, callback_query):
 
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
-    await handle_voice_message(bot, message)
+    await voice_to_text.handle_voice_message(bot, message)
+
+@advAiBot.on_message(filters.text|filters.private)
+async def handle_text_message(client, message):
+    await text_to_voice.handle_text_message(client, message)
 
 advAiBot.run()
 
