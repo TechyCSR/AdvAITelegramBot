@@ -38,6 +38,7 @@ async def handle_voice_message(client, message):
         return
     os.remove(wav_path)
     os.remove(voice_path)
+    print(res)
     await message.reply_text(res)
 
     
