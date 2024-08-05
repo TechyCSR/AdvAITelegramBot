@@ -4,9 +4,9 @@ import speech_recognition as sr
 from pyrogram import Client, filters
 
 # Define the bot token and API credentials
-api_id = '26793430'
-api_hash = '0ed89e64cd2a21a75eae5c4d216f2286'
-bot_token = '6374635745:AAEvVdIDmsdWbwk8e2JV34FljCEFDxn6PLQ'
+api_id = 'API_ID'
+api_hash = 'HASH'
+bot_token = 'YOUR_BOT_TOKEN'
 
 # Initialize the Pyrogram client
 bot = Client("audio_recognizer_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
