@@ -55,7 +55,7 @@ async def callback_query(client, callback_query):
         await settings_assistant_callback(client, callback_query)
     elif callback_query.data in ["mode_chatbot", "mode_coder", "mode_professional", "mode_teacher", "mode_therapist", "mode_assistant", "mode_gamer", "mode_translator"]:
         await change_mode_setting(client, callback_query)
-    elif callback_query.data=="settings_others":
+    elif callback_query.data=="settings_others" or callback_query.data=="support_donate":
         await settings_others_callback(client, callback_query)
     elif callback_query.data=="support":
          await settings_support_callback(client, callback_query)

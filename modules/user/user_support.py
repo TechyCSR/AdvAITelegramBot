@@ -5,7 +5,7 @@ from config import ADMINS as admin_ids
 
 
 
-
+print(admin_ids)
 # Function to handle settings support callback
 async def settings_support_callback(client, CallbackQuery):
     message_text = "🔧 **Support Options** 🔧\n\nSelect an option to get help or support."
@@ -47,7 +47,7 @@ feature_states = {
 # Function to handle support_admins callback
 async def support_admins_callback(client, callback: CallbackQuery):
     user_id = callback.from_user.id
-    
+
     if user_id not in admin_ids:
         await callback.answer("This section is for admins only.", show_alert=True)
         return

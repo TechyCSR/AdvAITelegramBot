@@ -19,9 +19,8 @@ ADMINS=[]
 ADMINS = os.environ.get('ADMINS') or os.getenv("ADMIN_IDS") or "123456789"
 ADMINS = ADMINS.split(",") # Split the string and convert it to list
 OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # Owner ID
+ADMINS+=[OWNER_ID] # Add the owner ID to the list
 LOG_CHANNEL = os.environ.get('LOG_CHANNEL') or os.getenv("LOG_CHANNEL") or "123456789" # Log Channel ID
-
-
 
 #check if all ids are int or not
 for x in ADMINS:
@@ -33,6 +32,10 @@ for x in ADMINS:
 
 if not OWNER_ID.isdigit():  
     sys.exit("Please enter a valid integer ID value, Check your OWNER_ID")
+
+#convert all ids to int
+ADMINS = list(map(int, ADMINS))
+OWNER_ID = int(OWNER_ID)
 
 
 
