@@ -9,6 +9,7 @@ from pyrogram.types import InlineQuery
 from modules.lang import translate_to_lang, default_lang
 from modules.chatlogs import channel_log
 
+
 global welcome_text
 global LOGO
 

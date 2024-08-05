@@ -13,7 +13,8 @@ from modules.user.assistant import settings_assistant_callback,change_mode_setti
 
 from modules.maintenance import settings_others_callback
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
-
+from modules.user.user_support import settings_support_callback,support_admins_callback
+from modules.user.dev_support import support_developers_callback
 
 import config
 from datetime import datetime
@@ -56,6 +57,16 @@ async def callback_query(client, callback_query):
         await change_mode_setting(client, callback_query)
     elif callback_query.data=="settings_others":
         await settings_others_callback(client, callback_query)
+    elif callback_query.data=="support":
+         await settings_support_callback(client, callback_query)
+    elif callback_query.data=="support_admins":
+        await support_admins_callback(client, callback_query)
+    elif callback_query.data=="support_developers":
+        await support_developers_callback(client, callback_query)
+    
+
+    
+        
     else:
         pass
 
