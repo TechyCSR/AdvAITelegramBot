@@ -4,8 +4,12 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQ
 
 from config import LOG_CHANNEL
 
-
+voted=[]
 async def rate_command(client: Client, message):
+    if message.from_user.id in voted:
+        await message.reply("You have already rated.")
+        return
+    voted.append(message.from_user.id)
     user = message.from_user
     mention = user.mention(user.first_name)
     user_info = f"User: {mention}\nUsername: @{user.username}\nID: {user.id}"
@@ -30,10 +34,11 @@ async def rate_command(client: Client, message):
 
 
 async def handle_rate_callback(client: Client, callback_query: CallbackQuery):
+   
     user = callback_query.from_user
     rating = callback_query.data.split("_")[1]
     mention = user.mention(user.first_name)
-    user_info = f"User: {mention}\nUsername: @{user.username}\nID: {user.id}"
+    user_info = f"User: {mention}\n\nID: {user.id}"
     rating_message = f"{user_info}\nRating: {'⭐️' * int(rating)}"
 
     await client.send_message(
@@ -41,4 +46,6 @@ async def handle_rate_callback(client: Client, callback_query: CallbackQuery):
         text=rating_message
     )
 
-    await callback_query.answer(f"Thank you for your rating of {'⭐️' * int(rating)} stars!", show_alert=True)
+    await callback_query.edit_message_text(f"Thank you for your rating of {'⭐️' * int(rating)} stars!")
+
+

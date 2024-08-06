@@ -11,9 +11,7 @@ async def leave_group(client: Client, message):
     chat_id = message.chat.id
     bot_username = (await client.get_me()).username
 
-    if len(message.command) != 2:
-        await message.reply("Invalid command! Please provide a group ID.")
-        return
+    
 
     group_id = int(message.command[1])
     
@@ -29,6 +27,9 @@ async def leave_group(client: Client, message):
         await message.reply(f"Failed to leave the group. Error: {e}")
 
 async def invite_command(client, message):
+    if len(message.command) != 2:
+        await message.reply("Invalid command! Please provide a group ID.")
+        return
     chat_id = message.text.split(" ")[1]
 
     try:

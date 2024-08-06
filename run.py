@@ -3,7 +3,7 @@
 import pyrogram 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from
+
 
 
 from modules.user.start import start , start_inline
@@ -87,22 +87,30 @@ async def voice(bot, message):
 #     await text_to_voice.handle_text_message(client, message)
 
 
-@advAiBot.on_message(filters.command("gleave") & filters.private & filters.chat(config.ADMINS))
+@advAiBot.on_message(filters.command("gleave") )
 async def leave_group_command(bot, update):
-    await leave_group(bot, update)
+    if update.from_user.id in config.ADMINS:
+        await leave_group(bot, update)
+    else:
+        await update.reply_text("You are not allowed to use this command.")
 
 @advAiBot.on_message(filters.command("rate") & filters.private)
 async def rate_commands(bot, update):
     await rate_command(bot, update)
 
-@advAiBot.on_message(filters.command("invite") &  filters.private & filters.chat(config.ADMINS))
+@advAiBot.on_message(filters.command("invite"))
 async def invite_commands(bot, update):
-    await invite_command(bot, update)
+    if update.from_user.id in config.ADMINS:
+        await invite_command(bot, update)
+    else:
+        await update.reply_text("You are not allowed to use this command.")
 
 @advAiBot.on_message(filters.command("uinfo") )
 async def info_commands(bot, update):
-    if update.from_
-    await info_command(bot, update)
+    if update.from_user.id in config.ADMINS:
+        await info_command(bot, update)
+    else:
+        await update.reply_text("You are not allowed to use this command.")
 
 
 
