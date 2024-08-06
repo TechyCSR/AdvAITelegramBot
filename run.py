@@ -3,6 +3,8 @@
 import pyrogram 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from
+
 
 from modules.user.start import start , start_inline
 from modules.user.help import help ,help_inline
@@ -10,12 +12,16 @@ from modules.user.commands import command_inline
 from modules.user.settings import settings_inline,settings_language_callback,change_voice_setting 
 from modules.user.settings import settings_voice_inlines
 from modules.user.assistant import settings_assistant_callback,change_mode_setting
-
-from modules.maintenance import settings_others_callback
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
 from modules.speech import  text_to_voice,voice_to_text
+
+
+from modules.maintenance import settings_others_callback
+from modules.group.group_settings import leave_group,invite_command
+from modules.feedback_nd_rating import rate_command,handle_rate_callback
+from modules.group.group_info import info_command
 
 import os
 import config
@@ -65,6 +71,10 @@ async def callback_query(client, callback_query):
         await support_admins_callback(client, callback_query)
     elif callback_query.data=="support_developers":
         await support_developers_callback(client, callback_query)
+
+    elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
+        await handle_rate_callback(client, callback_query)
+        
     else:
         pass
 
@@ -72,9 +82,32 @@ async def callback_query(client, callback_query):
 async def voice(bot, message):
     await voice_to_text.handle_voice_message(bot, message)
 
-@advAiBot.on_message(filters.text|filters.private)
-async def handle_text_message(client, message):
-    await text_to_voice.handle_text_message(client, message)
+# @advAiBot.on_message(filters.text & filters.private & filters.chat()
+# async def handle_text_message(client, message):
+#     await text_to_voice.handle_text_message(client, message)
+
+
+@advAiBot.on_message(filters.command("gleave") & filters.private & filters.chat(config.ADMINS))
+async def leave_group_command(bot, update):
+    await leave_group(bot, update)
+
+@advAiBot.on_message(filters.command("rate") & filters.private)
+async def rate_commands(bot, update):
+    await rate_command(bot, update)
+
+@advAiBot.on_message(filters.command("invite") &  filters.private & filters.chat(config.ADMINS))
+async def invite_commands(bot, update):
+    await invite_command(bot, update)
+
+@advAiBot.on_message(filters.command("uinfo") )
+async def info_commands(bot, update):
+    if update.from_
+    await info_command(bot, update)
+
+
+
+
+
 
 advAiBot.run()
 
