@@ -9,7 +9,6 @@ db = client['aibotdb']
 users_collection = db['users']
 
 
-
 def check_and_add_user(user_id):
     user = users_collection.find_one({"user_id": user_id})
     if not user:
