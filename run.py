@@ -20,7 +20,7 @@ from modules.group.group_settings import leave_group,invite_command
 from modules.feedback_nd_rating import rate_command,handle_rate_callback
 from modules.group.group_info import info_command
 
-from modules.modles.ai_res import aires
+from modules.modles.ai_res import aires, new_chat
 
 
 import os
@@ -112,11 +112,36 @@ async def info_commands(bot, update):
     else:
         await update.reply_text("You are not allowed to use this command.")
 
+def is_chat_text_filter():
+    async def funcc(_, __, update):
+        if bool(update.text):
+            return not update.text.startswith("/")
+        return False
+    return filters.create(funcc)
 
-@advAiBot.on_message(filters.text)
+@advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
     print(message.text)
     await aires(client, message)
+
+@advAiBot.on_message( filters.text & filters.command("ai") & filters.group)
+async def handle_message(bot, update):
+    message=update
+    client=bot
+    if len(message.text)>3:
+        message.text=message.text[3:]
+        print(message.text)        
+    else:
+        message.reply_text("Please provide valid text")
+        return
+    await aires(client, message)
+
+
+
+@advAiBot.on_message(filters.command("newchat"))
+async def handle_new_chat(client, message):
+    await new_chat(client, message)
+
 
 
 
