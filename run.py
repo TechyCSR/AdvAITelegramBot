@@ -132,7 +132,7 @@ async def handle_message(bot, update):
         message.text=message.text[3:]
         print(message.text)        
     else:
-        message.reply_text("Please provide valid text")
+        await message.reply_text("Please provide valid text")
         return
     await aires(client, message)
 
