@@ -20,6 +20,8 @@ from modules.group.group_settings import leave_group,invite_command
 from modules.feedback_nd_rating import rate_command,handle_rate_callback
 from modules.group.group_info import info_command
 
+from modules.modles.ai_res import aires
+
 
 import os
 import config
@@ -111,6 +113,10 @@ async def info_commands(bot, update):
         await update.reply_text("You are not allowed to use this command.")
 
 
+@advAiBot.on_message(filters.text)
+async def handle_message(client, message):
+    print(message.text)
+    await aires(client, message)
 
 
 

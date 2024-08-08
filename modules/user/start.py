@@ -45,10 +45,7 @@ button_list = [
 
 
 
-
 async def start(client, message):
-    user_id = message.from_user.id
-    user_db.check_and_add_user(user_id)
     global welcome_text
     global LOGO
     mention = message.from_user.mention
