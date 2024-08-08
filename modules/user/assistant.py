@@ -1,11 +1,15 @@
-
+from pymongo import MongoClient
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Global dictionary for storing current mode per user
-current_mode = {}
+from config import DATABASE_URL
 
+# Initialize the MongoDB client
+mongo_client = MongoClient(DATABASE_URL)
 
+# Access or create the database and collection
+db = mongo_client['aibotdb']
+ai_mode_collection = db['ai_mode']
 
 # Dictionary of modes with labels
 modes = {
@@ -22,11 +26,16 @@ modes = {
 # Function to handle settings assistant callback
 async def settings_assistant_callback(client, callback):
     user_id = callback.from_user.id
-    # Set default value to Chatbot if not set
-    if user_id not in current_mode:
-        current_mode[user_id] = "chatbot"
-
-    current_mode_label = modes[current_mode[user_id]]
+    
+    # Fetch the user's current mode from the database
+    user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
+    if user_mode_doc:
+        current_mode = user_mode_doc['mode']
+    else:
+        current_mode = "chatbot"
+        ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
+    
+    current_mode_label = modes[current_mode]
     message_text = f"Current mode: {current_mode_label}"
 
     keyboard = InlineKeyboardMarkup(
@@ -63,9 +72,15 @@ async def settings_assistant_callback(client, callback):
 async def change_mode_setting(client, callback):
     mode = callback.data.split("_")[1]
     user_id = callback.from_user.id
-    current_mode[user_id] = mode
 
-    current_mode_label = modes[current_mode[user_id]]
+    # Update the user's mode in the database
+    ai_mode_collection.update_one(
+        {"user_id": user_id},
+        {"$set": {"mode": mode}},
+        upsert=True
+    )
+
+    current_mode_label = modes[mode]
     message_text = f"Current mode: {current_mode_label}"
 
     keyboard = InlineKeyboardMarkup(

@@ -1,10 +1,15 @@
 
-
+from pymongo import MongoClient
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import DATABASE_URL
 
-# Global dictionary for storing language settings per user
-language_settings = {}
+# Initialize the MongoDB client
+mongo_client = MongoClient(DATABASE_URL)
+
+# Access or create the database and collection
+db = mongo_client['aibotdb']
+user_lang_collection = db['user_lang']
 
 # Dictionary of languages with flags
 languages = {
@@ -16,16 +21,20 @@ languages = {
     "ru": "🇷🇺 Russian"
 }
 
-
 # Function to handle settings language callback
 async def settings_langs_callback(client, callback):
     user_id = callback.from_user.id
-    # Set default value to English if not set
-    if user_id not in language_settings:
-        language_settings[user_id] = "en"
+    
+    # Fetch the user's current language from the database
+    user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
+    if user_lang_doc:
+        current_language = user_lang_doc['language']
+    else:
+        current_language = "en"
+        user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
 
-    current_language = languages[language_settings[user_id]]
-    message_text = f"Current language: {current_language}"
+    current_language_label = languages[current_language]
+    message_text = f"Current language: {current_language_label}"
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -56,10 +65,17 @@ async def settings_langs_callback(client, callback):
 # Function to handle language setting change
 async def change_language_setting(client, callback):
     user_id = callback.from_user.id
-    language_settings[user_id] = callback.data.split("_")[1]
+    new_language = callback.data.split("_")[1]
 
-    current_language = languages[language_settings[user_id]]
-    message_text = f"Current language: {current_language}"
+    # Update the user's language in the database
+    user_lang_collection.update_one(
+        {"user_id": user_id},
+        {"$set": {"language": new_language}},
+        upsert=True
+    )
+
+    current_language_label = languages[new_language]
+    message_text = f"Current language: {current_language_label}"
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -86,7 +102,6 @@ async def change_language_setting(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-
 
 
 # # Function to handle settings inline
