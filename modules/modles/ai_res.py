@@ -35,7 +35,7 @@ async def aires(client, message):
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history:
             history = user_history['history']
-        else:
+        else: 
             history = [
     {
         "role": "assistant",
@@ -47,7 +47,7 @@ async def aires(client, message):
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
             "growing needs of our users. The current version is V-1.0.1, which includes significant improvements in response accuracy and speed, "
             "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains."
+            "valuable tool for users across various domains."\
         )
     }
 ]

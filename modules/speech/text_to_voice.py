@@ -20,3 +20,10 @@ async def handle_text_message(client: Client, message: types.Message) -> str:
         await message.reply_text(f"Error generating audio file: {e}")
     
     await message.reply_audio(audio_path)
+    os.remove(audio_path)
+
+
+
+
+
+

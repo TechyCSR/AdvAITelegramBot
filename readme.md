@@ -19,7 +19,6 @@ Welcome to the **Telegram Advanced AI ChatBot** project! This bot leverages cutt
 
 - **🔧 Enhanced Personalization:** Adapt responses based on individual user preferences and history.
 - **🗣️ Voice Cloning:** Mimic user-specific voices for more personalized interactions.
-- **😊 Emotion Recognition:** Detect user emotions and respond accordingly.
 - **📊 Advanced Data Analytics:** Provide insights and reports based on user interactions.
 - **🕶️ Augmented Reality (AR):** Integrate AR capabilities for immersive experiences.
 - **🎥 Video Analysis:** Extract information and generate responses based on video content.
