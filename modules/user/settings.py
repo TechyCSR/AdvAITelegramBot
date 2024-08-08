@@ -63,22 +63,18 @@ async def settings_inline(client, callback):
 
 
 
-
-
 async def settings_language_callback(client, callback):
     user_id = callback.from_user.id
     
     # Fetch user voice settings from MongoDB
     user_settings = user_voice_collection.find_one({"user_id": user_id})
+    
+    # Determine the current setting; default to True (Voice) if not set
     voice_enabled = user_settings.get("voice", True) if user_settings else True
 
     # Update the button texts based on the user's current setting
-    if voice_enabled:
-        voice_button_text = "🎙️ Voice ✅"
-        text_button_text = "💬 Text"
-    else:
-        voice_button_text = "🎙️ Voice"
-        text_button_text = "💬 Text ✅"
+    voice_button_text = "🎙️ Voice ✅" if voice_enabled else "🎙️ Voice"
+    text_button_text = "💬 Text" if voice_enabled else "💬 Text ✅"
 
     message_text = f"Current setting: Answering in {'Voice' if voice_enabled else 'Text'} queries only."
 
@@ -106,10 +102,7 @@ async def change_voice_setting(client, callback):
     user_id = callback.from_user.id
     
     # Determine the new voice setting based on the callback data
-    if callback.data == "settings_voice":
-        new_voice_setting = True
-    else:  # "settings_text"
-        new_voice_setting = False
+    new_voice_setting = callback.data == "settings_voice"
 
     # Update the voice setting in MongoDB
     user_voice_collection.update_one(
@@ -118,13 +111,17 @@ async def change_voice_setting(client, callback):
         upsert=True
     )
 
+    # Fetch the updated setting to ensure it is stored correctly
+    updated_settings = user_voice_collection.find_one({"user_id": user_id})
+    voice_enabled = updated_settings.get("voice", True)
+
     # Determine the current setting to display
-    current_setting = "Voice" if new_voice_setting else "Text"
+    current_setting = "Voice" if voice_enabled else "Text"
     message_text = f"Current setting: Answering in {current_setting} queries only."
 
     # Update the button texts with checkmarks
-    voice_button_text = "🎙️ Voice ✅" if new_voice_setting else "🎙️ Voice"
-    text_button_text = "💬 Text" if new_voice_setting else "💬 Text ✅"
+    voice_button_text = "🎙️ Voice ✅" if voice_enabled else "🎙️ Voice"
+    text_button_text = "💬 Text" if voice_enabled else "💬 Text ✅"
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -144,6 +141,8 @@ async def change_voice_setting(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+
+
 
 # Function to handle settings inline
 async def settings_voice_inlines(client, callback):
