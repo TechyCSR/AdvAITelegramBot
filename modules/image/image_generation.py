@@ -80,7 +80,7 @@ async def generate_command(client, message):
     # Generate images
     urls = generate_images(prompt)
 
-    if urls.startswith("Error"):
+    if type(urls) == str:
         await message.reply_text(urls)
         return
     

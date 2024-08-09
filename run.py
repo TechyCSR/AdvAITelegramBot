@@ -144,7 +144,7 @@ async def handle_new_chat(client, message):
     await new_chat(client, message)
 
 
-@advAiBot.on_message(filters.command("img"))
+@advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
 async def handle_generate(client, message):
 
     await generate_command(client, message)
