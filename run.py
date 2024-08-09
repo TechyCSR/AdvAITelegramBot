@@ -49,7 +49,7 @@ async def callback_query(client, callback_query):
         await command_inline(client, callback_query)
     elif callback_query.data == "settings":
         await settings_inline(client, callback_query)
-    elif callback_query.data == "settings_language":
+    elif callback_query.data == "settings_v":
         await settings_language_callback(client, callback_query)
     elif callback_query.data in ["settings_voice", "settings_text"]:
         await change_voice_setting(client, callback_query)

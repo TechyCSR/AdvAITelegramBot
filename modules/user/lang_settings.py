@@ -111,7 +111,7 @@ async def change_language_setting(client, callback):
 #         [
 #             [
 #                 InlineKeyboardButton("🌐 Language", callback_data="settings_language"),
-#                 InlineKeyboardButton("🎙️ Voice", callback_data="settings_voice")
+#                 InlineKeyboardButton("🎙️ Voice", callback_data="settings_v")
 #             ],
 #             [
 #                 InlineKeyboardButton("🤖 Assistant", callback_data="settings_assistant"),
