@@ -20,6 +20,7 @@ from modules.group.group_settings import leave_group,invite_command
 from modules.feedback_nd_rating import rate_command,handle_rate_callback
 from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
+from modules.image.image_generation import generate_command
 
 
 
@@ -143,6 +144,10 @@ async def handle_new_chat(client, message):
     await new_chat(client, message)
 
 
+@advAiBot.on_message(filters.command("img"))
+async def handle_generate(client, message):
+
+    await generate_command(client, message)
 
 
 
