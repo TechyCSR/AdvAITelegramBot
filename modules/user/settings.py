@@ -12,12 +12,13 @@ from config import DATABASE_URL
 
 from pymongo import MongoClient
 
-# Initialize the MongoDB client
-mongo_client = MongoClient(DATABASE_URL)
 
-# Access or create the database and collection
-db = mongo_client['aibotdb']
-user_voice_collection = db['user_voice']
+# Replace with your MongoDB connection string
+client = MongoClient(DATABASE_URL)
+
+# Access your database and collection
+db = client["aibotdb"]
+user_voice_collection = db["user_voice_setting"]
 
 
 # Global dictionary for storing voice settings per user

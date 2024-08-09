@@ -18,7 +18,7 @@ gpt_client = GPTClient()
 def get_response(history):
     try:
         response = gpt_client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=history
         )
         return response.choices[0].message.content
@@ -47,7 +47,7 @@ async def aires(client, message):
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
             "growing needs of our users. The current version is V-1.0.1, which includes significant improvements in response accuracy and speed, "
             "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains."\
+            "valuable tool for users across various domains."
         )
     }
 ]
