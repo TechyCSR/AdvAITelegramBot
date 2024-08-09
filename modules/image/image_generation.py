@@ -92,7 +92,8 @@ async def generate_command(client, message):
     
     # Reply with the generated images in a single group
     await message.reply_media_group(media_group)
-    await message.reply_text(f"Images generated successfully for prompt: {prompt}\n\n**@AdvChatGptBot**")
+
+    await message.reply_text(f"Images generated : {prompt}\n User: {message.from_user.mention}\n**@AdChatGptBot**")
 
 
 

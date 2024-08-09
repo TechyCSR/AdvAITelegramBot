@@ -13,7 +13,7 @@ from modules.user.lang_settings import settings_langs_callback,change_language_s
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
 from modules.speech import  text_to_voice,voice_to_text
-
+from modules.image.img_to_text import extract_text_res
 
 from modules.maintenance import settings_others_callback
 from modules.group.group_settings import leave_group,invite_command
@@ -139,7 +139,7 @@ async def handle_message(bot, update):
 
 
 
-@advAiBot.on_message(filters.command("newchat"))
+@advAiBot.on_message(filters.command(["newchat", "reset","new_conversation","clear_chat","new"]))
 async def handle_new_chat(client, message):
     await new_chat(client, message)
 
@@ -149,6 +149,9 @@ async def handle_generate(client, message):
 
     await generate_command(client, message)
 
+@advAiBot.on_message(filters.photo)
+async def handle_image(bot,update):
+    await extract_text_res(bot, update)
 
 
 advAiBot.run()
