@@ -84,7 +84,7 @@ async def handle_voice_message(client, message):
         "role": "assistant",
         "content": (
             "I am an AI chatbot assistant, developed by CSR(i.e.@TechyCSR) and a dedicated team of students from Lovely Professional University (LPU). "
-            "Our core team includes CSR(@TechyCSR), Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
+            "Our core team also includes Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
             "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
             "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
