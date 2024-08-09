@@ -22,7 +22,8 @@ OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # 
 ADMINS+=[OWNER_ID] # Add the owner ID to the list
 LOG_CHANNEL = os.environ.get('LOG_CHANNEL') or os.getenv("LOG_CHANNEL") or "123456789" # Log Channel ID
 
-DATABASE_URL="mongodb+srv://techycsr:techycsr@cluster0.vo3t2jk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+DATABASE_URL=os.environ.get('DATABASE_URL') or os.getenv("DATABASE_URL") or "DATABASE_URL"
+
 
 #check if all ids are int or not
 for x in ADMINS:
