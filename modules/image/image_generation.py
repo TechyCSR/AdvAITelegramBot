@@ -14,6 +14,7 @@ mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
 user_images_collection = db['user_images']
 
+
 # Function to generate images
 def generate_images(prompt, max_images=3):
     generated_images = 0
