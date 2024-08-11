@@ -83,7 +83,7 @@ async def handle_voice_message(client, message):
     {
         "role": "assistant",
         "content": (
-            "I am an AI chatbot assistant, developed by CSR(i.e.@TechyCSR) and a dedicated team of students from Lovely Professional University (LPU). "
+            "I am an AI chatbot assistant, developed by Team Leader CSR(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
             "Our core team also includes Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
             "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
             "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
@@ -94,6 +94,7 @@ async def handle_voice_message(client, message):
         )
     }
 ]
+            
 
 
         # Add the new user query to the history
