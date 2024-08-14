@@ -154,4 +154,5 @@ async def handle_image(bot,update):
     await extract_text_res(bot, update)
 
 
+
 advAiBot.run()
