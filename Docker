@@ -1,19 +1,14 @@
-FROM python:3.11-alpine
+# Use the official Python image as the base image
+FROM python:3.11
 
-WORKDIR /AdvAITelegramBot
+# Set the working directory in the container
+WORKDIR /app
 
-COPY . /AdvAITelegramBot
+# Copy the application files into the working directory
+COPY . /app
 
+# Install the application dependencies
+RUN pip install -r requirements.txt
 
-
-RUN apk update \
-    &&  apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev git \
-    &&  apk add libffi-dev \
-    &&  apk add --no-cache curl-dev \
-    &&  apk add --no-cache curl \
-    &&  apk add --no-cache libcurl \
-    &&  apk add --no-cache libressl \
-    && pip install --no-cache-dir -r requirements.txt \ 
-    && apk del .build-deps
-
-CMD [ "python", "run.py" ]
+# Define the entry point for the container
+CMD ["python", "run.py"]
