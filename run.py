@@ -155,5 +155,3 @@ async def handle_image(bot,update):
 
 
 advAiBot.run()
-
-
