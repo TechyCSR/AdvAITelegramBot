@@ -4,7 +4,6 @@
 from . import user
 from . import group
 from . import maintenance
-from . import speech
 from . import feedback_nd_rating
 
 
