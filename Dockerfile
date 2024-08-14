@@ -17,3 +17,6 @@ RUN apk update \
     && apk del .build-deps
 
 CMD [ "python", "run.py" ]
+
+EXPOSE 80/tcp
+
