@@ -13,6 +13,7 @@ RUN apk update \
     &&  apk add --no-cache curl \
     &&  apk add --no-cache libcurl \
     &&  apk add --no-cache libressl \
+    &&  apk add --no-cache libsndfile1 \
     && pip install --no-cache-dir -r requirements.txt \ 
     && apk del .build-deps
 
