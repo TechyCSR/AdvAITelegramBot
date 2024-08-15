@@ -28,7 +28,7 @@ import os
 import config
 from datetime import datetime
 
-advAiBot = pyrogram.Client("Adance AI ChatBot", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
+advAiBot = pyrogram.Client("AdanceAIChatBotX", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
