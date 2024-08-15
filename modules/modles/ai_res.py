@@ -13,12 +13,12 @@ db = mongo_client['aibotdb']
 history_collection = db['history']
 
 # Initialize the GPT-4 client
-gpt_client = GPTClient(provider="HuggingChat")
+gpt_client = GPTClient()
 
 def get_response(history):  
     try:
         response = gpt_client.chat.completions.create(
-            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+            model="gpt-3.5-turbo",
             messages=history
         )
         return response.choices[0].message.content
