@@ -1,6 +1,6 @@
 import os
 from pymongo import MongoClient
-import soundfile as sf
+import soundfile as sf #linsorec1 
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
 from config import DATABASE_URL
