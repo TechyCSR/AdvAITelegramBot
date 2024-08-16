@@ -1,11 +1,11 @@
 import os
 from pymongo import MongoClient
-import soundfile as sf #linsorec1 
+from pydub import AudioSegment  # Import AudioSegment from pydub
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
 from config import DATABASE_URL
 
-from  modules.speech.text_to_voice import handle_text_message 
+from modules.speech.text_to_voice import handle_text_message 
 from modules.modles.ai_res import get_response
 
 # Initialize the MongoDB client
@@ -16,10 +16,10 @@ db = mongo_client['aibotdb']
 user_voice_setting_collection = db['user_voice_setting']
 history_collection = db['history']
 
-
 def ogg_to_wav(input_path, output_path):
-    audio, sr = sf.read(input_path)
-    sf.write(output_path, audio, sr, format="WAV")
+    # Use pydub to convert OGG to WAV
+    audio = AudioSegment.from_ogg(input_path)  # Load OGG file
+    audio.export(output_path, format="wav")    # Export as WAV file
 
 async def handle_voice_message(client, message):
     try:
@@ -51,25 +51,22 @@ async def handle_voice_message(client, message):
         os.remove(wav_path)
         os.remove(voice_path)
 
-    
     user_id = message.from_user.id
 
-# Check if the user already exists in the database
+    # Check if the user already exists in the database
     user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
 
-# If user settings exist, retrieve the current setting; otherwise, default to "voice"
-
-
+    # If user settings exist, retrieve the current setting; otherwise, default to "voice"
     if user_settings:
         current_setting = user_settings.get("voice", "voice")
     else:
-    # If user is not found in the database, set the default to "voice"
+        # If user is not found in the database, set the default to "voice"
         current_setting = "voice"
         user_voice_setting_collection.update_one(
             {"user_id": user_id},
             {"$set": {"voice": current_setting}},  # Setting default to "voice"
             upsert=True
-            )
+        )
     try:
         user_id = message.from_user.id
         ask = res
@@ -78,24 +75,22 @@ async def handle_voice_message(client, message):
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history:
             history = user_history['history']
-        else: 
+        else:
             history = [
-    {
-        "role": "assistant",
-        "content": (
-            "I am an AI chatbot assistant, developed by Team Leader CSR(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
-            "Our core team also includes Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
-            "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
-            "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
-            "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
-            "growing needs of our users. The current version is V-1.0.1, which includes significant improvements in response accuracy and speed, "
-            "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains."
-        )
-    }
-]
-            
-
+                {
+                    "role": "assistant",
+                    "content": (
+                        "I am an AI chatbot assistant, developed by Team Leader CSR(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
+                        "Our core team also includes Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
+                        "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
+                        "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
+                        "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
+                        "growing needs of our users. The current version is V-1.0.1, which includes significant improvements in response accuracy and speed, "
+                        "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
+                        "valuable tool for users across various domains."
+                    )
+                }
+            ]
 
         # Add the new user query to the history
         history.append({"role": "user", "content": ask})
@@ -105,7 +100,6 @@ async def handle_voice_message(client, message):
         
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.RECORD_AUDIO)
 
-        
         # Add the AI response to the history
         history.append({"role": "assistant", "content": ai_response})
 
@@ -129,4 +123,3 @@ async def handle_voice_message(client, message):
     print(f"Recognized text: {res}")
 
     await message.reply_text(ai_response)
-
