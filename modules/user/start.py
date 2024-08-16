@@ -46,10 +46,9 @@ button_list = [
 
 
 async def start(client, message):
-    global welcome_text
     global LOGO
-    mention = message.from_user.mention
-    welcome_text = welcome_text.format(user_mention=mention)
+    welcome_tex = welcome_text.format(user_mention = message.from_user.mention)
+
 
 
     # for i in button_list:
@@ -69,7 +68,7 @@ async def start(client, message):
     await client.send_animation(
         chat_id=message.chat.id,
         animation=LOGO,
-        caption=welcome_text,
+        caption=welcome_tex,
         reply_markup=keyboard
     
     )
@@ -78,10 +77,9 @@ async def start(client, message):
 
 
 async def start_inline(bot, callback):
-    global welcome_text
     global LOGO
     mention = callback.from_user.mention
-    welcome_text = welcome_text.format(user_mention=mention)
+    welcome_tex = welcome_text.format(user_mention=mention)
 
     # for i in button_list:
     #     if default_lang !="en":
@@ -100,7 +98,7 @@ async def start_inline(bot, callback):
     await bot.edit_message_caption(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
-        caption=welcome_text,
+        caption=welcome_tex,
         reply_markup=keyboard
     )
     await channel_log(bot, callback.message, "/start")
