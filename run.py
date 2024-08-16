@@ -12,7 +12,7 @@ from modules.user.assistant import settings_assistant_callback,change_mode_setti
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
-from modules.speech import  text_to_voice,voice_to_text
+# from modules.speech import  text_to_voice,voice_to_text
 from modules.image.img_to_text import extract_text_res
 
 from modules.maintenance import settings_others_callback
@@ -21,6 +21,7 @@ from modules.feedback_nd_rating import rate_command,handle_rate_callback
 from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command
+from modules.chatlogs import channel_log, user_log
 
 
 
@@ -79,9 +80,9 @@ async def callback_query(client, callback_query):
     else:
         pass
 
-@advAiBot.on_message(filters.voice)
-async def voice(bot, message):
-    await voice_to_text.handle_voice_message(bot, message)
+# @advAiBot.on_message(filters.voice)
+# async def voice(bot, message):
+#     await voice_to_text.handle_voice_message(bot, message)
 
 # @advAiBot.on_message(filters.text & filters.private & filters.chat()
 # async def handle_text_message(client, message):
@@ -122,7 +123,7 @@ def is_chat_text_filter():
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
-    print(message.text)
+    user_log(client, message, message.text)
     await aires(client, message)
 
 @advAiBot.on_message( filters.text & filters.command("ai") & filters.group)
@@ -131,10 +132,10 @@ async def handle_message(bot, update):
     client=bot
     if len(message.text)>3:
         message.text=message.text[3:]
-        print(message.text)        
     else:
         await message.reply_text("Please provide valid text")
         return
+    channel_log(client, message, message.text)
     await aires(client, message)
 
 
@@ -146,8 +147,15 @@ async def handle_new_chat(client, message):
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
 async def handle_generate(client, message):
+    try:
+        prompt = message.text.split(" ", 1)[1]
+    except IndexError:
+        await message.reply_text("Please provide a prompt to generate images.")
+        return
+    user_log(client, message, prompt)
 
-    await generate_command(client, message)
+
+    await generate_command(client, message, prompt)
 
 @advAiBot.on_message(filters.photo)
 async def handle_image(bot,update):

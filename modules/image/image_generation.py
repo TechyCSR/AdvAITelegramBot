@@ -73,9 +73,10 @@ def update_user_images(user_id, new_image_urls):
         })
 
 # Telegram bot command handler for generating images
-async def generate_command(client, message):
-    prompt = message.text.split(" ", 1)[1]  
-    print(f"Generating images for prompt: {prompt}")
+async def generate_command(client, message, prompt):
+
+    # prompt = message.text.split(" ", 1)[1]  
+    # print(f"Generating images for prompt: {prompt}")
     user_id = message.from_user.id
 
     # Generate images
