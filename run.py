@@ -29,7 +29,7 @@ import os
 import config
 from datetime import datetime
 
-advAiBot = pyrogram.Client("AdanceAIChatBotX", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
+advAiBot = pyrogram.Client("AdanceAIChatBotBeta", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
@@ -123,7 +123,7 @@ def is_chat_text_filter():
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
-    user_log(client, message, message.text)
+    await user_log(client, message, message.text)
     await aires(client, message)
 
 @advAiBot.on_message( filters.text & filters.command("ai") & filters.group)
@@ -135,7 +135,7 @@ async def handle_message(bot, update):
     else:
         await message.reply_text("Please provide valid text")
         return
-    channel_log(client, message, message.text)
+    await user_log(client, message, message.text)
     await aires(client, message)
 
 
@@ -152,7 +152,7 @@ async def handle_generate(client, message):
     except IndexError:
         await message.reply_text("Please provide a prompt to generate images.")
         return
-    user_log(client, message, prompt)
+    await user_log(client, message, prompt)
 
 
     await generate_command(client, message, prompt)
