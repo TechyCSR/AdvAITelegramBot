@@ -1,6 +1,8 @@
 
 
-import pyrogram 
+import os
+import config
+import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from modules.user.start import start , start_inline
@@ -12,9 +14,8 @@ from modules.user.assistant import settings_assistant_callback,change_mode_setti
 from modules.user.lang_settings import settings_langs_callback,change_language_setting
 from modules.user.user_support import settings_support_callback,support_admins_callback
 from modules.user.dev_support import support_developers_callback
-from modules.speech import  text_to_voice,voice_to_text
+# from modules.speech import  text_to_voice,voice_to_text
 from modules.image.img_to_text import extract_text_res
-
 from modules.maintenance import settings_others_callback
 from modules.group.group_settings import leave_group,invite_command
 from modules.feedback_nd_rating import rate_command,handle_rate_callback
@@ -22,11 +23,6 @@ from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
-
-
-
-import os
-import config
 from datetime import datetime
 
 advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
@@ -73,19 +69,17 @@ async def callback_query(client, callback_query):
         await support_admins_callback(client, callback_query)
     elif callback_query.data=="support_developers":
         await support_developers_callback(client, callback_query)
-
     elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
-        await handle_rate_callback(client, callback_query)
-        
+        await handle_rate_callback(client, callback_query) 
     else:
         pass
 
 
 
-@advAiBot.on_message(filters.voice )
-async def voice(bot, message):
-    print("Voice message received")
-    await voice_to_text.handle_voice_message(bot, message)
+# @advAiBot.on_message(filters.voice )
+# async def voice(bot, message):
+#     print("Voice message received")
+#     await voice_to_text.handle_voice_message(bot, message)
 
 
 # @advAiBot.on_message(filters.text & filters.private & filters.chat()
