@@ -1,6 +1,6 @@
 import os
 from pymongo import MongoClient
-from pydub import AudioSegment  # Import AudioSegment from pydub
+import soundfile as sf
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
 from config import DATABASE_URL
@@ -17,9 +17,9 @@ user_voice_setting_collection = db['user_voice_setting']
 history_collection = db['history']
 
 def ogg_to_wav(input_path, output_path):
-    # Use pydub to convert OGG to WAV
-    audio = AudioSegment.from_ogg(input_path)  # Load OGG file
-    audio.export(output_path, format="wav")    # Export as WAV file
+    audio, sr = sf.read(input_path)
+    sf.write(output_path, audio, sr, format="WAV")
+
 
 async def handle_voice_message(client, message):
     try:
@@ -27,12 +27,12 @@ async def handle_voice_message(client, message):
     except Exception:
         file_id = message.audio.file_id
 
-    voice_path = await client.download_media(file_id)
+    voice_path = await client.download_media(file_id) #ogg format
     
     # Convert the voice message to WAV format
     wav_path = voice_path + ".wav"
     ogg_to_wav(voice_path, wav_path)
-
+    # print(f"Converted voice message to WAV format: {wav_path}")
     # Extract text from the WAV file
     recognizer = sr.Recognizer()
     with sr.AudioFile(wav_path) as source:
@@ -50,6 +50,8 @@ async def handle_voice_message(client, message):
     finally:
         os.remove(wav_path)
         os.remove(voice_path)
+    
+    # print(f"Recognized text: {res}")
 
     user_id = message.from_user.id
 
@@ -118,8 +120,5 @@ async def handle_voice_message(client, message):
         # Convert the recognized text to speech
         audio_path = await handle_text_message(client, message, ai_response)
         return
-    
-    # Send the recognized text back to the user
-    print(f"Recognized text: {res}")
 
     await message.reply_text(ai_response)
