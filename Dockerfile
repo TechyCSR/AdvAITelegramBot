@@ -13,7 +13,8 @@ RUN apk update \
     && apk add --no-cache libressl \
     && apk add --no-cache libressl-dev \
     && apk add --no-cache libsndfile \
-    && apk add --no-cache  libsndfile1\
+    && apk add --no-cache libsndfile-dev \
+    && apt-get install libsndfile1\
     && pip install --no-cache-dir -r requirements.txt \
     && apk del .build-deps
 
