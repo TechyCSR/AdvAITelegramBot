@@ -1,21 +1,15 @@
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 WORKDIR /AdvAITelegramBot
 
 COPY . /AdvAITelegramBot
 
-RUN apk update \
-    && apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev git \
-    && apk add --no-cache libffi-dev \
-    && apk add --no-cache curl-dev \
-    && apk add --no-cache curl \
-    && apk add --no-cache libcurl \
-    && apk add --no-cache libressl \
-    && apk add --no-cache libressl-dev \
-    && apk add --no-cache libsndfile \
-    && apk add --no-cache libsndfile-dev \
-    && apt-get install libsndfile1\
+RUN apt-get update \
+    && apt-get install -y libsndfile1 \
+    && apt-get install -y --no-install-recommends gcc libffi-dev curl \
     && pip install --no-cache-dir -r requirements.txt \
-    && apk del .build-deps
+    && apt-get remove -y gcc \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 CMD ["python", "run.py"]
