@@ -74,10 +74,10 @@ async def callback_query(client, callback_query):
 
 
 
-# @advAiBot.on_message(filters.voice )
-# async def voice(bot, message):
-#     print("Voice message received")
-#     await voice_to_text.handle_voice_message(bot, message)
+@advAiBot.on_message(filters.voice )
+async def voice(bot, message):
+    print("Voice message received")
+    await voice_to_text.handle_voice_message(bot, message)
 
 
 
