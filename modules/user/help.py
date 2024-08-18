@@ -16,28 +16,32 @@ from modules.chatlogs import channel_log
 
 help_text = """
 
-**📚 Help Menu**
+**📚 Telegram Advanced AI ChatBot Help Menu**
 
-**Commands:**
-- **/start** - 🚀 Start the Bot
-- **/help** - ❓ Show this Help Menu
-- **/settings** - ⚙️ Configure Bot Settings
-- **/support** - 🛠️ Contact Support Team
-- **/features** - 🌟 View Bot Features
-- **/about** - ℹ️ About This Bot
+**🔧 Commands:**
+- **/start** - 🚀 Launch your AI journey
+- **/help** - ❓ Access this help guide
+- **/settings** - ⚙️ Personalize your experience
+- **/support** - 🛠️ Reach our assistance team
+- **/features** - 🌟 Explore bot capabilities
+- **/about** - ℹ️ Learn about our mission
 
-**Features:**
-- **AI ChatBot (GPT-4)** - 🧠 Intelligent Conversations
-- **AI Speech to Text & Vice Versa** - 🎙️ Seamless Voice Interaction
-- **AI Generative Images (DALL-E Model)** - 🎨 Create Stunning Images
-- **AI Image to Text (Google Lens)** - 🖼️ Extract Text from Images
+**🧠 AI-Powered Features:**
+- **Intelligent ChatBot (GPT-4)** - Engage in dynamic, context-aware conversations
+- **Voice Interaction** - Seamlessly convert speech to text and vice versa
+- **Image Generation (DALL-E)** - Transform your ideas into stunning visuals
+- **Visual Analysis (Google Lens)** - Extract insights and text from any image
 
-**Configuration Options:**
-- **Language Preferences** - 🌐 Multi-Language Support
-- **Notification Settings** - 🔔 Customize Notifications
-- **Privacy Settings** - 🔒 Secure Your Data
+**⚙️ Customization Options:**
+- **🌐 Language Preferences** - Communicate in your preferred language
+- **🔔 Smart Notifications** - Tailor alerts to your needs
+- **🔒 Privacy Controls** - Manage your data securely
 
+💡 **Quick Tip**: Simply start typing to chat with our AI!
 
+Need more help? Use /support to connect with our team.
+
+Enjoy exploring the future of AI communication! 🚀
 
 """
 
