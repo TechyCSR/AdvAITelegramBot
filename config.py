@@ -12,11 +12,11 @@ load_dotenv()
 
 #Preferences os >> env >> default
 
-API_KEY = os.environ.get('API_KEY') or os.getenv('API_ID') or "API_KEY"
+API_KEY = os.environ.get('API_ID') or os.getenv('API_ID') or "API_KEY"
 API_HASH = os.environ.get('API_HASH') or os.getenv("API_HASH")   or "API_HASH"
 BOT_TOKEN = os.environ.get('BOT_TOKEN ') or os.getenv("BOT_TOKEN") or   "BOT_TOKEN"
 ADMINS=[]
-ADMINS = os.environ.get('ADMINS') or os.getenv("ADMIN_IDS") or "123456789"
+ADMINS = os.environ.get('ADMIN_IDS') or os.getenv("ADMIN_IDS") or "123456789"
 ADMINS = ADMINS.split(",") # Split the string and convert it to list
 OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # Owner ID
 ADMINS+=[OWNER_ID] # Add the owner ID to the list
