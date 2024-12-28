@@ -4,7 +4,6 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQ
 
 from config import DATABASE_URL, LOG_CHANNEL
 
-# Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
 
 # Access or create the database and collection

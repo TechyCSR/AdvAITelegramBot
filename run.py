@@ -26,6 +26,8 @@ from modules.chatlogs import channel_log, user_log
 from datetime import datetime
 from modules.user.global_setting import global_setting_command
 
+import stream_page as st
+
 advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
@@ -91,16 +93,16 @@ async def callback_query(client, callback_query):
         pass
 
 
-
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
-    # print("Voice message received")
+    # print("Voice message received") #debug
     await voice_to_text.handle_voice_message(bot, message)
 
 @advAiBot.on_message(filters.command("gleave") )
 async def leave_group_command(bot, update):
     if update.from_user.id in config.ADMINS:
         await leave_group(bot, update)
+        await channel_log(bot, update, "/gleave")
     else:
         await update.reply_text("You are not allowed to use this command.")
 
@@ -112,6 +114,7 @@ async def rate_commands(bot, update):
 async def invite_commands(bot, update):
     if update.from_user.id in config.ADMINS:
         await invite_command(bot, update)
+        await channel_log(bot, update, "/invite")
     else:
         await update.reply_text("You are not allowed to use this command.")
 
@@ -119,26 +122,26 @@ async def invite_commands(bot, update):
 async def info_commands(bot, update):
     if update.from_user.id in config.ADMINS:
         await info_command(bot, update)
+        await channel_log(bot, update, "/uinfo")
     else:
         await update.reply_text("You are not allowed to use this command.")
         
 @advAiBot.on_message( filters.text & filters.command(["ai","ask","say"]) & filters.group)
 async def handle_message(bot, update):
-    message=update
-    client=bot
-    if len(message.text)>3:
-        message.text=message.text[3:]
+    if len(update.text)>3:
+        update.text=update.text[3:]
     else:
-        await message.reply_text("Please provide valid text")
+        await update.reply_text("Please provide valid text")
         return
-    await user_log(client, message, message.text)
-    await aires(client, message)
+    await user_log(bot, update, update.text)
+    await aires(bot, update)
 
 
 
 @advAiBot.on_message(filters.command(["newchat", "reset","new_conversation","clear_chat","new"]))
 async def handle_new_chat(client, message):
     await new_chat(client, message)
+    await channel_log(client, message, "/newchat")
 
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
@@ -161,6 +164,9 @@ async def handle_image(bot,update):
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
     await global_setting_command(bot, update)
+    await channel_log(bot, update, "/settings")
 
 
-advAiBot.run()
+if __name__ == "__main__":
+    
+    advAiBot.run()

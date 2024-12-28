@@ -6,7 +6,6 @@ from config import DATABASE_URL
 from modules.chatlogs import user_log
 
 
-# Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
 
 # Access or create the database and collection
@@ -75,7 +74,7 @@ async def aires(client, message):
 
         # Reply to the user's message with the AI response
         await message.reply_text(ai_response)
-        await user_log(client, message, "User"+ ask + "AI"+ ai_response)
+        await user_log(client, message, "\nUser: "+ ask + ".\n\nAI: "+ ai_response)
 
     except Exception as e:
         await message.reply_text(f"An error occurred: {e}")
@@ -84,7 +83,6 @@ async def aires(client, message):
 async def new_chat(client, message):
     try:
         user_id = message.from_user.id
-
         # Delete user history from MongoDB
         history_collection.delete_one({"user_id": user_id})
 

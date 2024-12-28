@@ -1,7 +1,5 @@
 
 from pyrogram import Client, filters
-
-
 from config import DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -86,8 +84,6 @@ async def global_setting_command(client, message):
         voice_setting=voice_setting,
         mode=current_mode_label,
     )
-
-    #on the keyboard, only onebutton to bot settings
 
     kbd=InlineKeyboardMarkup(
         [

@@ -1,7 +1,6 @@
 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
 from config import LOG_CHANNEL
 
 
@@ -15,7 +14,6 @@ async def info_command(client, message):
         last_name = user.last_name if user.last_name else ""
         username = user.username if user.username else ""
         mention = user.mention(first_name)
-
         info_message = f"User Info:\n\nFirst Name: {first_name}\nLast Name: {last_name}\nUsername: @{username}\nMention: {mention}\nUser ID: {user_id}"
         info_message += f"\n\nAdditional Info:"
         info_message += f"\nStatus: {user.status}"
@@ -24,6 +22,8 @@ async def info_command(client, message):
         info_message += f"\nIs Support: {user.is_support}"
         info_message += f"\nData Center ID: {user.dc_id}"
         info_message += f"\nLanguage Code: {user.language_code}"
+        
         await message.reply_text(info_message)
+
     except Exception as e:
         await message.reply_text(f"Failed to get user info for ID {user_id}.\nError: {e}")

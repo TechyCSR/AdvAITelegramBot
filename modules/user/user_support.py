@@ -18,7 +18,7 @@ async def settings_support_callback(client, CallbackQuery):
             ],
             [
                 InlineKeyboardButton("🌐 Community", url="https://community.link"),
-                InlineKeyboardButton("💰 Donate", callback_data="support_donate")
+                InlineKeyboardButton("💰 Source Code ", url="https://github.com/TechyCSR/AdvAITelegramBot")
             ],
             [
                 InlineKeyboardButton("🔙 Back", callback_data="back")

@@ -27,7 +27,7 @@ Explore the amazing features we have for you:
 - **AI Image to Text (Google Lens)**
 
 
-🚀 **Get started by adding me to your group!** 🚀
+*Get started by adding me to your group!**  🚀
 """
 
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"

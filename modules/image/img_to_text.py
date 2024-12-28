@@ -1,11 +1,9 @@
-
 import requests
 from pyrogram import Client, filters, enums
 from config import OCR_KEY, DATABASE_URL
 from pymongo import MongoClient
 from modules.modles.ai_res import get_response
 
-# Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
 
 # Access or create the database and collection

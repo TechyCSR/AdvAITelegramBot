@@ -3,15 +3,14 @@ from pymongo import MongoClient
 import soundfile as sf
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
-from config import DATABASE_URL
+from config import DATABASE_URL, LOG_CHANNEL
 
 from modules.speech.text_to_voice import handle_text_message 
 from modules.modles.ai_res import get_response
+from modules.chatlogs import user_log
 
-# Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
 
-# Access or create the database and collection
 db = mongo_client['aibotdb']
 user_voice_setting_collection = db['user_voice_setting']
 history_collection = db['history']
@@ -47,9 +46,6 @@ async def handle_voice_message(client, message):
         print(f"Could not request results from Google Speech Recognition service; {e}")
         await message.reply_text("There was an issue with the speech recognition service. Please try again later.")
         return
-    finally:
-        os.remove(wav_path)
-        os.remove(voice_path)
     
     # print(f"Recognized text: {res}")
 
@@ -71,8 +67,6 @@ async def handle_voice_message(client, message):
         )
     try:
         user_id = message.from_user.id
-        ask = res
-
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history:
@@ -95,7 +89,7 @@ async def handle_voice_message(client, message):
             ]
 
         # Add the new user query to the history
-        history.append({"role": "user", "content": ask})
+        history.append({"role": "user", "content": res})
 
         # Get the AI response
         ai_response = get_response(history)
@@ -117,8 +111,18 @@ async def handle_voice_message(client, message):
         print(f"Error in speech Voice2Text function: {e}")
 
     if current_setting == "voice":
-        # Convert the recognized text to speech
+        await client.send_audio(LOG_CHANNEL, wav_path)
         audio_path = await handle_text_message(client, message, ai_response)
+        await user_log(client, message, "\nUser: "+ res + ".\n\nAI: "+ ai_response)
+        os.remove(voice_path)
+        os.remove(wav_path)
         return
 
     await message.reply_text(ai_response)
+
+    # Log the user query and AI response and audio to log channel
+    await client.send_audio(LOG_CHANNEL, wav_path)
+    await user_log(client, message, "\nUser: "+ res + ".\n\nAI: "+ ai_response)
+    os.remove(voice_path)
+    os.remove(wav_path)
+

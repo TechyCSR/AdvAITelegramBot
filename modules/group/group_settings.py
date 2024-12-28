@@ -1,5 +1,3 @@
-
-
 from pyrogram import Client, filters
 import pyrogram.errors
 import asyncio
@@ -7,12 +5,10 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import LOG_CHANNEL as STCLOG
 
 
+
 async def leave_group(client: Client, message):
     chat_id = message.chat.id
     bot_username = (await client.get_me()).username
-
-    
-
     group_id = int(message.command[1])
     
     try:

@@ -18,7 +18,7 @@ user_images_collection = db['user_images']
 
 
 # Function to generate images
-def generate_images(prompt, max_images=3):
+def generate_images(prompt, max_images=5):
     generated_images = 0
     total_attempts = 0
     max_attempts = 2  
@@ -30,16 +30,12 @@ def generate_images(prompt, max_images=3):
         # })
 
         client = ImageClient()
-
         try:
             response = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
                 n=max_images - generated_images 
             )
-
-            # print(response)
-
             for image_data in response.data:
                 image_urls.append(image_data.url)
                 generated_images += 1
@@ -63,9 +59,6 @@ def generate_images(prompt, max_images=3):
 
 # Telegram bot command handler for generating images
 def generate_command(client, message, prompt):
-
-    # prompt = message.text.split(" ", 1)[1]  
-    # print(f"Generating images for prompt: {prompt}")
     user_id = message.from_user.id
 
     # Generate images
