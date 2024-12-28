@@ -7,9 +7,11 @@ from pymongo import MongoClient
 from g4f.client import Client as ImageClient
 from g4f.Provider import BingCreateImages
 from g4f.cookies import set_cookies
-from config import BING_COOKIE, DATABASE_URL
+from config import BING_COOKIE, DATABASE_URL , LOG_CHANNEL
+import requests
+from datetime import datetime
 
-# Initialize the MongoDB client
+
 mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
 user_images_collection = db['user_images']
@@ -23,11 +25,11 @@ def generate_images(prompt, max_images=3):
     image_urls = []
 
     while generated_images < max_images and total_attempts < max_attempts:
-        set_cookies(".bing.com", {
-            "_U": BING_COOKIE
-        })
+        # set_cookies(".bing.com", {
+        #     "_U": BING_COOKIE
+        # })
 
-        client = ImageClient(image_provider=BingCreateImages)
+        client = ImageClient()
 
         try:
             response = client.images.generate(
@@ -35,6 +37,8 @@ def generate_images(prompt, max_images=3):
                 prompt=prompt,
                 n=max_images - generated_images 
             )
+
+            # print(response)
 
             for image_data in response.data:
                 image_urls.append(image_data.url)
@@ -51,29 +55,14 @@ def generate_images(prompt, max_images=3):
 
     if generated_images < max_images:
         print(f"Warning: Only generated {generated_images} out of {max_images} requested images.")
+    
+    image_urls  = [u.replace("/images/", "./generated_images/") for u in image_urls]
 
     return image_urls
 
-# Function to update user's image history in MongoDB
-def update_user_images(user_id, new_image_urls):
-    user_images = user_images_collection.find_one({"user_id": user_id})
-    
-    if user_images:
-        # Keep only the last 3 images
-        updated_images = user_images["images"][-2:] + new_image_urls
-        user_images_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"images": updated_images}}
-        )
-    else:
-        # If user doesn't exist, create a new entry
-        user_images_collection.insert_one({
-            "user_id": user_id,
-            "images": new_image_urls
-        })
 
 # Telegram bot command handler for generating images
-async def generate_command(client, message, prompt):
+def generate_command(client, message, prompt):
 
     # prompt = message.text.split(" ", 1)[1]  
     # print(f"Generating images for prompt: {prompt}")
@@ -81,21 +70,23 @@ async def generate_command(client, message, prompt):
 
     # Generate images
     urls = generate_images(prompt)
-
-    if type(urls) == str:
-        await message.reply_text(urls)
-        return
-    
-    # Update the user's image history
-    update_user_images(user_id, urls)
+    if not urls:
+        message.reply_text("Error generating images. Please try again. or try with different prompt")
+        return 
     
     # Prepare media group (album) to send images as a group
     media_group = [InputMediaPhoto(url,caption=f"Generated images for prompt: {prompt}") for url in urls]
     
     # Reply with the generated images in a single group
-    await message.reply_media_group(media_group)
+    message.reply_media_group(media_group,caption=f"Images generated for prompt: {prompt} \n\nUser: {message.from_user.mention}\n\n**@AdvChatGptBot**")
+    message.reply_text(f"Images generated : {prompt}\n User: {message.from_user.mention}\n**@AdvChatGptBot**")
 
-    await message.reply_text(f"Images generated : {prompt}\n User: {message.from_user.mention}\n**@AdChatGptBot**")
+    #log images to log channel
+    client.send_media_group(LOG_CHANNEL, media_group)
+    client.send_message(LOG_CHANNEL, f"#ImgLog\nImages generated : {prompt}\nUser: {message.from_user.mention}\n user_id: {message.from_user.id} \n time : {datetime.now()} \nchat_id : {message.chat.id} \nuser_id : {message.from_user.id} \n")
+    # delete the image files after sending
+    for url in urls:
+        os.remove(url)
 
 
 

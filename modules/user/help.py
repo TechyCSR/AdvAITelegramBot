@@ -19,17 +19,14 @@ help_text = """
 **📚 Telegram Advanced AI ChatBot Help Menu**
 
 **🔧 Commands:**
-- **/start** - 🚀 Launch your AI journey
+- **/start** - 🚀 Launch your AI journey (works in private only)
 - **/help** - ❓ Access this help guide
 - **/settings** - ⚙️ Personalize your experience
-- **/support** - 🛠️ Reach our assistance team
-- **/features** - 🌟 Explore bot capabilities
-- **/about** - ℹ️ Learn about our mission
 
 **🧠 AI-Powered Features:**
 - **Intelligent ChatBot (GPT-4)** - Engage in dynamic, context-aware conversations
 - **Voice Interaction** - Seamlessly convert speech to text and vice versa
-- **Image Generation (DALL-E)** - Transform your ideas into stunning visuals
+- **Image Generation (DALL-E 3)** - Transform your ideas into stunning visuals
 - **Visual Analysis (Google Lens)** - Extract insights and text from any image
 
 **⚙️ Customization Options:**
@@ -39,9 +36,7 @@ help_text = """
 
 💡 **Quick Tip**: Simply start typing to chat with our AI!
 
-Need more help? Use /support to connect with our team.
-
-Enjoy exploring the future of AI communication! 🚀
+Enjoy exploring the future of AI communication! 
 
 """
 

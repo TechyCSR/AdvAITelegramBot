@@ -11,20 +11,18 @@ from modules.chatlogs import channel_log
 from modules.lang import translate_to_lang, default_lang
 
 
-command__text = """
-**Commands:**
+command__text = """**Commands:**
 - **/start** - 🚀 Start the Bot
 - **/help** - ❓ Show this Help Menu
 - **/settings** - ⚙️ Configure Bot Settings
-- **/support** - 🛠️ Contact Support Team
 
 **Features:**
 - **AI ChatBot (GPT-4)** - 🧠 Intelligent Conversations
 - **AI Speech to Text & Vice Versa** - 🎙️ Seamless Voice Interaction
-- **AI Generative Images (DALL-E Model)** - 🎨 Create Stunning Images
+- **AI Generative Images (DALL-E 3 Model)** - 🎨 Create Stunning Images
 - **AI Image to Text (Google Lens)** - 🖼️ Extract Text from Images
-
-"""
+- **Mutiple Modes** - 🔄 Change ChatBot Modes
+- **Can be added to Groups** - 👥 Enable in Group Chats"""
 
 async def command_inline(client, callback):
     global command__text
@@ -40,5 +38,6 @@ async def command_inline(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+    
 
 

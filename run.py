@@ -4,7 +4,7 @@ import os
 import config
 import pyrogram
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup ,InputMediaPhoto
 from modules.user.start import start , start_inline
 from modules.user.help import help ,help_inline
 from modules.user.commands import command_inline
@@ -24,6 +24,7 @@ from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
 from datetime import datetime
+from modules.user.global_setting import global_setting_command
 
 advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
@@ -34,6 +35,19 @@ async def start_command(bot, update):
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
     await help(bot, update)
+
+
+def is_chat_text_filter():
+    async def funcc(_, __, update):
+        if bool(update.text):
+            return not update.text.startswith("/")
+        return False
+    return filters.create(funcc)
+
+@advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
+async def handle_message(client, message):
+    await user_log(client, message, message.text)
+    await aires(client, message)
 
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
@@ -76,10 +90,8 @@ async def callback_query(client, callback_query):
 
 @advAiBot.on_message(filters.voice )
 async def voice(bot, message):
-    print("Voice message received")
+    # print("Voice message received")
     await voice_to_text.handle_voice_message(bot, message)
-
-
 
 @advAiBot.on_message(filters.command("gleave") )
 async def leave_group_command(bot, update):
@@ -105,20 +117,8 @@ async def info_commands(bot, update):
         await info_command(bot, update)
     else:
         await update.reply_text("You are not allowed to use this command.")
-
-def is_chat_text_filter():
-    async def funcc(_, __, update):
-        if bool(update.text):
-            return not update.text.startswith("/")
-        return False
-    return filters.create(funcc)
-
-@advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
-async def handle_message(client, message):
-    await user_log(client, message, message.text)
-    await aires(client, message)
-
-@advAiBot.on_message( filters.text & filters.command("ai") & filters.group)
+        
+@advAiBot.on_message( filters.text & filters.command(["ai","ask","say"]) & filters.group)
 async def handle_message(bot, update):
     message=update
     client=bot
@@ -138,21 +138,25 @@ async def handle_new_chat(client, message):
 
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
-async def handle_generate(client, message):
+def handle_generate(client, message):
     try:
         prompt = message.text.split(" ", 1)[1]
     except IndexError:
-        await message.reply_text("Please provide a prompt to generate images.")
+        message.reply_text("Please provide a prompt to generate images.")
         return
-    await user_log(client, message, prompt)
-
-
-    await generate_command(client, message, prompt)
+    temp= message.reply_text("Generating images. Please wait...")
+    generate_command(client, message, prompt)
+    temp.delete()   
 
 @advAiBot.on_message(filters.photo)
 async def handle_image(bot,update):
+    if update.from_user.id == bot.me.id:
+        return
     await extract_text_res(bot, update)
 
+@advAiBot.on_message(filters.command("settings"))
+async def settings_command(bot, update):
+    await global_setting_command(bot, update)
 
 
 advAiBot.run()

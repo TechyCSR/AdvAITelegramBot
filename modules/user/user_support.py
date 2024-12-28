@@ -5,7 +5,7 @@ from config import ADMINS as admin_ids
 
 
 
-print(admin_ids)
+# print(admin_ids)
 # Function to handle settings support callback
 async def settings_support_callback(client, CallbackQuery):
     message_text = "🔧 **Support Options** 🔧\n\nSelect an option to get help or support."

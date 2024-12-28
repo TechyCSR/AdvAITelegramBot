@@ -139,6 +139,7 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
+.tests/
 /site
 
 # mypy

@@ -112,3 +112,10 @@ async def change_mode_setting(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+
+def current_mode(user_id):
+    user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
+    if user_mode_doc:
+        return user_mode_doc['mode']
+    else:
+        return "chatbot"
