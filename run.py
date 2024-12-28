@@ -26,7 +26,6 @@ from modules.chatlogs import channel_log, user_log
 from datetime import datetime
 from modules.user.global_setting import global_setting_command
 
-
 advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
@@ -166,6 +165,5 @@ async def settings_command(bot, update):
     await channel_log(bot, update, "/settings")
 
 
-# if __name__ == "__main__":
-    
-#     advAiBot.run()
+if __name__ == "__main__":
+    advAiBot.run()
