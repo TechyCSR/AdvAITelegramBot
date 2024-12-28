@@ -71,7 +71,7 @@ def generate_command(client, message, prompt):
     media_group = [InputMediaPhoto(url,caption=f"Generated images for prompt: {prompt}") for url in urls]
     
     # Reply with the generated images in a single group
-    message.reply_media_group(media_group,caption=f"Images generated for prompt: {prompt} \n\nUser: {message.from_user.mention}\n\n**@AdvChatGptBot**")
+    message.reply_media_group(media_group)
     message.reply_text(f"Images generated : {prompt}\n User: {message.from_user.mention}\n**@AdvChatGptBot**")
 
     #log images to log channel
