@@ -42,6 +42,15 @@ modes = {
     "translator": "Translator"
 }
 
+languages = {
+    "en": "🇬🇧 English",
+    "hi": "🇮🇳 Hindi",
+    "zh": "🇨🇳 Chinese",
+    "ar": "🇸🇦 Arabic",
+    "fr": "🇫🇷 French",
+    "ru": "🇷🇺 Russian"
+}
+
 settings_text = """
 **Setting Menu for User {mention}**
 
@@ -93,6 +102,7 @@ You can change your settings from below options.
     
     current_mode_label = modes[current_mode]
 
+    current_language=languages[current_language]
     settings_text = settings_text.format(
         mention=callback.from_user.mention,
         user_id=callback.from_user.id,
