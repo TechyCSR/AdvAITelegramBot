@@ -3,6 +3,7 @@ from pymongo import MongoClient
 from pyrogram import Client, filters, enums
 from g4f.client import Client as GPTClient
 from config import DATABASE_URL
+from modules.chatlogs import user_log
 
 
 # Initialize the MongoDB client
@@ -74,6 +75,7 @@ async def aires(client, message):
 
         # Reply to the user's message with the AI response
         await message.reply_text(ai_response)
+        await user_log(client, message, "User"+ ask + "AI"+ ai_response)
 
     except Exception as e:
         await message.reply_text(f"An error occurred: {e}")

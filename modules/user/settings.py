@@ -252,6 +252,8 @@ You can change your settings from below options.
         ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
     
     current_mode_label = modes[current_mode]
+    current_language=languages[current_language]
+
 
     settings_text = settings_text.format(
         mention=callback.from_user.mention,

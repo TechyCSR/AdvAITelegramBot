@@ -1,27 +1,22 @@
-
-
-
 import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-
-
-
 from modules.lang import translate_to_lang, default_lang
 from modules.chatlogs import channel_log
 
 
 help_text = """
 
-**📚 Telegram Advanced AI ChatBot Help Menu**
+**📚 Telegram @AdvChatGptBot 's Help Menu**
 
 **🔧 Commands:**
-- **/start** - 🚀 Launch your AI journey (works in private only)
 - **/help** - ❓ Access this help guide
 - **/settings** - ⚙️ Personalize your experience
+- **/new or /newchat ** - 🔄 Start a New Chat and Clear Previous Chat History
+
 
 **🧠 AI-Powered Features:**
 - **Intelligent ChatBot (GPT-4)** - Engage in dynamic, context-aware conversations
@@ -50,8 +45,6 @@ async def help(client, message):
         text=help_text,
         disable_web_page_preview=True
     )
-    await channel_log(client, message, "/help")
-
 async def help_inline(bot, callback):
     global help_text
     keyboard=InlineKeyboardMarkup(
@@ -72,7 +65,6 @@ async def help_inline(bot, callback):
         disable_web_page_preview=True
     )
 
-    await channel_log(bot, callback.message, "/help")
     await callback.answer()
     return
     

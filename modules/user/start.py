@@ -17,17 +17,17 @@ global LOGO
 welcome_text = """
 **Hey {user_mention}!** 
 
-Welcome to the **Telegram Advanced AI ChatBot**! 🌟
+Welcome to the **Advanced AI ChatBot**! 🌟
 
 Explore the amazing features we have for you:
-- **AI ChatBot (GPT-4)**
+
+- **AI ChatBot (GPT-4o and GPT-4o-mini)**
 - **AI Speech to Text & Vice Versa**
-- **AI Generative Images (DALL-E Model)**
+- **AI Generative Images (DALL-E 3 Model)**
 - **AI Image to Text (Google Lens)**
 
-Let's get started and experience the future of AI-powered conversations! 🚀
 
-
+🚀 **Get started by adding me to your group!** 🚀
 """
 
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"
@@ -72,7 +72,6 @@ async def start(client, message):
         reply_markup=keyboard
     
     )
-    await channel_log(client, message, "/start")
 
 
 
@@ -101,5 +100,4 @@ async def start_inline(bot, callback):
         caption=welcome_tex,
         reply_markup=keyboard
     )
-    await channel_log(bot, callback.message, "/start")
 

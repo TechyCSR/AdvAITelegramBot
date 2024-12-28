@@ -15,6 +15,7 @@ command__text = """**Commands:**
 - **/start** - 🚀 Start the Bot
 - **/help** - ❓ Show this Help Menu
 - **/settings** - ⚙️ Configure Bot Settings
+- **/new or /newchat ** - 🔄 Start a New Chat and Clear Previous Chat History
 
 **Features:**
 - **AI ChatBot (GPT-4)** - 🧠 Intelligent Conversations

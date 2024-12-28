@@ -31,10 +31,13 @@ advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
     await start(bot, update)
+    await channel_log(bot, update, "/start")
+
 
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
     await help(bot, update)
+    await channel_log(bot, update, "/help")
 
 
 def is_chat_text_filter():
@@ -46,8 +49,9 @@ def is_chat_text_filter():
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
-    await user_log(client, message, message.text)
     await aires(client, message)
+
+
 
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
@@ -88,7 +92,7 @@ async def callback_query(client, callback_query):
 
 
 
-@advAiBot.on_message(filters.voice )
+@advAiBot.on_message(filters.voice)
 async def voice(bot, message):
     # print("Voice message received")
     await voice_to_text.handle_voice_message(bot, message)

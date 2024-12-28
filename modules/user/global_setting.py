@@ -26,6 +26,15 @@ modes = {
     "translator": "Translator"
 }
 
+languages = {
+    "en": "🇬🇧 English",
+    "hi": "🇮🇳 Hindi",
+    "zh": "🇨🇳 Chinese",
+    "ar": "🇸🇦 Arabic",
+    "fr": "🇫🇷 French",
+    "ru": "🇷🇺 Russian"
+}
+
 global_settings_text = """
 **Setting Menu for User {mention}**
 
@@ -67,6 +76,8 @@ async def global_setting_command(client, message):
         ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
     
     current_mode_label = modes[current_mode]
+    current_language=languages[current_language]
+
 
     global_settings_text = global_settings_text.format(
         mention=message.from_user.mention,
