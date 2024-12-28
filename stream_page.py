@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit.components.v1 import html
+from run import advAiBot
 
 # Set up page configuration
 st.set_page_config(
@@ -127,3 +128,5 @@ st.markdown(
 )
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+advAiBot.run()
