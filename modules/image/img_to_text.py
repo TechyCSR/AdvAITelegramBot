@@ -4,6 +4,8 @@ from config import OCR_KEY, DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from modules.modles.ai_res import get_response
 from modules.chatlogs import user_log
+import os
+
 
 mongo_client = MongoClient(DATABASE_URL)
 
@@ -93,7 +95,9 @@ async def extract_text_res(bot, update):
         await update.reply_text(ai_response+"\n\n**Beta Verion Feature @AdvChatGptBot**")
         #log photo and text
         await bot.send_photo(chat_id=LOG_CHANNEL, photo=file)
+
         await user_log(bot, update, "#Image\n"+extracted_text+"\n"+ai_response)
+        os.remove(file)
 
     except Exception as e:
         await update.reply_text(f"An error occurred: {e}")
