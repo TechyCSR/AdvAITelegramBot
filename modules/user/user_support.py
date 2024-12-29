@@ -3,12 +3,34 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 
 from config import ADMINS as admin_ids
 
+support_text="""
+About the bot:
+
+**Suports Image to Text, Text to Image, Voice to Text, Text to Voice, Chatbot, and many more features.**
+
+**Version:** V-2.O
+**ChatGpt Model:** [Gpt-4o and Gpt-4o-mini (OpenAi)](https://chat.openai.com/)
+**Image Generation Model:** [DALL-E-3 Model](https://openai.com/dall-e/)
+**Voice Generation Model:** [Google Speech to Text](https://cloud.google.com/speech-to-text)
+**Voice Recognition Model:** [Google Text to Speech](https://cloud.google.com/text-to-speech)
+**Image to Text Model:** [OCR](https://ocr.space/ocrapi)
+**Databse:** [MongoDB](https://www.mongodb.com)
+**Hosting:** [Railway](https://railway.app)
+**Source Code:** [GitHub](https://github.com/TechyCSR/AdvAITelegramBot)
+
+**Support Options:**
+
+
+
+
+"""
+
 
 
 # print(admin_ids)
 # Function to handle settings support callback
 async def settings_support_callback(client, CallbackQuery):
-    message_text = "🔧 **Support Options** 🔧\n\nSelect an option to get help or support."
+    # message_text = "🔧 **Support Options** 🔧\n\nSelect an option to get help or support."
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -17,8 +39,8 @@ async def settings_support_callback(client, CallbackQuery):
                 InlineKeyboardButton("💻 Developers", callback_data="support_developers")
             ],
             [
-                InlineKeyboardButton("🌐 Community", url="https://community.link"),
-                InlineKeyboardButton("💰 Source Code ", url="https://github.com/TechyCSR/AdvAITelegramBot")
+                InlineKeyboardButton("🌐 Community", url="https://t.me/AdvChatGpt"),
+                InlineKeyboardButton("⌨ Source Code", url="https://github.com/TechyCSR/AdvAITelegramBot")
             ],
             [
                 InlineKeyboardButton("🔙 Back", callback_data="back")
@@ -27,7 +49,7 @@ async def settings_support_callback(client, CallbackQuery):
     )
 
     await CallbackQuery.message.edit(
-        text=message_text,
+        text=support_text,
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
