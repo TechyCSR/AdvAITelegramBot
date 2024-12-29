@@ -25,9 +25,10 @@ async def user_log(client, message,prompt):
         text=f"""
 **User:** [{message.from_user.first_name}](tg://user?id={message.from_user.id})
 
-**#Convo:** `{prompt}`
+**#Convo:** {prompt}
 
 **Date:** `{datetime.now()}`
+
 **Chat ID:** `{message.chat.id}`
 """
     )

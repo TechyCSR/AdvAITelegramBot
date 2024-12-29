@@ -1,8 +1,5 @@
-
-
 import os
 import sys
-
 import time
 import datetime
 from dotenv import load_dotenv
@@ -37,11 +34,7 @@ for x in ADMINS:
 if not OWNER_ID.isdigit():  
     sys.exit("Please enter a valid integer ID value, Check your OWNER_ID")
 
-#convert all ids to int
 ADMINS = list(map(int, ADMINS))
 OWNER_ID = int(OWNER_ID)
-
-
-
 BOT_NAME = os.environ.get('BOT_NAME') or os.getenv("BOT_NAME") or "Adance AI ChatBot"
 

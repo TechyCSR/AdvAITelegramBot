@@ -21,7 +21,7 @@ async def support_developers_callback(client,  CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("CSR", url='https://t.me/TechyCSR')
+                InlineKeyboardButton("CHANDAN SINGH", url='https://t.me/TechyCSR')
             ],
             [
                 InlineKeyboardButton("Ankit", url=f"https://t.me/@me0w_v"),

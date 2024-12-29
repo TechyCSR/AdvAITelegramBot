@@ -60,6 +60,8 @@ settings_text = """
 **User Mode**: {mode}
 
 You can change your settings from below options.
+
+**@AdvChatGptBot**
 """
 
 
@@ -74,6 +76,8 @@ async def settings_inline(client, callback):
 **User Mode**: {mode}
 
 You can change your settings from below options.
+
+**@AdvChatGptBot**
 """
 
     user_id = callback.from_user.id
@@ -225,6 +229,8 @@ async def settings_voice_inlines(client, callback):
 **User Mode**: {mode}
 
 You can change your settings from below options.
+
+**@AdvChatGptBot**
 """
 
     user_id = callback.from_user.id

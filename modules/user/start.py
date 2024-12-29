@@ -17,7 +17,7 @@ global LOGO
 welcome_text = """
 **Hey {user_mention}!** 
 
-Welcome to the **Advanced AI ChatBot**! 🌟
+Welcome to the **Advanced ChatGpt Bot**! 🌟
 
 Explore the amazing features we have for you:
 
@@ -25,9 +25,11 @@ Explore the amazing features we have for you:
 - **AI Speech to Text & Vice Versa**
 - **AI Generative Images (DALL-E 3 Model)**
 - **AI Image to Text (Google Lens)**
+- **AI ChatBot in Groups**
 
+And much more, to know more about the bot, click the button below:
 
-*Get started by adding me to your group!**  🚀
+**@AdvChatGptBot**
 """
 
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"

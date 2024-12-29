@@ -12,18 +12,30 @@ from modules.lang import translate_to_lang, default_lang
 
 
 command__text = """**Commands:**
+
+**You directly start typing to chat with AI.**
+
+**Here are some commands you can use to control the bot:**
+
 - **/start** - 🚀 Start the Bot
-- **/help** - ❓ Show this Help Menu
+- **/ai** - 🤖 Start a Chat with AI in Groups
+(Eg: `/ai what is the capital of India?`)
+- **/img or /image** - 🖼️ Generate image from given prompt
 - **/settings** - ⚙️ Configure Bot Settings
 - **/new or /newchat ** - 🔄 Start a New Chat and Clear Previous Chat History
+- **/rate** - ⭐ Rate the Bot
+- **/help** - ❓ Show this Help Menu
 
-**Features:**
-- **AI ChatBot (GPT-4)** - 🧠 Intelligent Conversations
-- **AI Speech to Text & Vice Versa** - 🎙️ Seamless Voice Interaction
-- **AI Generative Images (DALL-E 3 Model)** - 🎨 Create Stunning Images
-- **AI Image to Text (Google Lens)** - 🖼️ Extract Text from Images
-- **Mutiple Modes** - 🔄 Change ChatBot Modes
-- **Can be added to Groups** - 👥 Enable in Group Chats"""
+
+**Voice and Image Commands:**
+
+Directly record a voice message or send an image to chat with AI.
+In group send image with caption "ai" or "ask" to extract text from image and send it to ai.
+
+Eg: `/img Sunset on a beach` or `/image Sunset on a beach` |
+
+**@AdvChatGptBot**
+"""
 
 async def command_inline(client, callback):
     global command__text

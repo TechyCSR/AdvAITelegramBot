@@ -25,7 +25,7 @@ from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
 from modules.user.global_setting import global_setting_command
 
-advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
+advAiBot = pyrogram.Client("AdvChatGptBot", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
@@ -156,7 +156,15 @@ def handle_generate(client, message):
 async def handle_image(bot,update):
     if update.from_user.id == bot.me.id:
         return
-    await extract_text_res(bot, update)
+    if update.chat.type == "private":
+        await extract_text_res(bot, update)
+    else:
+        #chheck if caption is contains command "ai" or Ai or AI or ask or Ask or ASK
+        if update.caption:
+            if "ai" in update.caption.lower() or "ask" in update.caption.lower():
+                await extract_text_res(bot, update)
+        else:
+            return
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):

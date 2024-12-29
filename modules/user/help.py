@@ -9,14 +9,7 @@ from modules.chatlogs import channel_log
 
 
 help_text = """
-
 **📚 Telegram @AdvChatGptBot 's Help Menu**
-
-**🔧 Commands:**
-- **/help** - ❓ Access this help guide
-- **/settings** - ⚙️ Personalize your experience
-- **/new or /newchat ** - 🔄 Start a New Chat and Clear Previous Chat History
-
 
 **🧠 AI-Powered Features:**
 - **Intelligent ChatBot (GPT-4)** - Engage in dynamic, context-aware conversations
@@ -29,10 +22,13 @@ help_text = """
 - **🔔 Smart Notifications** - Tailor alerts to your needs
 - **🔒 Privacy Controls** - Manage your data securely
 
-💡 **Quick Tip**: Simply start typing to chat with our AI!
+**Commands:**
+- **/start** -Start the Bot
+- **/ai** - Start a Chat with AI in Groups 
+- **/img or /image** - Generate Text from Image
+- **/new or /newchat ** - Start a New Chat and Clear Previous Chat History
 
-Enjoy exploring the future of AI communication! 
-
+**@AdvChatGptBot**
 """
 
 

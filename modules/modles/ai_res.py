@@ -28,9 +28,9 @@ def get_response(history):
 
 async def aires(client, message):
     try:
+        temp =await message.reply_text("typing....")
         user_id = message.from_user.id
         ask = message.text
-
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history:
@@ -40,14 +40,14 @@ async def aires(client, message):
     {
         "role": "assistant",
         "content": (
-            "I am an AI chatbot assistant, developed by CHANDAN SINGH(i.e.@TechyCSR) and a dedicated team of students from Lovely Professional University (LPU). "
+            "I am an AI chatbot assistant, developed by CHANDAN SINGH(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
             "Our core team also includes Ankit and Aarushi. who have all worked together to create a bot that facilitates user tasks and "
             "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
             "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
             "growing needs of our users. The current version is V-2.O, which includes significant improvements in response accuracy and speed, "
             "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains."
+            "valuable tool for users across various domains. To Reach out CHANDAN SINGH, you can contact him on techycsr.me or on his email csr.info.in@gmail.comv."
         )
     }
 ]
@@ -72,9 +72,9 @@ async def aires(client, message):
             upsert=True
         )
 
-        # Reply to the user's message with the AI response
-        await message.reply_text(ai_response)
-        await user_log(client, message, "\nUser: "+ ask + ".\n\nAI: "+ ai_response)
+        # edit to the user's message with the AI response
+        await temp.edit_text(ai_response)
+        await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
         await message.reply_text(f"An error occurred: {e}")

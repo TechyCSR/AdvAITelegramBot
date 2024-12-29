@@ -1,8 +1,9 @@
 import requests
 from pyrogram import Client, filters, enums
-from config import OCR_KEY, DATABASE_URL
+from config import OCR_KEY, DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from modules.modles.ai_res import get_response
+from modules.chatlogs import user_log
 
 mongo_client = MongoClient(DATABASE_URL)
 
@@ -12,7 +13,10 @@ history_collection = db['history']
 
 async def extract_text_res(bot, update):
     processing_msg = await update.reply("ᴇxᴛʀᴀᴄᴛɪɴɢ ᴛᴇxᴛ ꜰʀᴏᴍ ɪᴍᴀɢᴇ...")
-
+    if update.caption:
+        caption = update.caption[3:]
+    else:
+        caption = ""
     # Get the largest available version of the image
     if isinstance(update.photo, list):
         photo = update.photo[-1]
@@ -37,13 +41,12 @@ async def extract_text_res(bot, update):
         text = f"Error: Failed to extract text from image. {error_message}"
         await update.reply_photo(photo=file, caption=text + "\nNo text found")
         return
-    
-    # Send the extracted text as a reply
+    extracted_text = extracted_text + caption
     await processing_msg.delete()
 
     try:
         user_id = update.from_user.id
-        ask = extracted_text
+        ask = extracted_text 
 
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
@@ -54,14 +57,14 @@ async def extract_text_res(bot, update):
     {
         "role": "assistant",
         "content": (
-            "I am an AI chatbot assistant, developed by CSR(i.e.@TechyCSR) and a dedicated team of students from Lovely Professional University (LPU). "
-            "Our core team also includes Ankit, Aarushi, and Yashvi, who have all worked together to create a bot that facilitates user tasks and "
+            "I am an AI chatbot assistant, developed by CHANDAN SINGH(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
+            "Our core team also includes Ankit and Aarushi who have all worked together to create a bot that facilitates user tasks and "
             "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
             "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
-            "growing needs of our users. The current version is V-1.0.1, which includes significant improvements in response accuracy and speed, "
+            "growing needs of our users. The current version is V-2.O, which includes significant improvements in response accuracy and speed, "
             "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains."
+            "valuable tool for users across various domains. To Reach out CHANDAN SINGH, you can contact him on techycsr.me or on his email csr.info.in@gmail.com"
         )
     }
 ]
@@ -87,7 +90,10 @@ async def extract_text_res(bot, update):
         )
 
         # Reply to the user's message with the AI response
-        await update.reply_text(ai_response)
+        await update.reply_text(ai_response+"\n\n**Beta Verion Feature @AdvChatGptBot**")
+        #log photo and text
+        await bot.send_photo(chat_id=LOG_CHANNEL, photo=file)
+        await user_log(bot, update, "#Image\n"+extracted_text+"\n"+ai_response)
 
     except Exception as e:
         await update.reply_text(f"An error occurred: {e}")

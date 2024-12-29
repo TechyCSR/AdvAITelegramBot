@@ -42,6 +42,8 @@ global_settings_text = """
 **User mode**: {mode}
 
 You can change your settings from @AdvChatGptBot's settings menu.
+
+**@AdvChatGptBot**
 """
 
 

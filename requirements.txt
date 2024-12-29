@@ -9,8 +9,3 @@ SpeechRecognition== 3.10.0
 gTTS==2.3.2
 numpy
 pymongo
-
-
-
-#export PYTHONPATH=/home/csr/Documents/WebD/AdvAITelegramBot
-

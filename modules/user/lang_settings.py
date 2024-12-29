@@ -104,27 +104,3 @@ async def change_language_setting(client, callback):
     )
 
 
-# # Function to handle settings inline
-# async def settings_inline(client, callback):
-#     global settings_text
-#     keyboard = InlineKeyboardMarkup(
-#         [
-#             [
-#                 InlineKeyboardButton("🌐 Language", callback_data="settings_language"),
-#                 InlineKeyboardButton("🎙️ Voice", callback_data="settings_v")
-#             ],
-#             [
-#                 InlineKeyboardButton("🤖 Assistant", callback_data="settings_assistant"),
-#                 InlineKeyboardButton("🔧 Others", callback_data="settings_others")
-#             ],
-#             [
-#                 InlineKeyboardButton("🔙 Back", callback_data="back")
-#             ]
-#         ]
-#     )
-#     await callback.message.edit(
-#         text=settings_text,
-#         reply_markup=keyboard,
-#         disable_web_page_preview=True
-#     )
-
