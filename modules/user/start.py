@@ -31,6 +31,7 @@ Explore the amazing features we have for you:
 """
 
 LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"
+LOGO="./assets/logos/logo6.gif"
 
 
 button_list = [

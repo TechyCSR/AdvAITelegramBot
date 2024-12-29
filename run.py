@@ -23,7 +23,6 @@ from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
-from datetime import datetime
 from modules.user.global_setting import global_setting_command
 
 advAiBot = pyrogram.Client("AdvAIChatBotDev", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)

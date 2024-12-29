@@ -2,7 +2,6 @@ import os
 from pymongo import MongoClient
 from config import DATABASE_URL
 
-# Initialize the MongoDB client
 client = MongoClient(DATABASE_URL)
 db = client['aibotdb']
 users_collection = db['users']
