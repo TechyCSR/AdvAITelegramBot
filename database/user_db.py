@@ -26,7 +26,7 @@ async def check_and_add_user(user_id):
     """Check if a user ID exists in the users collection, and add it if it doesn't."""
     user = users_collection.find_one({"user_id": user_id})
     if not user:
-        await users_collection.insert_one({"user_id": user_id})
+        users_collection.insert_one({"user_id": user_id})
         print(f"User ID {user_id} was added to the users collection.")
 
 def drop_user_id(user_id):
