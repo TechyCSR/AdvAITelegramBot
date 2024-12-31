@@ -52,8 +52,8 @@ def generate_images(prompt, max_images=5):
     if generated_images < max_images:
         print(f"Warning: Only generated {generated_images} out of {max_images} requested images.")
     
-    # image_urls  = [u.replace("/images/", "./generated_images/") for u in image_urls]
-
+    image_urls  = [u.replace("/images/", "./generated_images/") for u in image_urls]
+    print(image_urls)
     return image_urls
 
 
