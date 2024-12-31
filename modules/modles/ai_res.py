@@ -13,12 +13,12 @@ db = mongo_client['aibotdb']
 history_collection = db['history']
 
 # Initialize the GPT-4 client
-gpt_client = GPTClient()
+gpt_client = GPTClient(provider="Mhystical")
 
 def get_response(history):  
     try:
         response = gpt_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=history
         )
         return response.choices[0].message.content
