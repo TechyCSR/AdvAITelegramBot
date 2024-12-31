@@ -32,8 +32,8 @@ And much more, to know more about the bot, click the button below:
 **@AdvChatGptBot**
 """
 
-LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4"
-# LOGO="./assets/logos/logo3.gif"
+# LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4" # GIF (Not using now)
+LOGO="./assets/logos/logo1.gif"
 
 
 button_list = [
@@ -64,8 +64,8 @@ async def start(client, message):
         [InlineKeyboardButton( button_list[1], callback_data="commands"),
          InlineKeyboardButton(button_list[2], callback_data="help")],
         [InlineKeyboardButton(button_list[3], callback_data="settings"),
-         InlineKeyboardButton(button_list[4], callback_data="support")],
-        [InlineKeyboardButton(button_list[5], callback_data="info")]
+         InlineKeyboardButton(button_list[4], callback_data="support")]
+        
     ])
     # Send the welcome message with the GIF and the keyboard
     await client.send_animation(
@@ -93,8 +93,7 @@ async def start_inline(bot, callback):
         [InlineKeyboardButton(button_list[1], callback_data="commands"),
          InlineKeyboardButton(button_list[2], callback_data="help")],
         [InlineKeyboardButton(button_list[3], callback_data="settings"),
-         InlineKeyboardButton(button_list[4], callback_data="support")],
-        [InlineKeyboardButton(button_list[5], callback_data="info")]
+         InlineKeyboardButton(button_list[4], callback_data="support")]
     ])
     # Send the welcome message with the GIF and the keyboard
     await bot.edit_message_caption(
