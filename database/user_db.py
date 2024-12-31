@@ -1,17 +1,33 @@
 import os
 from pymongo import MongoClient
 from config import DATABASE_URL
+import asyncio
 
 client = MongoClient(DATABASE_URL)
 db = client['aibotdb']
 users_collection = db['users']
 
 
-def check_and_add_user(user_id):
+#make it async
+
+async def check_and_add_username(user_id, username):
+    """Check if a username exists in the users collection, and add it if it doesn't."""
+    user = users_collection.find_one({"user_id": user_id})
+    if user:
+        if "username" in user:
+            if user["username"] == username:
+                return
+    users_collection.update_one({"user_id": user_id}, {"$set": {"username": username}})
+    print(f"Username {username} was added to user ID {user_id}.")
+
+    
+
+async def check_and_add_user(user_id):
+    """Check if a user ID exists in the users collection, and add it if it doesn't."""
     user = users_collection.find_one({"user_id": user_id})
     if not user:
-        users_collection.insert_one({"user_id": user_id, "user_type": "user"})
-        print(f"New User ID {user_id} was added to the users collection.")
+        await users_collection.insert_one({"user_id": user_id})
+        print(f"User ID {user_id} was added to the users collection.")
 
 def drop_user_id(user_id):
     """Remove a specific user ID from the users collection."""
@@ -39,12 +55,15 @@ def check_and_add_blocked_user(user_id):
 
 #get all user ids and send one message to all users one by one
 
-# async def get_user_ids_message(client, message, text):
-#     user_ids = users_collection.distinct("user_id")
-#     reply.send_message(us
-
-#     for user_id in user_ids:
-#         try:
-#             client.send_message(user_id, text)
-#         except Exception as e:
-#             print(f"Error sending message to user ID {user_id}: {e}")
+async def get_user_ids_message(bot, update, text):
+    user_ids = users_collection.distinct("user_id")
+    total=0
+    await update.reply_text(f"Sending message to {len(user_ids)} users...")
+    for user_id in user_ids:
+        try:
+            await bot.send_message(user_id, text)
+            await asyncio.sleep(0.05)
+            total+=1
+        except Exception as e:
+            print(f"Error sending message to user ID {user_id}: {e}")
+    await update.reply_text(f"Message sent to {total} users.")

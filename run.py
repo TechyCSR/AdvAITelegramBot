@@ -24,6 +24,7 @@ from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
 from modules.user.global_setting import global_setting_command
+import database.user_db as user_db
 
 advAiBot = pyrogram.Client("AdvChatGptBot", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
@@ -171,6 +172,19 @@ async def settings_command(bot, update):
     await global_setting_command(bot, update)
     await channel_log(bot, update, "/settings")
 
+@advAiBot.on_message(filters.command(["announce","broadcast","acc"]))
+async def announce_command(bot, update):
+    if update.from_user.id in config.ADMINS:
+        try:
+            text = update.text.split(" ", 1)[1]
+            print(text)
+            await user_db.get_user_ids_message(bot, update, text)
+        except IndexError:
+            await update.reply_text("Please provide a message to send.")
+            return
+    else:
+        await update.reply_text("You are not allowed to use this command.")
+    
 
 if __name__ == "__main__":
     advAiBot.run()

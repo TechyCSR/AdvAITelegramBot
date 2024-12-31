@@ -32,6 +32,12 @@ And much more, to know more about the bot, click the button below:
 **@AdvChatGptBot**
 """
 
+tip_text = """
+**Tip :** To Generate Image, Use `/img` command and send it with prompt text.
+Eg: `/img Sunset under the sea with a boat`
+"""
+
+
 
 LOGO="https://i.ibb.co/FmGxDh9/logo1.gif"
 
@@ -50,6 +56,11 @@ button_list = [
 
 async def start(client, message):
     global LOGO
+    global tip_text
+    await user_db.check_and_add_user(message.from_user.id)
+    if message.from_user.username:
+        await user_db.check_and_add_username(message.from_user.id, message.from_user.username)
+
     welcome_tex = welcome_text.format(user_mention = message.from_user.mention)
     # for i in button_list:
     #     if default_lang !="en":
@@ -72,6 +83,7 @@ async def start(client, message):
         reply_markup=keyboard
     
     )
+    await message.reply_text(tip_text)
 
 
 
