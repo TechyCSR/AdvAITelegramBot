@@ -159,7 +159,6 @@ AdvAITelegramBot/
 ├── Dockerfile                   # Docker configuration for the project
 ├── LICENSE                      # License for the project
 ├── README.md                    # Project documentation
-├── blackbox.json                # Blackbox configuration
 ├── config.py                    # Bot configuration file
 ├── requirements.txt             # Python dependencies
 ├── run.py                       # Entry point for running the bot
