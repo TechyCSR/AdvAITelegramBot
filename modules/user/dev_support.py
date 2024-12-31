@@ -24,7 +24,7 @@ async def support_developers_callback(client,  CallbackQuery):
                 InlineKeyboardButton("CHANDAN SINGH", url='https://t.me/TechyCSR')
             ],
             [
-                InlineKeyboardButton("Ankit", url=f"https://t.me/@me0w_v"),
+                InlineKeyboardButton("Ankit", url=f"https://t.me/ankxMe"),
                 InlineKeyboardButton("Aarushi", url=f"https://t.me/skylark776")
             ],
             [
