@@ -32,8 +32,8 @@ And much more, to know more about the bot, click the button below:
 **@AdvChatGptBot**
 """
 
-# LOGO ="https://graph.org/file/5d3d030e668795f769e20.mp4" # GIF (Not using now)
-LOGO="./assets/logos/logo1.gif"
+
+LOGO="https://i.ibb.co/FmGxDh9/logo1.gif"
 
 
 button_list = [
@@ -51,9 +51,6 @@ button_list = [
 async def start(client, message):
     global LOGO
     welcome_tex = welcome_text.format(user_mention = message.from_user.mention)
-
-
-
     # for i in button_list:
     #     if default_lang !="en":
     #         button_list[button_list.index(i)] = translate_to_lang(i, default_lang )
