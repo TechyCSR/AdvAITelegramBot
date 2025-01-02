@@ -24,16 +24,8 @@ modes = {
     "translator": "Translator"
 }
 
-languages = {
-    "en": "🇬🇧 English",
-    "hi": "🇮🇳 Hindi",
-    "zh": "🇨🇳 Chinese",
-    "ar": "🇸🇦 Arabic",
-    "fr": "🇫🇷 French",
-    "ru": "🇷🇺 Russian"
-}
-
-global_settings_text = """
+async def global_setting_command(client, message):
+    global_settings_text = """
 **Setting Menu for User {mention}**
 
 **User ID**: {user_id}
@@ -45,26 +37,38 @@ You can change your settings from @AdvChatGptBot's settings menu.
 
 **@AdvChatGptBot**
 """
-
-
-async def global_setting_command(client, message):
-    global global_settings_text
     temp= await message.reply_text("**Fetching your settings...**")
 
     user_id = message.from_user.id
     user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
+
     if user_lang_doc:
         current_language = user_lang_doc['language']
     else:
         current_language = "en"
         user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
-    user_settings = user_voice_collection.find_one({"user_id": user_id})
     
+    if current_language == "en":
+        current_language = "🇬🇧 English"
+    elif current_language == "hi":
+        current_language = "🇮🇳 Hindi"
+    elif current_language == "zh":
+        current_language = "🇨🇳 Chinese"
+    elif current_language == "ar":
+        current_language = "🇸🇦 Arabic"
+    elif current_language == "fr":
+        current_language = "🇫🇷 French"
+    elif current_language == "ru":
+        current_language = "🇷🇺 Russian"
+    
+
+    user_settings = user_voice_collection.find_one({"user_id": user_id})
     if user_settings:
         voice_setting = user_settings.get("voice", "voice")
+        if voice_setting == "text":
+            voice_setting = "Text"
     else:
         voice_setting = "voice"
-        # If user doesn't exist, add them with default setting "voice"
         user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
     
     user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
@@ -76,7 +80,7 @@ async def global_setting_command(client, message):
         ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
     
     current_mode_label = modes[current_mode]
-    current_language=languages[current_language]
+    # current_language=languages[current_language]
 
 
     global_settings_text = global_settings_text.format(
