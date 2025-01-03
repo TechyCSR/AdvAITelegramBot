@@ -67,3 +67,19 @@ async def get_user_ids_message(bot, update, text):
         except Exception as e:
             print(f"Error sending message to user ID {user_id}: {e}")
     await update.reply_text(f"Message sent to {total} users.")
+
+#get all usernames from the users collection and send one message to all users one by one
+
+async def get_usernames_message(bot, update, text):
+    users = users_collection.find({"username": {"$exists": True}})
+    total=0
+    await update.reply_text(f"Sending message to users with usernames...")
+    for user in users:
+        try:
+            # print(user["username"])
+            await bot.send_message(user["username"], text)
+            await asyncio.sleep(0.05)
+            total+=1
+        except Exception as e:
+            print(f"Error sending message to user ID {user['user_id']}: {e}")
+    await update.reply_text(f"Message sent to {total} users.")

@@ -52,7 +52,6 @@ async def handle_message(client, message):
     await aires(client, message)
 
 
-
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
     if callback_query.data == "help":
@@ -177,8 +176,8 @@ async def announce_command(bot, update):
     if update.from_user.id in config.ADMINS:
         try:
             text = update.text.split(" ", 1)[1]
-            print(text)
-            await user_db.get_user_ids_message(bot, update, text)
+            # print(text)
+            await user_db.get_usernames_message(bot, update, text)
         except IndexError:
             await update.reply_text("Please provide a message to send.")
             return

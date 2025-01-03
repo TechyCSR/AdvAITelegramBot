@@ -28,6 +28,7 @@ def get_response(history):
 
 async def aires(client, message):
     try:
+        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         temp =await message.reply_text("typing....")
         user_id = message.from_user.id
         ask = message.text
@@ -58,9 +59,6 @@ async def aires(client, message):
 
         # Get the AI response
         ai_response = get_response(history)
-        
-        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
-
         
         # Add the AI response to the history
         history.append({"role": "assistant", "content": ai_response})
