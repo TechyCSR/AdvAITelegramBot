@@ -48,7 +48,7 @@ async def aires(client, message):
             "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
             "growing needs of our users. The current version is V-2.O, which includes significant improvements in response accuracy and speed, "
             "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains. To Reach out CHANDAN SINGH, you can contact him on techycsr.me or on his email csr.info.in@gmail.comv."
+            "valuable tool for users across various domains. To Reach out Chandan Singh, you can contact him on techycsr.me or on his email csr.info.in@gmail.com."
         )
     }
 ]
