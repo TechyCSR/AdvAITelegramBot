@@ -26,7 +26,7 @@ from modules.chatlogs import channel_log, user_log
 from modules.user.global_setting import global_setting_command
 import database.user_db as user_db
 
-advAiBot = pyrogram.Client("AdvChatGptBot", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
+advAiBot = pyrogram.Client("AdvChatGptBotV2", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
