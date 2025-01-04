@@ -3,10 +3,17 @@ from pymongo import MongoClient
 from config import DATABASE_URL
 import asyncio
 
-client = MongoClient(DATABASE_URL)
-db = client['aibotdb']
-users_collection = db['users']
+# Always make the database connection a Async function cause making connection to db takes time so make it asynchrnous 
+async def dbconnect():
+    # Use Motor's async client
+    client = AsyncIOMotorClient(DATABASE_URL)
+    db = client['aibotdb']
+    users_collection = db['users']
+    print("Database connected successfully!")
+    return users_collection
 
+# Calling the db function
+asyncio.run(dbconnect())
 
 #make it async
 
