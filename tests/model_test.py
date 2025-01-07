@@ -6,7 +6,7 @@ from g4f.cookies import set_cookies
 
 
 
-gpt_client = GPTClient(provider="Mhystical")
+gpt_client = GPTClient()
 
 history = []
 history.append({"role": "system", "content": "Hello! I am GPT-4, a chatbot."})
