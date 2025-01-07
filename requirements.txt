@@ -1,7 +1,7 @@
 pyrogram 
 python-dotenv
 tgcrypto
-g4f[all]
+g4f[all]==0.4.0.0
 pytz
 # py3langid>=0.2.2
 soundfile==0.12.1

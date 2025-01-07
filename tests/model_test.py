@@ -6,7 +6,7 @@ from g4f.cookies import set_cookies
 
 
 
-gpt_client = GPTClient(provider="Blackbox")
+gpt_client = GPTClient(provider="PollinationsAI")
 
 history = []
 history.append({"role": "system", "content": "Hello! I am GPT-4, a chatbot."})

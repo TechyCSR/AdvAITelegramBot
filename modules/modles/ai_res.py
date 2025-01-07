@@ -13,7 +13,7 @@ db = mongo_client['aibotdb']
 history_collection = db['history']
 
 # Initialize the GPT-4 client
-gpt_client = GPTClient(provider="Blackbox")
+gpt_client = GPTClient(provider="PollinationsAI")
 
 def get_response(history):  
     try:
