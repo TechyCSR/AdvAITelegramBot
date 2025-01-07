@@ -51,8 +51,6 @@ coverage.xml
 .pytest_cache/
 cover/
 
-ImgGenModel/
-
 # Translations
 *.mo
 *.pot

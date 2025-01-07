@@ -4,12 +4,12 @@ import random
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram import Client, filters
 from pymongo import MongoClient
-# from ImgGenModel.g4f.client import Client as ImageClient
-# from ImgGenModel.g4f.Provider import BingCreateImages
-# from ImgGenModel.g4f.cookies import set_cookies
-from g4f.client import Client as ImageClient
-from g4f.Provider import BingCreateImages
-from g4f.cookies import set_cookies
+from ImgGenModel.g4f.client import Client as ImageClient
+from ImgGenModel.g4f.Provider import BingCreateImages
+from ImgGenModel.g4f.cookies import set_cookies
+# from g4f.client import Client as ImageClient
+# from g4f.Provider import BingCreateImages
+# from g4f.cookies import set_cookies
 from config import BING_COOKIE, DATABASE_URL , LOG_CHANNEL
 import requests
 from datetime import datetime
