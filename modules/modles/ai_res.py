@@ -18,7 +18,7 @@ gpt_client = GPTClient(provider="PollinationsAI")
 def get_response(history):  
     try:
         response = gpt_client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=history
         )
         return response.choices[0].message.content
