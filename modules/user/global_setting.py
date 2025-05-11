@@ -1,15 +1,8 @@
-import logging
 from pyrogram import Client, filters
 from config import DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from modules.lang import translate_to_lang, get_user_language
-from modules.maintenance import is_maintenance_mode
-from modules.welcome import is_welcome_enabled
-from modules.auto_delete import is_auto_delete_enabled
-
-# Configure logging
-logger = logging.getLogger(__name__)
+from modules.lang import translate_to_lang
 
 # Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
@@ -40,74 +33,69 @@ languages = {
     "ru": "🇷🇺 Russian"
 }
 
-async def global_setting_command(client: Client, message: Message):
-    try:
-        # Get user's language
-        user_lang = await get_user_language(message.from_user.id)
-        
-        # Get translated text
-        translated_text = await translate_to_lang(
-            "**Global Settings**\n\n"
-            "Here you can configure global settings for the bot.\n\n"
-            "**Current Settings:**\n"
-            "• Maintenance Mode: {maintenance_status}\n"
-            "• Welcome Message: {welcome_status}\n"
-            "• Auto Delete: {auto_delete_status}\n"
-            "• Log Channel: {log_channel_status}\n\n"
-            "Use the buttons below to modify these settings.",
-            message.from_user.id
-        )
-        
-        # Get current settings
-        maintenance_status = "Enabled" if await is_maintenance_mode() else "Disabled"
-        welcome_status = "Enabled" if await is_welcome_enabled() else "Disabled"
-        auto_delete_status = "Enabled" if await is_auto_delete_enabled() else "Disabled"
-        log_channel_status = "Configured" if LOG_CHANNEL else "Not Configured"
-        
-        # Format the text with current settings
-        formatted_text = translated_text.format(
-            maintenance_status=maintenance_status,
-            welcome_status=welcome_status,
-            auto_delete_status=auto_delete_status,
-            log_channel_status=log_channel_status
-        )
-        
-        # Create inline keyboard
-        keyboard = InlineKeyboardMarkup([
+async def global_setting_command(client, message):
+    global_settings_text = """
+**Setting Menu for User {mention}**
+
+**User ID**: {user_id}
+**User language:** {language}
+**User voice**: {voice_setting}
+**User mode**: {mode}
+
+You can change your settings from @AdvChatGptBot's settings menu.
+
+**@AdvChatGptBot**
+"""
+    temp = await message.reply_text("**Fetching your settings...**")
+
+    user_id = message.from_user.id
+    user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
+
+    if user_lang_doc:
+        current_language = user_lang_doc['language']
+    else:
+        current_language = "en"
+        user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
+    
+    current_language_label = languages[current_language]
+
+    user_settings = user_voice_collection.find_one({"user_id": user_id})
+    if user_settings:
+        voice_setting = user_settings.get("voice", "voice")
+        if voice_setting == "text":
+            voice_setting = "Text"
+        else:
+            voice_setting = "Voice"
+    else:
+        voice_setting = "Voice"
+        user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
+    
+    user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
+
+    if user_mode_doc:
+        current_mode = user_mode_doc['mode']
+    else:
+        current_mode = "chatbot"
+        ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
+    
+    current_mode_label = modes[current_mode]
+
+    translated_text = translate_to_lang(global_settings_text, user_id)
+    formatted_text = translated_text.format(
+        mention=message.from_user.mention,
+        user_id=message.from_user.id,
+        language=current_language_label,
+        voice_setting=voice_setting,
+        mode=current_mode_label
+    )
+
+    kbd = InlineKeyboardMarkup(
+        [
             [
-                InlineKeyboardButton(
-                    await translate_to_lang("Maintenance Mode", message.from_user.id),
-                    callback_data="toggle_maintenance"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    await translate_to_lang("Welcome Message", message.from_user.id),
-                    callback_data="toggle_welcome"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    await translate_to_lang("Auto Delete", message.from_user.id),
-                    callback_data="toggle_auto_delete"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    await translate_to_lang("Log Channel", message.from_user.id),
-                    callback_data="set_log_channel"
-                )
+                InlineKeyboardButton("🔧 Bot Settings", url=f"https://t.me/{client.me.username}?start=settings")
             ]
-        ])
-        
-        # Send the message
-        await message.reply_text(
-            formatted_text,
-            reply_markup=keyboard
-        )
-        
-    except Exception as e:
-        logger.error(f"Error in global_setting_command: {e}")
-        await message.reply_text(
-            await translate_to_lang("Sorry, there was an error processing your request. Please try again.", message.from_user.id)
-        )
+        ]
+    )
+
+    await message.reply_text(formatted_text, reply_markup=kbd)
+    await temp.delete()
