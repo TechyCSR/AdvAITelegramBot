@@ -1,122 +1,65 @@
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from modules.lang import translate_text_async, get_user_language, get_language_display_name
-import logging
+import pyrogram
+from pyrogram import filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import Message
+from pyrogram.types import InlineQuery
+from pyrogram.types import CallbackQuery
+from modules.lang import translate_to_lang
+from modules.chatlogs import channel_log
 
-# Configure logging
-logger = logging.getLogger(__name__)
 
 help_text = """
-**❓ Help Menu**
+**📚 Telegram @AdvChatGptBot 's Help Menu**
 
-Here are the main features I can help you with:
+**🧠 AI-Powered Features:**
+- **Intelligent ChatBot (GPT-4)** - Engage in dynamic, context-aware conversations
+- **Voice Interaction** - Seamlessly convert speech to text and vice versa
+- **Image Generation (DALL-E 3)** - Transform your ideas into stunning visuals
+- **Visual Analysis (Google Lens)** - Extract insights and text from any image
 
-🤖 **Chat Features**
-• Natural conversations
-• Context-aware responses
-• Multiple AI personalities
-• Code assistance
-• Translation support
+**⚙️ Customization Options:**
+- **🌐 Language Preferences** - Communicate in your preferred language
+- **🔔 Smart Notifications** - Tailor alerts to your needs
+- **🔒 Privacy Controls** - Manage your data securely
 
-🎨 **Image Generation**
-• Create images from text
-• Multiple style options
-• High-quality outputs
+**Commands:**
+- **/start** -Start the Bot
+- **/ai** - Start a Chat with AI in Groups 
+- **/img or /image** - Generate Text from Image
+- **/new or /newchat ** - Start a New Chat and Clear Previous Chat History
 
-🔤 **Text-to-Speech**
-• Convert text to voice
-• Multiple voice options
-• Natural-sounding speech
-
-🎤 **Speech-to-Text**
-• Convert voice to text
-• Support for multiple languages
-• Accurate transcription
-
-⚙️ **Settings**
-• Language preferences
-• Voice settings
-• AI mode selection
-• Other preferences
-
-Use the buttons below to navigate or type /commands for a list of available commands.
+**@AdvChatGptBot**
 """
 
-async def help(client, message):
-    try:
-        user_id = message.from_user.id
-        user_lang = get_user_language(user_id)
-        
-        # Translate help message
-        translated_text = await translate_text_async(help_text, user_lang)
-        
-        # Create keyboard with translated buttons
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("📝 Commands", user_lang),
-                        callback_data="commands"
-                    ),
-                    InlineKeyboardButton(
-                        await translate_text_async("⚙️ Settings", user_lang),
-                        callback_data="settings"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("🔙 Back", user_lang),
-                        callback_data="back"
-                    )
-                ]
-            ]
-        )
-        
-        await message.reply_text(
-            translated_text,
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-    except Exception as e:
-        logger.error(f"Error in help command: {e}")
-        await message.reply_text("An error occurred. Please try again.")
 
-async def help_inline(client, callback):
-    try:
-        user_id = callback.from_user.id
-        user_lang = get_user_language(user_id)
-        
-        # Translate help message
-        translated_text = await translate_text_async(help_text, user_lang)
-        
-        # Create keyboard with translated buttons
-        keyboard = InlineKeyboardMarkup(
+async def help(client, message):
+    user_id = message.from_user.id
+    translated_text = translate_to_lang(help_text, user_id)
+    await client.send_message(
+        chat_id=message.chat.id,
+        text=translated_text,
+        disable_web_page_preview=True
+    )
+
+async def help_inline(bot, callback):
+    user_id = callback.from_user.id
+    translated_text = translate_to_lang(help_text, user_id)
+    keyboard = InlineKeyboardMarkup(
+        [
             [
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("📝 Commands", user_lang),
-                        callback_data="commands"
-                    ),
-                    InlineKeyboardButton(
-                        await translate_text_async("⚙️ Settings", user_lang),
-                        callback_data="settings"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("🔙 Back", user_lang),
-                        callback_data="back"
-                    )
-                ]
+                InlineKeyboardButton("🔙 Back", callback_data="back")
             ]
-        )
-        
-        await callback.message.edit_text(
-            translated_text,
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-    except Exception as e:
-        logger.error(f"Error in help_inline: {e}")
-        await callback.answer("An error occurred. Please try again.", show_alert=True)
+        ]
+    )
+
+    await bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        text=translated_text,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+
+    await callback.answer()
+    return
     

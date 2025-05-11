@@ -64,10 +64,8 @@ You can change your settings from @AdvChatGptBot's settings menu.
         voice_setting = user_settings.get("voice", "voice")
         if voice_setting == "text":
             voice_setting = "Text"
-        else:
-            voice_setting = "Voice"
     else:
-        voice_setting = "Voice"
+        voice_setting = "voice"
         user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
     
     user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
@@ -86,7 +84,7 @@ You can change your settings from @AdvChatGptBot's settings menu.
         user_id=message.from_user.id,
         language=current_language_label,
         voice_setting=voice_setting,
-        mode=current_mode_label
+        mode=current_mode_label,
     )
 
     kbd = InlineKeyboardMarkup(
