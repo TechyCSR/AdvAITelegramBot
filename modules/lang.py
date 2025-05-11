@@ -1,130 +1,118 @@
-from googletrans import Translator
-from pymongo import MongoClient
-from config import DATABASE_URL
+from typing import Dict, Optional
+import logging
 from functools import lru_cache
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import logging
+from modules.database_config import db_config, DatabaseConfig
+from googletrans import Translator
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize MongoDB client with optimized settings
-client = MongoClient(DATABASE_URL, maxPoolSize=50, minPoolSize=10)
-db = client["aibotdb"]
-user_lang_collection = db['user_lang']
-
-# Create index for faster queries
-user_lang_collection.create_index("user_id", unique=True)
-
-# Initialize translator with optimized settings
-translator = Translator()
-
-# Thread pool for translations
-thread_pool = ThreadPoolExecutor(max_workers=10)
-
-# Language code mapping with proper names
-LANGUAGE_CODES = {
-    "en": {"code": "en", "name": "English", "flag": "🇬🇧"},
-    "hi": {"code": "hi", "name": "Hindi", "flag": "🇮🇳"},
-    "zh": {"code": "zh-cn", "name": "Chinese", "flag": "🇨🇳"},
-    "ar": {"code": "ar", "name": "Arabic", "flag": "🇸🇦"},
-    "fr": {"code": "fr", "name": "French", "flag": "🇫🇷"},
-    "ru": {"code": "ru", "name": "Russian", "flag": "🇷🇺"}
-}
-
-# Cache for translations with increased size
-@lru_cache(maxsize=2000)
-def get_cached_translation(text: str, target_lang: str) -> str:
-    """Get cached translation or perform new translation"""
-    try:
-        # Get the correct language code
-        lang_info = LANGUAGE_CODES.get(target_lang, {"code": target_lang})
-        lang_code = lang_info["code"]
-        
-        # If target language is English, return original text
-        if lang_code == "en":
-            return text
-            
-        # Perform translation
-        result = translator.translate(text, dest=lang_code)
-        return result.text
-    except Exception as e:
-        logger.error(f"Translation error: {e}")
-        return text
-
-def get_user_language(user_id: int) -> str:
-    """Get user's language preference from database"""
-    try:
-        user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
-        if user_lang_doc:
-            return user_lang_doc['language']
-        # Set default language to English if not found
-        user_lang_collection.insert_one({"user_id": user_id, "language": "en"})
-        return "en"
-    except Exception as e:
-        logger.error(f"Error getting user language: {e}")
-        return "en"
-
-def set_user_language(user_id: int, language: str) -> bool:
-    """Set user's language preference in database"""
-    try:
-        if language not in LANGUAGE_CODES:
+class LanguageManager:
+    _instance = None
+    _executor = ThreadPoolExecutor(max_workers=10)
+    _cache: Dict[str, str] = {}
+    _max_cache_size = 1000
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        self.translator = Translator()
+    
+    @lru_cache(maxsize=1000)
+    def get_language_display_name(self, lang_code: str) -> str:
+        languages = {
+            "en": "🇬🇧 English",
+            "hi": "🇮🇳 हिंदी",
+            "zh": "🇨🇳 中文",
+            "ar": "🇸🇦 العربية",
+            "fr": "🇫🇷 Français",
+            "ru": "🇷🇺 Русский"
+        }
+        return languages.get(lang_code, "🇬🇧 English")
+    
+    @DatabaseConfig.retry_on_failure
+    async def get_user_language(self, user_id: int) -> str:
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                lambda: db_config.db.user_lang.find_one({"user_id": user_id})
+            )
+            return result["language"] if result else "en"
+        except Exception as e:
+            logger.error(f"Error getting user language: {e}")
+            return "en"
+    
+    @DatabaseConfig.retry_on_failure
+    async def update_user_language(self, user_id: int, language: str) -> bool:
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                lambda: db_config.db.user_lang.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"language": language}},
+                    upsert=True
+                )
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error updating user language: {e}")
             return False
-        user_lang_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"language": language}},
-            upsert=True
-        )
-        # Clear translation cache
-        get_cached_translation.cache_clear()
-        return True
-    except Exception as e:
-        logger.error(f"Error setting user language: {e}")
-        return False
+    
+    def _get_cache_key(self, text: str, target_lang: str) -> str:
+        return f"{text}:{target_lang}"
+    
+    def _update_cache(self, key: str, value: str):
+        if len(self._cache) >= self._max_cache_size:
+            self._cache.clear()
+        self._cache[key] = value
+    
+    async def translate_text_async(self, text: str, target_lang: str) -> str:
+        if target_lang == "en":
+            return text
+        
+        cache_key = self._get_cache_key(text, target_lang)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+        
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                lambda: self.translator.translate(text, dest=target_lang)
+            )
+            translated_text = result.text
+            self._update_cache(cache_key, translated_text)
+            return translated_text
+        except Exception as e:
+            logger.error(f"Translation error: {e}")
+            return text
+
+lang_manager = LanguageManager.get_instance()
+
+async def get_user_language(user_id: int) -> str:
+    return await lang_manager.get_user_language(user_id)
+
+async def update_user_language(user_id: int, language: str) -> bool:
+    return await lang_manager.update_user_language(user_id, language)
 
 async def translate_text_async(text: str, target_lang: str) -> str:
-    """Asynchronous translation function"""
-    try:
-        # Run translation in thread pool
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            thread_pool,
-            get_cached_translation,
-            text,
-            target_lang
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Error in translate_text_async: {e}")
-        return text
+    return await lang_manager.translate_text_async(text, target_lang)
 
-def translate_to_lang(text: str, user_id: int = None, target_lang: str = None, **kwargs) -> str:
-    """Translate text to target language with optimized caching"""
+def get_language_display_name(lang_code: str) -> str:
+    return lang_manager.get_language_display_name(lang_code)
+
+async def translate_to_lang(text: str, user_id: int) -> str:
+    """Translate text to user's preferred language."""
     try:
-        # Format text with kwargs first
-        if kwargs:
-            text = text.format(**kwargs)
-            
-        # Determine target language
-        if target_lang:
-            lang = target_lang
-        elif user_id:
-            lang = get_user_language(user_id)
-        else:
-            return text
-            
-        # Get cached translation
-        return get_cached_translation(text, lang)
+        user_lang = await get_user_language(user_id)
+        return await translate_text_async(text, user_lang)
     except Exception as e:
         logger.error(f"Error in translate_to_lang: {e}")
         return text
-
-def get_language_display_name(lang_code: str) -> str:
-    """Get language display name with flag"""
-    lang_info = LANGUAGE_CODES.get(lang_code, {"name": lang_code, "flag": "🌐"})
-    return f"{lang_info['flag']} {lang_info['name']}"
 
 # while True:
 #     print(translate_to_lang("Hello, How are you?"))

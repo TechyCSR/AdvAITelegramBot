@@ -1,27 +1,26 @@
-import pyrogram
-from pyrogram import filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.types import Message
-from pyrogram.types import InlineQuery
-from pyrogram.types import CallbackQuery
-from modules.lang import translate_to_lang, translate_text_async, get_user_language, get_language_display_name
-from modules.chatlogs import channel_log
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from modules.lang import translate_text_async, get_user_language
 import database.user_db as user_db
 import logging
+from typing import List, Dict
+import asyncio
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Define button texts
-button_list = [
-    "Add to Group",
-    "Commands",
-    "Help",
-    "Settings",
-    "Support"
-]
+class ButtonManager:
+    _buttons: Dict[str, List[str]] = {
+        "main": ["Add to Group", "Commands", "Help", "Settings", "Support"],
+        "navigation": ["❓ Help", "⚙️ Settings", "🔙 Back"]
+    }
+    
+    @classmethod
+    async def get_translated_buttons(cls, user_id: int, button_type: str) -> List[str]:
+        user_lang = await get_user_language(user_id)
+        return [await translate_text_async(btn, user_lang) for btn in cls._buttons[button_type]]
 
-welcome_text = """
+class MessageTemplates:
+    WELCOME = """
 **Welcome {user_mention}!** 👋
 
 I'm an advanced AI-powered Telegram bot that can:
@@ -35,80 +34,74 @@ Use the buttons below to explore my features!
 
 **@AdvChatGptBot**
 """
+    TIP = "💡 Tip: You can use /help to see all available commands!"
 
-tip_text = "💡 Tip: You can use /help to see all available commands!"
-
-# Use a more reliable animation URL
-WELCOME_ANIMATION = "https://telegra.ph/file/8c1c3a4f4c8d4f5d5e5e5.mp4"
-
-async def start(client, message):
-    try:
-        await user_db.check_and_add_user(message.from_user.id)
-        if message.from_user.username:
-            await user_db.check_and_add_username(message.from_user.id, message.from_user.username)
-
-        user_id = message.from_user.id
-        user_lang = get_user_language(user_id)
-        
-        # Format welcome text with user mention
-        formatted_welcome = welcome_text.format(
-            user_mention=message.from_user.mention
-        )
-        
-        # Translate welcome text and button texts
-        translated_welcome = await translate_text_async(formatted_welcome, user_lang)
-        translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
-        translated_tip = translate_to_lang(tip_text, user_id)
-
-        # Create the inline keyboard buttons with translated text
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
-            [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
-             InlineKeyboardButton(translated_buttons[2], callback_data="help")],
-            [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
-             InlineKeyboardButton(translated_buttons[4], callback_data="support")]
+class StartHandler:
+    @staticmethod
+    async def create_keyboard(user_id: int, client: Client) -> InlineKeyboardMarkup:
+        buttons = await ButtonManager.get_translated_buttons(user_id, "main")
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton(buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
+            [InlineKeyboardButton(buttons[1], callback_data="commands"),
+             InlineKeyboardButton(buttons[2], callback_data="help")],
+            [InlineKeyboardButton(buttons[3], callback_data="settings"),
+             InlineKeyboardButton(buttons[4], callback_data="support")]
         ])
 
-        await message.reply_text(
-            translated_welcome,
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-        
-        await message.reply_text(translated_tip)
-    except Exception as e:
-        logger.error(f"Error in start command: {e}")
-        await message.reply_text("An error occurred. Please try again.")
+    @staticmethod
+    async def handle_start(client: Client, message: Message):
+        try:
+            await user_db.check_and_add_user(message.from_user.id)
+            if message.from_user.username:
+                await user_db.check_and_add_username(message.from_user.id, message.from_user.username)
 
-async def start_inline(client, callback):
-    try:
-        user_id = callback.from_user.id
-        user_lang = get_user_language(user_id)
-        
-        # Format welcome text with user mention
-        formatted_welcome = welcome_text.format(
-            user_mention=callback.from_user.mention
-        )
-        
-        # Translate welcome text and button texts
-        translated_welcome = await translate_text_async(formatted_welcome, user_lang)
-        translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
+            user_id = message.from_user.id
+            user_lang = await get_user_language(user_id)
+            
+            welcome_text = MessageTemplates.WELCOME.format(
+                user_mention=message.from_user.mention
+            )
+            
+            translated_welcome = await translate_text_async(welcome_text, user_lang)
+            translated_tip = await translate_text_async(MessageTemplates.TIP, user_lang)
+            keyboard = await StartHandler.create_keyboard(user_id, client)
 
-        # Create the inline keyboard buttons with translated text
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
-            [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
-             InlineKeyboardButton(translated_buttons[2], callback_data="help")],
-            [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
-             InlineKeyboardButton(translated_buttons[4], callback_data="support")]
-        ])
+            await message.reply_text(
+                translated_welcome,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+            
+            await message.reply_text(translated_tip)
+        except Exception as e:
+            logger.error(f"Error in start command: {e}")
+            await message.reply_text("An error occurred. Please try again.")
 
-        await callback.message.edit_text(
-            translated_welcome,
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-    except Exception as e:
-        logger.error(f"Error in start_inline: {e}")
-        await callback.answer("An error occurred. Please try again.", show_alert=True)
+    @staticmethod
+    async def handle_start_inline(client: Client, callback: CallbackQuery):
+        try:
+            user_id = callback.from_user.id
+            user_lang = await get_user_language(user_id)
+            
+            welcome_text = MessageTemplates.WELCOME.format(
+                user_mention=callback.from_user.mention
+            )
+            
+            translated_welcome = await translate_text_async(welcome_text, user_lang)
+            keyboard = await StartHandler.create_keyboard(user_id, client)
+
+            await callback.message.edit_text(
+                translated_welcome,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        except Exception as e:
+            logger.error(f"Error in start_inline: {e}")
+            await callback.answer("An error occurred. Please try again.", show_alert=True)
+
+async def start(client: Client, message: Message):
+    await StartHandler.handle_start(client, message)
+
+async def start_inline(client: Client, callback: CallbackQuery):
+    await StartHandler.handle_start_inline(client, callback)
 

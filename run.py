@@ -142,15 +142,28 @@ async def handle_new_chat(client, message):
     await channel_log(client, message, "/newchat")
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
-def handle_generate(client, message):
+async def handle_generate(client, message):
     try:
-        prompt = message.text.split(" ", 1)[1]
-    except IndexError:
-        message.reply_text("Please provide a prompt to generate images.")
-        return
-    temp = message.reply_text("Generating images. Please wait...")
-    generate_command(client, message, prompt)
-    temp.delete()
+        # Get the command used
+        command = message.command[0]
+        
+        # Extract prompt from message
+        if len(message.command) < 2:
+            await message.reply_text("Please provide a prompt to generate images.\nExample: /generate a beautiful sunset")
+            return
+            
+        prompt = " ".join(message.command[1:])
+        
+        if not prompt.strip():
+            await message.reply_text("Please provide a prompt to generate images.\nExample: /generate a beautiful sunset")
+            return
+        
+        # Call generate_command with await
+        await generate_command(client, message, prompt)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_generate: {e}")
+        await message.reply_text("Sorry, there was an error processing your request. Please make sure to provide a valid prompt.")
 
 @advAiBot.on_message(filters.photo)
 async def handle_image(bot, update):

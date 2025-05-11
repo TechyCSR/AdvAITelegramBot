@@ -1,12 +1,15 @@
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from modules.lang import translate_text_async, get_user_language, get_language_display_name
+from pyrogram import Client
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from modules.lang import translate_text_async, get_user_language
 import logging
+from typing import Dict, List
+import asyncio
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-commands_text = """
+class CommandTemplates:
+    COMMANDS = """
 **📝 Available Commands**
 
 🤖 **Chat Commands**
@@ -33,62 +36,77 @@ commands_text = """
 {help_tip}
 """
 
-async def command_inline(client, callback):
-    try:
-        user_id = callback.from_user.id
-        user_lang = get_user_language(user_id)
-        
-        # Translate command descriptions
-        translated_descriptions = {
-            "start_desc": await translate_text_async("Start the bot", user_lang),
-            "help_desc": await translate_text_async("Show help menu", user_lang),
-            "commands_desc": await translate_text_async("Show this commands list", user_lang),
-            "newchat_desc": await translate_text_async("Start a new conversation", user_lang),
-            "settings_desc": await translate_text_async("Open settings menu", user_lang),
-            "generate_desc": await translate_text_async("Generate images from text", user_lang),
-            "img_desc": await translate_text_async("Alternative for generate", user_lang),
-            "image_ai_desc": await translate_text_async("Send an image with caption 'ai' to analyze it", user_lang),
-            "voice_to_text_desc": await translate_text_async("Send a voice message to convert to text", user_lang),
-            "text_to_voice_desc": await translate_text_async("Use /tts [text] to convert text to voice", user_lang),
-            "language_desc": await translate_text_async("Change language", user_lang),
-            "voice_desc": await translate_text_async("Change voice settings", user_lang),
-            "mode_desc": await translate_text_async("Change AI mode", user_lang),
-            "help_tip": await translate_text_async("Use the buttons below to navigate or type /help for more information.", user_lang)
-        }
-        
-        # Format commands text with translated descriptions
-        message_text = commands_text.format(**translated_descriptions)
-        
-        # Create keyboard with translated buttons
-        keyboard = InlineKeyboardMarkup(
+    DESCRIPTIONS = {
+        "start_desc": "Start the bot",
+        "help_desc": "Show help menu",
+        "commands_desc": "Show this commands list",
+        "newchat_desc": "Start a new conversation",
+        "settings_desc": "Open settings menu",
+        "generate_desc": "Generate images from text",
+        "img_desc": "Alternative for generate",
+        "image_ai_desc": "Send an image with caption 'ai' to analyze it",
+        "voice_to_text_desc": "Send a voice message to convert to text",
+        "text_to_voice_desc": "Use /tts [text] to convert text to voice",
+        "language_desc": "Change language",
+        "voice_desc": "Change voice settings",
+        "mode_desc": "Change AI mode",
+        "help_tip": "Use the buttons below to navigate or type /help for more information."
+    }
+
+class CommandHandler:
+    @staticmethod
+    async def create_navigation_keyboard(user_id: int) -> InlineKeyboardMarkup:
+        user_lang = await get_user_language(user_id)
+        buttons = [
             [
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("❓ Help", user_lang),
-                        callback_data="help"
-                    ),
-                    InlineKeyboardButton(
-                        await translate_text_async("⚙️ Settings", user_lang),
-                        callback_data="settings"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        await translate_text_async("🔙 Back", user_lang),
-                        callback_data="back"
-                    )
-                ]
+                InlineKeyboardButton(
+                    await translate_text_async("❓ Help", user_lang),
+                    callback_data="help"
+                ),
+                InlineKeyboardButton(
+                    await translate_text_async("⚙️ Settings", user_lang),
+                    callback_data="settings"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    await translate_text_async("🔙 Back", user_lang),
+                    callback_data="back"
+                )
             ]
-        )
-        
-        await callback.message.edit_text(
-            message_text,
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-    except Exception as e:
-        logger.error(f"Error in command_inline: {e}")
-        await callback.answer("An error occurred. Please try again.", show_alert=True)
+        ]
+        return InlineKeyboardMarkup(buttons)
+
+    @staticmethod
+    async def get_translated_descriptions(user_lang: str) -> Dict[str, str]:
+        tasks = [
+            translate_text_async(desc, user_lang)
+            for desc in CommandTemplates.DESCRIPTIONS.values()
+        ]
+        translated_descriptions = await asyncio.gather(*tasks)
+        return dict(zip(CommandTemplates.DESCRIPTIONS.keys(), translated_descriptions))
+
+    @staticmethod
+    async def handle_command_inline(client: Client, callback: CallbackQuery):
+        try:
+            user_id = callback.from_user.id
+            user_lang = await get_user_language(user_id)
+            
+            translated_descriptions = await CommandHandler.get_translated_descriptions(user_lang)
+            message_text = CommandTemplates.COMMANDS.format(**translated_descriptions)
+            keyboard = await CommandHandler.create_navigation_keyboard(user_id)
+            
+            await callback.message.edit_text(
+                message_text,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        except Exception as e:
+            logger.error(f"Error in command_inline: {e}")
+            await callback.answer("An error occurred. Please try again.", show_alert=True)
+
+async def command_inline(client: Client, callback: CallbackQuery):
+    await CommandHandler.handle_command_inline(client, callback)
     
 
 
