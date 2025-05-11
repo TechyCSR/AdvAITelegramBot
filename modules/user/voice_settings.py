@@ -170,37 +170,4 @@ async def change_voice_setting(client, callback):
         )
     except Exception as e:
         logger.error(f"Error in change_voice_setting: {e}")
-        await callback.answer("Failed to change voice mode. Please try again.", show_alert=True)
-
-async def get_user_voice(user_id: int) -> str:
-    """Get user's voice preference."""
-    try:
-        result = user_voice_collection.find_one({"user_id": user_id})
-        return result.get("voice_mode", "text") if result else "text"  # Default to text if not set
-    except Exception as e:
-        logger.error(f"Error getting user voice preference: {e}")
-        return "text"
-
-async def set_user_voice(user_id: int, voice: str) -> bool:
-    """Set user's voice preference."""
-    try:
-        user_voice_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"voice_mode": voice}},
-            upsert=True
-        )
-        return True
-    except Exception as e:
-        logger.error(f"Error setting user voice preference: {e}")
-        return False
-
-async def toggle_user_voice(user_id: int) -> str:
-    """Toggle user's voice preference between voice and text."""
-    try:
-        current_voice = await get_user_voice(user_id)
-        new_voice = "text" if current_voice == "voice" else "voice"
-        await set_user_voice(user_id, new_voice)
-        return new_voice
-    except Exception as e:
-        logger.error(f"Error toggling user voice preference: {e}")
-        return "text" 
+        await callback.answer("Failed to change voice mode. Please try again.", show_alert=True) 

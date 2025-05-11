@@ -8,11 +8,6 @@ from config import DATABASE_URL
 from functools import lru_cache
 import logging
 from pymongo import MongoClient
-from pyrogram import Client
-from modules.auto_delete import is_auto_delete_enabled
-from modules.welcome import is_welcome_enabled
-from modules.user.ai_mode_settings import get_user_ai_mode
-from modules.user.voice_settings import get_user_voice
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -31,29 +26,9 @@ user_lang_collection.create_index("user_id", unique=True)
 user_voice_collection.create_index("user_id", unique=True)
 ai_mode_collection.create_index("user_id", unique=True)
 
-# Define supported languages
-languages = {
-    "en": "English",
-    "hi": "Hindi",
-    "zh": "Chinese",
-    "ar": "Arabic",
-    "fr": "French",
-    "ru": "Russian"
-}
-
-# Define AI modes
-modes = {
-    "chatbot": "🤖 Chatbot",
-    "coder": "👨‍💻 Coder/Developer",
-    "professional": "👔 Professional",
-    "teacher": "👨‍🏫 Teacher",
-    "therapist": "🧠 Therapist",
-    "assistant": "👨‍💼 Personal Assistant",
-    "gamer": "🎮 Gamer",
-    "translator": "🌐 Translator"
-}
-
-async def get_user_settings(user_id: int):
+# Cache for user settings with increased size
+@lru_cache(maxsize=2000)
+def get_user_settings(user_id: int):
     """Get all user settings in one database query"""
     settings = {
         'language': 'en',
@@ -81,99 +56,114 @@ async def get_user_settings(user_id: int):
     
     return settings
 
-@Client.on_message(filters.command("settings"))
-async def settings_command(client, message):
+def update_user_settings(user_id: int, setting_type: str, value: str):
+    """Update user settings with optimized database operations"""
     try:
-        # Get user settings
-        settings = await get_user_settings(message.from_user.id)
+        collection_map = {
+            'language': user_lang_collection,
+            'voice': user_voice_collection,
+            'mode': ai_mode_collection
+        }
         
-        # Get user details
-        user = message.from_user
-        user_id = user.id
-        username = user.username or "Not set"
-        first_name = user.first_name or "Not set"
-        last_name = user.last_name or "Not set"
-        
-        # Get additional preferences
-        auto_delete = await is_auto_delete_enabled()
-        welcome = await is_welcome_enabled()
-        
-        # Format user details
-        user_details = (
-            f"👤 **User Details**\n"
-            f"├ ID: `{user_id}`\n"
-            f"├ Username: @{username}\n"
-            f"├ First Name: {first_name}\n"
-            f"└ Last Name: {last_name}\n\n"
-            f"⚙️ **Preferences**\n"
-            f"├ Language: {languages.get(settings['language'], settings['language'])}\n"
-            f"├ AI Mode: {modes.get(settings['mode'], settings['mode'])}\n"
-            f"├ Voice: {settings['voice'].capitalize()}\n"
-            f"├ Auto Delete: {'Enabled' if auto_delete else 'Disabled'}\n"
-            f"└ Welcome Message: {'Enabled' if welcome else 'Disabled'}"
-        )
-        
-        # Create keyboard with single button
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🤖 Bot Link", url="https://t.me/your_bot_username")]
-        ])
-        
-        # Send message
-        await message.reply_text(
-            user_details,
-            reply_markup=keyboard
-        )
-        
+        if setting_type in collection_map:
+            collection_map[setting_type].update_one(
+                {"user_id": user_id},
+                {"$set": {setting_type: value}},
+                upsert=True
+            )
+            # Clear cache for this user
+            get_user_settings.cache_clear()
+            return True
+        return False
     except Exception as e:
-        logger.error(f"Error in settings command: {e}")
-        await message.reply_text("An error occurred while fetching settings. Please try again later.")
+        logger.error(f"Error updating user settings: {e}")
+        return False
 
-@Client.on_callback_query(filters.regex("^settings_"))
-async def settings_inline(client, callback_query):
+modes = {
+    "chatbot": "🤖 Chatbot",
+    "coder": "👨‍💻 Coder/Developer",
+    "professional": "👔 Professional",
+    "teacher": "👨‍🏫 Teacher",
+    "therapist": "🧠 Therapist",
+    "assistant": "👨‍💼 Personal Assistant",
+    "gamer": "🎮 Gamer",
+    "translator": "🌐 Translator"
+}
+
+settings_text = """
+**⚙️ Settings Menu**
+
+👤 **User Information:**
+• Name: {mention}
+• ID: `{user_id_str}`
+
+🌐 **Language:** {language}
+🎙️ **Voice Mode:** {voice_setting}
+🤖 **AI Mode:** {mode}
+
+Select an option below to change your settings.
+"""
+
+async def settings_inline(client, callback):
     try:
+        user_id = callback.from_user.id
+        user_lang = get_user_language(user_id)
+        
         # Get user settings
-        settings = await get_user_settings(callback_query.from_user.id)
+        settings = get_user_settings(user_id)
         
-        # Get user details
-        user = callback_query.from_user
-        user_id = user.id
-        username = user.username or "Not set"
-        first_name = user.first_name or "Not set"
-        last_name = user.last_name or "Not set"
-        
-        # Get additional preferences
-        auto_delete = await is_auto_delete_enabled()
-        welcome = await is_welcome_enabled()
-        
-        # Format user details
-        user_details = (
-            f"👤 **User Details**\n"
-            f"├ ID: `{user_id}`\n"
-            f"├ Username: @{username}\n"
-            f"├ First Name: {first_name}\n"
-            f"└ Last Name: {last_name}\n\n"
-            f"⚙️ **Preferences**\n"
-            f"├ Language: {languages.get(settings['language'], settings['language'])}\n"
-            f"├ AI Mode: {modes.get(settings['mode'], settings['mode'])}\n"
-            f"├ Voice: {settings['voice'].capitalize()}\n"
-            f"├ Auto Delete: {'Enabled' if auto_delete else 'Disabled'}\n"
-            f"└ Welcome Message: {'Enabled' if welcome else 'Disabled'}"
+        # Format and translate message
+        message_text = await translate_text_async(
+            settings_text.format(
+                mention=callback.from_user.mention,
+                user_id_str=str(user_id),
+                language=get_language_display_name(settings['language']),
+                voice_setting=settings['voice'].capitalize(),
+                mode=modes[settings['mode']]
+            ),
+            user_lang
         )
         
-        # Create keyboard with single button
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🤖 Bot Link", url="https://t.me/your_bot_username")]
-        ])
-        
-        # Edit message
-        await callback_query.message.edit_text(
-            user_details,
-            reply_markup=keyboard
+        # Create keyboard with translated buttons
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        await translate_text_async("🌐 Language", user_lang),
+                        callback_data="settings_lans"
+                    ),
+                    InlineKeyboardButton(
+                        await translate_text_async("🎙️ Voice", user_lang),
+                        callback_data="settings_v"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        await translate_text_async("🤖 AI Mode", user_lang),
+                        callback_data="settings_assistant"
+                    ),
+                    InlineKeyboardButton(
+                        await translate_text_async("⚡ Others", user_lang),
+                        callback_data="settings_others"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        await translate_text_async("🔙 Back", user_lang),
+                        callback_data="back"
+                    )
+                ]
+            ]
         )
         
+        await callback.message.edit_text(
+            message_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
     except Exception as e:
-        logger.error(f"Error in settings inline: {e}")
-        await callback_query.answer("An error occurred. Please try again.", show_alert=True)
+        logger.error(f"Error in settings_inline: {e}")
+        await callback.answer("An error occurred. Please try again.", show_alert=True)
 
 async def settings_back_callback(client, callback):
     try:
@@ -220,7 +210,7 @@ async def settings_back_callback(client, callback):
 async def settings_language_callback(client, callback):
     try:
         user_id = callback.from_user.id
-        settings = await get_user_settings(user_id)
+        settings = get_user_settings(user_id)
         current_language = settings['language']
         
         # Format and translate message
@@ -291,7 +281,7 @@ async def change_language(client, callback):
             return
         
         # Get updated settings
-        settings = await get_user_settings(user_id)
+        settings = get_user_settings(user_id)
         
         # Format and translate confirmation message
         message_text = await translate_text_async(
@@ -370,7 +360,7 @@ async def change_voice_setting(client, callback):
         update_user_settings(user_id, 'voice', new_voice_setting)
 
         # Get current language
-        settings = await get_user_settings(user_id)
+        settings = get_user_settings(user_id)
 
         # Format and translate message
         message_text = await translate_text_async(
@@ -416,7 +406,7 @@ async def settings_voice_inlines(client, callback):
         user_id = callback.from_user.id
         
         # Get all user settings in one go
-        settings = await get_user_settings(user_id)
+        settings = get_user_settings(user_id)
         
         # Format settings for display
         current_language_label = languages[settings['language']]
