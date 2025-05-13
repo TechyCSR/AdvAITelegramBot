@@ -4,22 +4,35 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import get_ui_message, get_user_language
+from modules.lang import translate_to_lang
 from modules.chatlogs import channel_log
 import database.user_db as user_db
 
-# Define button texts in English (will be translated at runtime)
+# Define button texts
 button_list = [
-    "add_to_group_button",
-    "commands_button",
-    "help_button",
-    "settings_button",
-    "support_button"
+    "Add to Group",
+    "Commands",
+    "Help",
+    "Settings",
+    "Support"
 ]
 
-# Add these to the English language file via the message key system
-welcome_text_key = "welcome_message"
-tip_text_key = "welcome_tip"
+welcome_text = """
+**Welcome {user_mention}!** 👋
+
+I'm an advanced AI-powered Telegram bot that can:
+- Chat intelligently using GPT-4
+- Convert voice messages to text and vice versa
+- Generate images from text descriptions
+- Extract text from images
+- Support multiple languages
+
+Use the buttons below to explore my features!
+
+**@AdvChatGptBot**
+"""
+
+tip_text = "💡 Tip: You can use /help to see all available commands!"
 
 LOGO = "https://telegra.ph/file/2c1010dc1030c8898448f.mp4"
 
@@ -28,18 +41,11 @@ async def start(client, message):
     if message.from_user.username:
         await user_db.check_and_add_username(message.from_user.id, message.from_user.username)
 
-    # Get user's language preference
+    # Translate welcome text and button texts
     user_id = message.from_user.id
-    
-    # Get translated welcome message with user mention
-    welcome_text = get_ui_message(welcome_text_key, user_id)
-    welcome_text = welcome_text.replace("{user_mention}", message.from_user.mention)
-    
-    # Get translated button texts
-    translated_buttons = [get_ui_message(btn, user_id) for btn in button_list]
-    
-    # Get translated tip text
-    tip_text = get_ui_message(tip_text_key, user_id)
+    translated_welcome = translate_to_lang(welcome_text, user_id)
+    translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
+    translated_tip = translate_to_lang(tip_text, user_id)
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
@@ -54,20 +60,18 @@ async def start(client, message):
     await client.send_animation(
         chat_id=message.chat.id,
         animation=LOGO,
-        caption=welcome_text,
+        caption=translated_welcome,
         reply_markup=keyboard
     )
-    await message.reply_text(tip_text)
+    await message.reply_text(translated_tip)
 
 async def start_inline(bot, callback):
     user_id = callback.from_user.id
-    
-    # Get translated welcome message with user mention
-    welcome_text = get_ui_message(welcome_text_key, user_id)
-    welcome_text = welcome_text.replace("{user_mention}", callback.from_user.mention)
-    
-    # Get translated button texts
-    translated_buttons = [get_ui_message(btn, user_id) for btn in button_list]
+    mention = callback.from_user.mention
+
+    # Translate welcome text and button texts
+    translated_welcome = translate_to_lang(welcome_text, user_id)
+    translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
@@ -82,7 +86,7 @@ async def start_inline(bot, callback):
     await bot.edit_message_caption(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
-        caption=welcome_text,
+        caption=translated_welcome,
         reply_markup=keyboard
     )
 

@@ -4,7 +4,6 @@ import soundfile as sf
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
 from config import DATABASE_URL, LOG_CHANNEL
-from modules.lang import get_ui_message, get_user_language
 
 from modules.speech.text_to_voice import handle_text_message 
 from modules.modles.ai_res import get_response
@@ -27,8 +26,6 @@ async def handle_voice_message(client, message):
     except Exception:
         file_id = message.audio.file_id
 
-    user_id = message.from_user.id
-    
     voice_path = await client.download_media(file_id) #ogg format
     
     # Convert the voice message to WAV format
@@ -43,14 +40,16 @@ async def handle_voice_message(client, message):
     try:
         res = recognizer.recognize_google(audio, language='en-US')
     except sr.UnknownValueError:
-        await message.reply_text(get_ui_message("voice_recognition_error", user_id))
+        await message.reply_text("Sorry, I couldn't understand the audio.")
         return
     except sr.RequestError as e:
         print(f"Could not request results from Google Speech Recognition service; {e}")
-        await message.reply_text(get_ui_message("voice_service_error", user_id))
+        await message.reply_text("There was an issue with the speech recognition service. Please try again later.")
         return
     
     # print(f"Recognized text: {res}")
+
+    user_id = message.from_user.id
 
     # Check if the user already exists in the database
     user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
@@ -67,6 +66,7 @@ async def handle_voice_message(client, message):
             upsert=True
         )
     try:
+        user_id = message.from_user.id
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history:
@@ -107,10 +107,8 @@ async def handle_voice_message(client, message):
         )
 
     except Exception as e:
-        error_msg = get_ui_message("ai_processing_error", user_id)
-        await message.reply_text(f"{error_msg}: {e}")
+        await message.reply_text(f"An error occurred: {e}")
         print(f"Error in speech Voice2Text function: {e}")
-        return
 
     if current_setting == "voice":
         await client.send_audio(LOG_CHANNEL, wav_path)

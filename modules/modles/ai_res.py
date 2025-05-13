@@ -4,7 +4,6 @@ from pyrogram import Client, filters, enums
 from g4f.client import Client as GPTClient
 from config import DATABASE_URL
 from modules.chatlogs import user_log
-from modules.lang import get_ui_message, get_user_language
 
 
 mongo_client = MongoClient(DATABASE_URL)
@@ -29,11 +28,9 @@ def get_response(history):
 
 async def aires(client, message):
     try:
-        user_id = message.from_user.id
-        
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
-        temp = await message.reply_text(get_ui_message("typing", user_id))
-        
+        temp =await message.reply_text("typing....")
+        user_id = message.from_user.id
         ask = message.text
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
@@ -78,8 +75,7 @@ async def aires(client, message):
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
-        error_msg = get_ui_message("ai_processing_error", user_id)
-        await message.reply_text(f"{error_msg}: {e}")
+        await message.reply_text(f"An error occurred: {e}")
         print(f"Error in aires function: {e}")
 
 async def new_chat(client, message):
@@ -89,13 +85,10 @@ async def new_chat(client, message):
         history_collection.delete_one({"user_id": user_id})
 
         # Send confirmation message to the user
-        await message.reply_text(get_ui_message("new_chat_started", user_id))
+        await message.reply_text("Your chat history has been cleared. You can start a new conversation now.")
 
     except Exception as e:
-        error_msg = get_ui_message("clear_history_error", user_id)
-        if error_msg == "clear_history_error":
-            error_msg = "An error occurred while clearing chat history"
-        await message.reply_text(f"{error_msg}: {e}")
+        await message.reply_text(f"An error occurred while clearing chat history: {e}")
         print(f"Error in new_chat function: {e}")
 
 

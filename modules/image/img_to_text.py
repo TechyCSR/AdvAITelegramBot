@@ -4,7 +4,6 @@ from config import OCR_KEY, DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from modules.modles.ai_res import get_response
 from modules.chatlogs import user_log
-from modules.lang import get_ui_message, get_user_language
 import os
 
 
@@ -15,14 +14,11 @@ db = mongo_client['aibotdb']
 history_collection = db['history']
 
 async def extract_text_res(bot, update):
-    user_id = update.from_user.id
-    processing_msg = await update.reply(get_ui_message("extracting_text", user_id))
-    
+    processing_msg = await update.reply("ᴇxᴛʀᴀᴄᴛɪɴɢ ᴛᴇxᴛ ꜰʀᴏᴍ ɪᴍᴀɢᴇ...")
     if update.caption:
         caption = update.caption[3:]
     else:
         caption = ""
-    
     # Get the largest available version of the image
     if isinstance(update.photo, list):
         photo = update.photo[-1]
@@ -44,15 +40,14 @@ async def extract_text_res(bot, update):
         extracted_text = response_data["ParsedResults"][0]["ParsedText"]
     else:
         error_message = response_data["ErrorMessage"]
-        error_text = get_ui_message("ocr_error", user_id) + f": {error_message}"
-        await update.reply_photo(photo=file, caption=error_text + "\n" + get_ui_message("no_text_found", user_id))
-        await processing_msg.delete()
+        text = f"Error: Failed to extract text from image. {error_message}"
+        await update.reply_photo(photo=file, caption=text + "\nNo text found")
         return
-    
     extracted_text = extracted_text + caption
     await processing_msg.delete()
 
     try:
+        user_id = update.from_user.id
         ask = extracted_text 
 
         # Fetch user history from MongoDB
@@ -96,22 +91,16 @@ async def extract_text_res(bot, update):
             upsert=True
         )
 
-        # Get the translated completion message
-        feature_notice = get_ui_message("beta_feature_notice", user_id)
-        if feature_notice == "beta_feature_notice":
-            feature_notice = "**Beta Version Feature @AdvChatGptBot**"
-        
         # Reply to the user's message with the AI response
-        await update.reply_text(ai_response + "\n\n" + feature_notice)
-        
-        # Log photo and text
+        await update.reply_text(ai_response+"\n\n**Beta Verion Feature @AdvChatGptBot**")
+        #log photo and text
         await bot.send_photo(chat_id=LOG_CHANNEL, photo=file)
-        await user_log(bot, update, "#Image\n" + extracted_text + "\n" + ai_response)
+
+        await user_log(bot, update, "#Image\n"+extracted_text+"\n"+ai_response)
         os.remove(file)
 
     except Exception as e:
-        error_msg = get_ui_message("ai_processing_error", user_id)
-        await update.reply_text(f"{error_msg}: {e}")
-        print(f"Error in extract_text_res function: {e}")
+        await update.reply_text(f"An error occurred: {e}")
+        print(f"Error in aires function: {e}")
 
 

@@ -1,3 +1,4 @@
+
 import os
 import random
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,7 +11,6 @@ from ImgGenModel.g4f.cookies import set_cookies
 # from g4f.Provider import BingCreateImages
 # from g4f.cookies import set_cookies
 from config import BING_COOKIE, DATABASE_URL , LOG_CHANNEL
-from modules.lang import get_ui_message, get_user_language
 import requests
 from datetime import datetime
 
@@ -77,30 +77,15 @@ def generate_command(client, message, prompt):
 
     if error_var==1:
         client.send_message(LOG_CHANNEL, f"#ImgLog #Rejected\nImages generated : {prompt}\n**User**: {message.from_user.mention}\n **User ID**: {message.from_user.id} \n **Time** : {datetime.now()} \n**Chat ID**: {message.chat.id}\n")
-        message.reply_text(get_ui_message("image_generation_error", user_id))
+        message.reply_text("Error generating images. Please try again. or try with different prompt")
         return 
     
     # Prepare media group (album) to send images as a group
-    # Get the caption in user's language
-    caption_template = get_ui_message("generated_image_caption", user_id, None)
-    if not caption_template or caption_template == "generated_image_caption":
-        caption_template = "Generated images for prompt: {prompt}"
-    
-    caption = caption_template.replace("{prompt}", prompt)
-    
-    media_group = [InputMediaPhoto(url, caption=caption) for url in urls]
+    media_group = [InputMediaPhoto(url,caption=f"Generated images for prompt: {prompt}") for url in urls]
     
     # Reply with the generated images in a single group
     message.reply_media_group(media_group)
-    
-    # Get the completion message in user's language
-    completion_msg = get_ui_message("image_gen_complete", user_id, None)
-    if not completion_msg or completion_msg == "image_gen_complete":
-        completion_msg = "Images generated : {prompt}\nUser: {user_mention}\n**@AdvChatGptBot**"
-    
-    completion_msg = completion_msg.replace("{prompt}", prompt).replace("{user_mention}", message.from_user.mention)
-    
-    message.reply_text(completion_msg)
+    message.reply_text(f"Images generated : {prompt}\n User: {message.from_user.mention}\n**@AdvChatGptBot**")
 
     #log images to log channel
     client.send_media_group(LOG_CHANNEL, media_group)
