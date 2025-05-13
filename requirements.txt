@@ -5,8 +5,11 @@ g4f==0.4.0.0
 pytz
 # py3langid>=0.2.2
 soundfile==0.12.1
-SpeechRecognition== 3.10.0
+SpeechRecognition==3.10.0
 gTTS==2.3.2
 numpy
 pymongo
-googletrans
+
+# Translation dependencies
+deep-translator==1.11.4  # More reliable translations with placeholder support
+regex==2023.10.3  # For regex pattern matching in placeholder detection

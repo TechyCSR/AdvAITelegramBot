@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import translate_to_lang
+from modules.lang import async_translate_to_lang, batch_translate
 from modules.chatlogs import channel_log
 import database.user_db as user_db
 
@@ -43,17 +43,24 @@ async def start(client, message):
 
     # Translate welcome text and button texts
     user_id = message.from_user.id
-    translated_welcome = translate_to_lang(welcome_text, user_id)
-    translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
-    translated_tip = translate_to_lang(tip_text, user_id)
+    
+    # Batch translate all text together for efficiency
+    texts_to_translate = [welcome_text, tip_text] + button_list
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    
+    # Extract translated results
+    translated_welcome = translated_texts[0]
+    translated_welcome = translated_welcome.format(user_mention=message.from_user.mention)
+    translated_tip = translated_texts[1]
+    translated_buttons = translated_texts[2:]
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
-         InlineKeyboardButton(translated_buttons[2], callback_data="help")],
-        [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
-         InlineKeyboardButton(translated_buttons[4], callback_data="support")]
+        [InlineKeyboardButton(translated_buttons[0] + " 🔥 ", url=f"https://t.me/{client.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[1] + " 🛠️ ", callback_data="commands"),
+         InlineKeyboardButton(translated_buttons[2] + " 💬 ", callback_data="help")],
+        [InlineKeyboardButton(translated_buttons[3] + " ⚙️ ", callback_data="settings"),
+         InlineKeyboardButton(translated_buttons[4] + " 🆘 ", callback_data="support")]
     ])
 
     # Send the welcome message with the GIF and the keyboard
@@ -69,17 +76,22 @@ async def start_inline(bot, callback):
     user_id = callback.from_user.id
     mention = callback.from_user.mention
 
-    # Translate welcome text and button texts
-    translated_welcome = translate_to_lang(welcome_text, user_id)
-    translated_buttons = [translate_to_lang(btn, user_id) for btn in button_list]
+    # Batch translate all text together for efficiency
+    texts_to_translate = [welcome_text] + button_list
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    
+    # Extract translated results
+    translated_welcome = translated_texts[0]
+    translated_welcome = translated_welcome.format(user_mention=mention)
+    translated_buttons = translated_texts[1:]
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
-         InlineKeyboardButton(translated_buttons[2], callback_data="help")],
-        [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
-         InlineKeyboardButton(translated_buttons[4], callback_data="support")]
+        [InlineKeyboardButton(translated_buttons[0] + " 🔥 ", url=f"https://t.me/{bot.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[1] + " 🛠️ ", callback_data="commands"),
+         InlineKeyboardButton(translated_buttons[2] + " 💬 ", callback_data="help")],
+        [InlineKeyboardButton(translated_buttons[3] + " ⚙️ ", callback_data="settings"),
+         InlineKeyboardButton(translated_buttons[4] + " 🆘 ", callback_data="support")]
     ])
 
     # Send the welcome message with the GIF and the keyboard

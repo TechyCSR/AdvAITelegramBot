@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import translate_to_lang
+from modules.lang import async_translate_to_lang
 from modules.chatlogs import channel_log
 
 
@@ -34,7 +34,7 @@ help_text = """
 
 async def help(client, message):
     user_id = message.from_user.id
-    translated_text = translate_to_lang(help_text, user_id)
+    translated_text = await async_translate_to_lang(help_text, user_id)
     await client.send_message(
         chat_id=message.chat.id,
         text=translated_text,
@@ -43,7 +43,7 @@ async def help(client, message):
 
 async def help_inline(bot, callback):
     user_id = callback.from_user.id
-    translated_text = translate_to_lang(help_text, user_id)
+    translated_text = await async_translate_to_lang(help_text, user_id)
     keyboard = InlineKeyboardMarkup(
         [
             [

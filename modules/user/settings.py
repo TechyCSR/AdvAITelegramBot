@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import translate_to_lang
+from modules.lang import async_translate_to_lang
 from modules.chatlogs import channel_log
 from config import DATABASE_URL
 
@@ -81,7 +81,7 @@ async def settings_inline(client, callback):
     current_mode_label = modes[current_mode]
     current_language_label = languages[current_language]
 
-    translated_text = translate_to_lang(settings_text, user_id)
+    translated_text = await async_translate_to_lang(settings_text, user_id)
     formatted_text = translated_text.format(
         mention=callback.from_user.mention,
         user_id=callback.from_user.id,
@@ -90,18 +90,25 @@ async def settings_inline(client, callback):
         mode=current_mode_label,
     )
 
+    # Translate button labels
+    language_btn = await async_translate_to_lang("🌐 Language", user_id)
+    voice_btn = await async_translate_to_lang("🎙️ Voice", user_id)
+    assistant_btn = await async_translate_to_lang("🤖 Assistant", user_id)
+    others_btn = await async_translate_to_lang("🔧 Others", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🌐 Language", callback_data="settings_lans"),
-                InlineKeyboardButton("🎙️ Voice", callback_data="settings_v")
+                InlineKeyboardButton(language_btn, callback_data="settings_lans"),
+                InlineKeyboardButton(voice_btn, callback_data="settings_v")
             ],
             [
-                InlineKeyboardButton("🤖 Assistant", callback_data="settings_assistant"),
-                InlineKeyboardButton("🔧 Others", callback_data="settings_others")
+                InlineKeyboardButton(assistant_btn, callback_data="settings_assistant"),
+                InlineKeyboardButton(others_btn, callback_data="settings_others")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="back")
+                InlineKeyboardButton(back_btn, callback_data="back")
             ]
         ]
     )
@@ -128,11 +135,20 @@ async def settings_language_callback(client, callback):
         user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
 
     print(f"Voice setting for {user_id}: {voice_setting}")
+    
+    # Translate base text and options
+    voice_text = await async_translate_to_lang("Voice", user_id)
+    text_option = await async_translate_to_lang("Text", user_id)
+    current_setting = await async_translate_to_lang("Current setting: Answering in", user_id)
+    queries_only = await async_translate_to_lang("queries only.", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+    
     # Update the button texts based on the user's current setting
-    voice_button_text = "🎙️ Voice ✅" if voice_setting == "voice" else "🎙️ Voice"
-    text_button_text = "💬 Text ✅" if voice_setting == "text" else "💬 Text"
+    voice_button_text = f"🎙️ {voice_text} ✅" if voice_setting == "voice" else f"🎙️ {voice_text}"
+    text_button_text = f"💬 {text_option} ✅" if voice_setting == "text" else f"💬 {text_option}"
 
-    message_text = f"Current setting: Answering in {'Voice' if voice_setting == 'voice' else 'Text'} queries only."
+    # Create the message text with translated components
+    message_text = f"{current_setting} {voice_text if voice_setting == 'voice' else text_option} {queries_only}"
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -141,7 +157,7 @@ async def settings_language_callback(client, callback):
                 InlineKeyboardButton(text_button_text, callback_data="settings_text")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(back_btn, callback_data="settings_back")
             ]
         ]
     )
@@ -167,12 +183,19 @@ async def change_voice_setting(client, callback):
         upsert=True
     )
 
-    # Determine the current setting to display
-    message_text = f"Current setting: Answering in {'Voice' if new_voice_setting == 'voice' else 'Text'} queries only."
+    # Translate base text and options
+    voice_text = await async_translate_to_lang("Voice", user_id)
+    text_option = await async_translate_to_lang("Text", user_id)
+    current_setting = await async_translate_to_lang("Current setting: Answering in", user_id)
+    queries_only = await async_translate_to_lang("queries only.", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+
+    # Create the message text with translated components
+    message_text = f"{current_setting} {voice_text if new_voice_setting == 'voice' else text_option} {queries_only}"
 
     # Update the button texts with checkmarks
-    voice_button_text = "🎙️ Voice ✅" if new_voice_setting == "voice" else "🎙️ Voice"
-    text_button_text = "💬 Text ✅" if new_voice_setting == "text" else "💬 Text"
+    voice_button_text = f"🎙️ {voice_text} ✅" if new_voice_setting == "voice" else f"🎙️ {voice_text}"
+    text_button_text = f"💬 {text_option} ✅" if new_voice_setting == "text" else f"💬 {text_option}"
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -181,7 +204,7 @@ async def change_voice_setting(client, callback):
                 InlineKeyboardButton(text_button_text, callback_data="settings_text")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(back_btn, callback_data="settings_back")
             ]
         ]
     )
@@ -235,7 +258,7 @@ You can change your settings from below options.
     current_mode_label = modes[current_mode]
     current_language_label = languages[current_language]
 
-    translated_text = translate_to_lang(settings_text, user_id)
+    translated_text = await async_translate_to_lang(settings_text, user_id)
     formatted_text = translated_text.format(
         mention=callback.from_user.mention,
         user_id=callback.from_user.id,
@@ -243,18 +266,26 @@ You can change your settings from below options.
         voice_setting=voice_setting,
         mode=current_mode_label,
     )
+    
+    # Translate button labels
+    language_btn = await async_translate_to_lang("🌐 Language", user_id)
+    voice_btn = await async_translate_to_lang("🎙️ Voice", user_id)
+    assistant_btn = await async_translate_to_lang("🤖 Assistant", user_id)
+    others_btn = await async_translate_to_lang("🔧 Others", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+    
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🌐 Language", callback_data="settings_lans"),
-                InlineKeyboardButton("🎙️ Voice", callback_data="settings_v")
+                InlineKeyboardButton(language_btn, callback_data="settings_lans"),
+                InlineKeyboardButton(voice_btn, callback_data="settings_v")
             ],
             [
-                InlineKeyboardButton("🤖 Assistant", callback_data="settings_assistant"),
-                InlineKeyboardButton("🔧 Others", callback_data="settings_others")
+                InlineKeyboardButton(assistant_btn, callback_data="settings_assistant"),
+                InlineKeyboardButton(others_btn, callback_data="settings_others")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="back")
+                InlineKeyboardButton(back_btn, callback_data="back")
             ]
         ]
     )

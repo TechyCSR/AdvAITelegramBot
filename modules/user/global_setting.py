@@ -2,7 +2,7 @@ from pyrogram import Client, filters
 from config import DATABASE_URL, LOG_CHANNEL
 from pymongo import MongoClient
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from modules.lang import translate_to_lang
+from modules.lang import async_translate_to_lang
 
 # Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
@@ -78,7 +78,7 @@ You can change your settings from @AdvChatGptBot's settings menu.
     
     current_mode_label = modes[current_mode]
 
-    translated_text = translate_to_lang(global_settings_text, user_id)
+    translated_text = await async_translate_to_lang(global_settings_text, user_id)
     formatted_text = translated_text.format(
         mention=message.from_user.mention,
         user_id=message.from_user.id,

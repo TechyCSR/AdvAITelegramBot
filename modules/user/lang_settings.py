@@ -1,8 +1,8 @@
-
 from pymongo import MongoClient
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import DATABASE_URL
+from modules.lang import async_translate_to_lang
 
 # Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
@@ -34,7 +34,14 @@ async def settings_langs_callback(client, callback):
         user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
 
     current_language_label = languages[current_language]
-    message_text = f"Current language: {current_language_label}"
+    
+    # Translate current language text
+    current_lang_text = await async_translate_to_lang("Current language:", user_id)
+    message_text = f"{current_lang_text} {current_language_label}"
+
+    # No need to translate language names as they're always displayed in their native form
+    # But translate the Back button
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -51,7 +58,7 @@ async def settings_langs_callback(client, callback):
                 InlineKeyboardButton("🇷🇺 Russian", callback_data="language_ru")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(back_btn, callback_data="settings_back")
             ]
         ]
     )
@@ -75,7 +82,15 @@ async def change_language_setting(client, callback):
     )
 
     current_language_label = languages[new_language]
-    message_text = f"Current language: {current_language_label}"
+    
+    # Translate current language text 
+    # Note: We translate using the NEW language setting
+    current_lang_text = await async_translate_to_lang("Current language:", lang=new_language)
+    message_text = f"{current_lang_text} {current_language_label}"
+
+    # No need to translate language names as they're always displayed in their native form
+    # But translate the Back button using the new language
+    back_btn = await async_translate_to_lang("🔙 Back", lang=new_language)
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -92,7 +107,7 @@ async def change_language_setting(client, callback):
                 InlineKeyboardButton("🇷🇺 Russian", callback_data="language_ru")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(back_btn, callback_data="settings_back")
             ]
         ]
     )
@@ -104,3 +119,11 @@ async def change_language_setting(client, callback):
     )
 
 
+languages = {
+    "en": "🇬🇧 English",
+    "hi": "🇮🇳 Hindi",
+    "zh": "🇨🇳 Chinese",
+    "ar": "🇸🇦 Arabic",
+    "fr": "🇫🇷 French",
+    "ru": "🇷🇺 Russian"
+}

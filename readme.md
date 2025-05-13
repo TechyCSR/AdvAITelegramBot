@@ -1,4 +1,3 @@
-
 <div align="center" style="margin-top:1em;">
     <h1>
         <a href="https://t.me/AdvChatGptbot" alt="Run Telegram Bot shield"><marquee scrollamount="3" width="60%">Telegram Advanced AI ChatBot</marquee>
@@ -69,6 +68,8 @@ Welcome to the **Telegram Advanced AI ChatBot** project! This bot leverages cutt
   Transform your ideas into stunning visuals by generating images from textual prompts.  
 - **🔍 Visual Analysis (Google Lens):**  
   Extract insights and text from any image using cutting-edge AI tools.  
+- **🌐 Multilingual Support:**  
+  Fully localized interface in 6 languages (English, Hindi, Chinese, Arabic, French, Russian) with real-time translation of all bot responses.
 
 ---
 
@@ -93,6 +94,11 @@ Welcome to the **Telegram Advanced AI ChatBot** project! This bot leverages cutt
 
 - **Image Recognition:**  
   - **Image to Text Model:** [OCR](https://ocr.space/ocrapi), [Google Cloud Vision API](https://cloud.google.com/vision)
+
+- **Translation and Localization:**
+  - **Translation API:** [Deep Translator](https://deep-translator.readthedocs.io/)
+  - **Languages Supported:** English, Hindi, Chinese, Arabic, French, Russian
+  - **Features:** Automatic UI translation, response translation, placeholder preservation
 
 - **Backend Development:** 
   - **Framework:** [Flask](https://flask.palletsprojects.com/)  
@@ -149,9 +155,10 @@ AdvAITelegramBot/
 |   ├── chatlogs.py                  # Chat logging script
 |   ├── feedback_and_ratings.py      # Feedback and ratings handling
 |   ├── maintenance.py               # Maintenance scripts
-|   ├── lang.py                      # General language processing utilities
+|   ├── lang.py                      # Translation and language processing utilities
 ├── tests/                       # Test cases for modules
 │   ├── test_speech.py           # Test cases for speech module
+│   ├── test_translation.py      # Test cases for translation module
 ├── har_and_cookies/             # Stores HAR files and cookies for debugging
 │   └── ...                      # HAR and cookie files
 ├── .env                         # Environment variables (API keys, etc.)

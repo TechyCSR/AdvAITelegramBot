@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from modules.lang import async_translate_to_lang
 
 from config import ADMINS as admin_ids
 
@@ -30,26 +31,36 @@ About the bot:
 # print(admin_ids)
 # Function to handle settings support callback
 async def settings_support_callback(client, CallbackQuery):
-    # message_text = "🔧 **Support Options** 🔧\n\nSelect an option to get help or support."
+    user_id = CallbackQuery.from_user.id
+    
+    # Translate support text
+    translated_support_text = await async_translate_to_lang(support_text, user_id)
+    
+    # Translate button labels
+    admins_btn = await async_translate_to_lang("👥 Admins", user_id)
+    developers_btn = await async_translate_to_lang("💻 Developers", user_id)
+    community_btn = await async_translate_to_lang("🌐 Community", user_id)
+    source_code_btn = await async_translate_to_lang("⌨ Source Code", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
 
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("👥 Admins", callback_data="support_admins"),
-                InlineKeyboardButton("💻 Developers", callback_data="support_developers")
+                InlineKeyboardButton(admins_btn, callback_data="support_admins"),
+                InlineKeyboardButton(developers_btn, callback_data="support_developers")
             ],
             [
-                InlineKeyboardButton("🌐 Community", url="https://t.me/AdvChatGpt"),
-                InlineKeyboardButton("⌨ Source Code", url="https://github.com/TechyCSR/AdvAITelegramBot")
+                InlineKeyboardButton(community_btn, url="https://t.me/AdvChatGpt"),
+                InlineKeyboardButton(source_code_btn, url="https://github.com/TechyCSR/AdvAITelegramBot")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="back")
+                InlineKeyboardButton(back_btn, callback_data="back")
             ]
         ]
     )
 
     await CallbackQuery.message.edit(
-        text=support_text,
+        text=translated_support_text,
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
@@ -71,42 +82,51 @@ async def support_admins_callback(client, callback: CallbackQuery):
     user_id = callback.from_user.id
 
     if user_id not in admin_ids:
-        await callback.answer("This section is for admins only.", show_alert=True)
+        # Translate the alert message
+        alert_message = await async_translate_to_lang("This section is for admins only.", user_id)
+        await callback.answer(alert_message, show_alert=True)
         return
 
-    message_text = "🔧 **Admin Panel** 🔧\n\nManage the features below:"
+    # Translate admin panel title and labels
+    admin_panel_title = await async_translate_to_lang("🔧 **Admin Panel** 🔧\n\nManage the features below:", user_id)
+    image_generation_text = await async_translate_to_lang("🖼️ Image Generation", user_id)
+    voice_feature_text = await async_translate_to_lang("🎙️ Voice Feature", user_id)
+    premium_service_text = await async_translate_to_lang("💎 Premium Service", user_id)
+    on_text = await async_translate_to_lang("🔊 On", user_id)
+    off_text = await async_translate_to_lang("🔇 Off", user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
 
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(f"🖼️ Image Generation ({feature_states['image_generation']})", callback_data="toggle_image_generation")
+                InlineKeyboardButton(f"{image_generation_text} ({feature_states['image_generation']})", callback_data="toggle_image_generation")
             ],
             [
-                InlineKeyboardButton("🔊 On", callback_data="set_image_generation_on"),
-                InlineKeyboardButton("🔇 Off", callback_data="set_image_generation_off")
+                InlineKeyboardButton(on_text, callback_data="set_image_generation_on"),
+                InlineKeyboardButton(off_text, callback_data="set_image_generation_off")
             ],
             [
-                InlineKeyboardButton(f"🎙️ Voice Feature ({feature_states['voice_feature']})", callback_data="toggle_voice_feature")
+                InlineKeyboardButton(f"{voice_feature_text} ({feature_states['voice_feature']})", callback_data="toggle_voice_feature")
             ],
             [
-                InlineKeyboardButton("🔊 On", callback_data="set_voice_feature_on"),
-                InlineKeyboardButton("🔇 Off", callback_data="set_voice_feature_off")
+                InlineKeyboardButton(on_text, callback_data="set_voice_feature_on"),
+                InlineKeyboardButton(off_text, callback_data="set_voice_feature_off")
             ],
             [
-                InlineKeyboardButton(f"💎 Premium Service ({feature_states['premium_service']})", callback_data="toggle_premium_service")
+                InlineKeyboardButton(f"{premium_service_text} ({feature_states['premium_service']})", callback_data="toggle_premium_service")
             ],
             [
-                InlineKeyboardButton("🔊 On", callback_data="set_premium_service_on"),
-                InlineKeyboardButton("🔇 Off", callback_data="set_premium_service_off")
+                InlineKeyboardButton(on_text, callback_data="set_premium_service_on"),
+                InlineKeyboardButton(off_text, callback_data="set_premium_service_off")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="support")
+                InlineKeyboardButton(back_btn, callback_data="support")
             ]
         ]
     )
 
     await callback.message.edit(
-        text=message_text,
+        text=admin_panel_title,
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
