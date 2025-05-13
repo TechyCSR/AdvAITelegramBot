@@ -125,6 +125,7 @@ celerybeat.pid
 .env
 .Adance AI ChatBot.session
 .venv
+sessions/
 env/
 venv/
 ENV/

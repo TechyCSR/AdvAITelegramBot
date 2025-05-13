@@ -25,14 +25,13 @@ from modules.image.image_generation import generate_command
 from modules.chatlogs import channel_log, user_log
 from modules.user.global_setting import global_setting_command
 import database.user_db as user_db
-
-advAiBot = pyrogram.Client("AdvChatGptBotV2", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH)
+#working directory is sessions
+advAiBot = pyrogram.Client("AdvChatGptBotV2", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH,workdir="sessions")
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
     await start(bot, update)
     await channel_log(bot, update, "/start")
-
 
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
