@@ -2,8 +2,11 @@ import os
 import asyncio
 import time
 import re
- from pyrogram import Client, filters, enums
-efrom modules.chatlogs import user_log
+from pymongo import MongoClient
+from pyrogram import Client, filters, enums
+from g4f.client import Client as GPTClient
+from config import DATABASE_URL
+from modules.chatlogs import user_log
 
 
 mongo_client = MongoClient(DATABASE_URL)
