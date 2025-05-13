@@ -34,7 +34,7 @@ Use the buttons below to explore my features!
 
 tip_text = "💡 Tip: You can use /help to see all available commands!"
 
-LOGO = "https://telegra.ph/file/2c1010dc1030c8898448f.mp4"
+LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
 async def start(client, message):
     await user_db.check_and_add_user(message.from_user.id)
