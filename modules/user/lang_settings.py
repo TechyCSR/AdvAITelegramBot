@@ -1,8 +1,8 @@
-
 from pymongo import MongoClient
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import DATABASE_URL
+from modules.lang import get_ui_message, get_user_language
 
 # Initialize the MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
@@ -26,15 +26,13 @@ async def settings_langs_callback(client, callback):
     user_id = callback.from_user.id
     
     # Fetch the user's current language from the database
-    user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
-    if user_lang_doc:
-        current_language = user_lang_doc['language']
-    else:
+    current_language = get_user_language(user_id)
+    if not current_language:
         current_language = "en"
         user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
 
     current_language_label = languages[current_language]
-    message_text = f"Current language: {current_language_label}"
+    message_text = get_ui_message("current_language", user_id).replace("{lang}", current_language_label)
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -51,7 +49,7 @@ async def settings_langs_callback(client, callback):
                 InlineKeyboardButton("🇷🇺 Russian", callback_data="language_ru")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(get_ui_message("back_button", user_id), callback_data="settings_back")
             ]
         ]
     )
@@ -74,8 +72,14 @@ async def change_language_setting(client, callback):
         upsert=True
     )
 
+    # Get success message in the new language
+    success_message = get_ui_message("language_changed", user_id, new_language)
+    
+    # Send temporary notification
+    await callback.answer(success_message)
+    
     current_language_label = languages[new_language]
-    message_text = f"Current language: {current_language_label}"
+    message_text = get_ui_message("current_language", user_id, new_language).replace("{lang}", current_language_label)
 
     keyboard = InlineKeyboardMarkup(
         [
@@ -92,7 +96,7 @@ async def change_language_setting(client, callback):
                 InlineKeyboardButton("🇷🇺 Russian", callback_data="language_ru")
             ],
             [
-                InlineKeyboardButton("🔙 Back", callback_data="settings_back")
+                InlineKeyboardButton(get_ui_message("back_button", user_id, new_language), callback_data="settings_back")
             ]
         ]
     )
