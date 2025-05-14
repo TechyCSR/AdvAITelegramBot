@@ -12,11 +12,16 @@ from config import BING_COOKIE, DATABASE_URL, LOG_CHANNEL
 import requests
 from datetime import datetime
 import time
+import logging
+import json
 
+# Get the logger
+logger = logging.getLogger(__name__)
 
 mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
 user_images_collection = db['user_images']
+image_feedback_collection = db['image_feedback']  # New collection for tracking feedback
 
 # Store active generations to track them
 active_generations = {}
@@ -24,13 +29,14 @@ active_generations = {}
 # Function to generate images with improved error handling and performance
 async def generate_images(prompt, max_images=4, style="realistic"):
     """Optimized image generation function with parallel processing"""
+    logger.info(f"Generating images with prompt: '{prompt}', style: '{style}'")
     generated_images = 0
     total_attempts = 0
     max_attempts = 2  # Reduced retry attempts for faster response
     image_urls = []
     
     # Try PollinationsAI first (faster) and fall back to default if needed
-    providers = ["PollinationsAI", None]  # None = default provider
+    providers = ["PollinationsAI", "Bing", None]
     
     for provider in providers:
         if generated_images >= max_images:
@@ -40,10 +46,17 @@ async def generate_images(prompt, max_images=4, style="realistic"):
         try:
             # Set provider if specified
             provider_obj = None
+            model_name = "dall-e-3"  # Default model
+            
             if provider == "PollinationsAI":
                 try:
                     provider_obj = PollinationsAI
-                except Exception:
+                    # PollinationsAI doesn't support stable-diffusion explicitly
+                    # It uses its own internal model, so don't specify model name
+                    model_name = None
+                    logger.info(f"Using PollinationsAI provider with its default model")
+                except Exception as e:
+                    logger.error(f"Failed to use PollinationsAI provider: {str(e)}")
                     continue
             
             # Create a complete prompt with style
@@ -54,16 +67,25 @@ async def generate_images(prompt, max_images=4, style="realistic"):
             height = 1024
             
             # Use async generation with timeout
+            logger.info(f"Starting image generation with provider: {provider or 'default'}, model: {model_name or 'provider default'}")
+            
+            # Prepare generation parameters based on provider
+            generation_kwargs = {
+                "prompt": styled_prompt,
+                "n": max_images - generated_images,
+                "provider": provider_obj,
+                "width": width,
+                "height": height,
+                "quality": "standard"  # Use standard quality for faster generation
+            }
+            
+            # Only add model parameter if it's specified (for providers that need it)
+            if model_name:
+                generation_kwargs["model"] = model_name
+                
+            # Call the API with the appropriate parameters
             response = await asyncio.wait_for(
-                client.images.async_generate(
-                    model="dall-e-3" if not provider else "stable-diffusion",
-                    prompt=styled_prompt,
-                    n=max_images - generated_images,
-                    provider=provider_obj,
-                    width=width,
-                    height=height,
-                    quality="standard"  # Use standard quality for faster generation
-                ),
+                client.images.async_generate(**generation_kwargs),
                 timeout=15  # Set timeout to prevent hanging
             )
             
@@ -77,16 +99,20 @@ async def generate_images(prompt, max_images=4, style="realistic"):
                     
             # If we got at least some images, consider it successful
             if generated_images > 0:
+                logger.info(f"Successfully generated {generated_images} images")
                 break
                 
         except asyncio.TimeoutError:
+            logger.warning(f"Image generation timed out with provider {provider}")
             print(f"Image generation timed out with provider {provider}")
             continue
         except Exception as e:
+            logger.error(f"Error generating image with provider {provider}: {str(e)}")
             print(f"Error generating image with provider {provider}: {str(e)}")
             continue
     
     if not image_urls:
+        logger.error("Failed to generate any images")
         return None, "Failed to generate images. Please try a different prompt or try again later."
     
     # Process URLs to local paths
@@ -97,11 +123,21 @@ async def generate_images(prompt, max_images=4, style="realistic"):
 # Telegram bot command handler for generating images with modern UI
 async def generate_command(client, message, prompt, reply_to_message_id=None, regenerate=False, feedback_msg=None):
     user_id = message.from_user.id
-    # Store this generation for tracking
+    chat_id = message.chat.id
+    username = message.from_user.username or f"user_{user_id}"
+    
+    logger.info(f"Image generation command from user {user_id} with prompt: '{prompt}'")
+    
+    # Record metadata about this generation
     generation_id = f"{user_id}_{int(time.time())}"
+    generation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     active_generations[generation_id] = {
         "prompt": prompt,
-        "status": "processing"
+        "status": "processing",
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "timestamp": generation_time,
+        "regenerated": regenerate
     }
     
     # Parse parameters from prompt if any
@@ -118,8 +154,9 @@ async def generate_command(client, message, prompt, reply_to_message_id=None, re
     if regenerate and feedback_msg:
         try:
             await feedback_msg.delete()
+            logger.info(f"Deleted previous feedback message for regeneration")
         except Exception as e:
-            print(f"Error deleting feedback message: {e}")
+            logger.error(f"Error deleting feedback message: {e}")
     
     # Show processing status with modern UI
     processing_msg = await message.reply_text(
@@ -138,13 +175,29 @@ async def generate_command(client, message, prompt, reply_to_message_id=None, re
         await processing_msg.edit_text(
             f"❌ **Image Generation Failed**\n\n{error}"
         )
+        
+        # Log the failure in a standardized format
+        log_data = {
+            "type": "image_generation_failed",
+            "prompt": prompt,
+            "style": style,
+            "user_id": user_id,
+            "username": username,
+            "chat_id": chat_id,
+            "error": error,
+            "timestamp": generation_time
+        }
+        
+        logger.error(f"Image generation failed: {json.dumps(log_data)}")
+        
         try:
             await client.send_message(
                 LOG_CHANNEL, 
-                f"#ImgLog #Rejected\nPrompt: {prompt}\nStyle: {style}\n**User**: {message.from_user.mention}\n**User ID**: {message.from_user.id}\n**Time**: {datetime.now()}\n**Chat ID**: {message.chat.id}\n"
+                f"#ImgLog #Rejected\n**Prompt**: `{prompt}`\n**Style**: `{style}`\n**User**: {message.from_user.mention}\n**User ID**: {message.from_user.id}\n**Time**: {generation_time}\n**Chat ID**: {message.chat.id}\n**Error**: {error}"
             )
-        except Exception:
-            pass  # Don't fail if logging fails
+        except Exception as e:
+            logger.error(f"Failed to send log to channel: {str(e)}")
+            
         return 
     
     # Prepare media group with generated images
@@ -165,8 +218,8 @@ async def generate_command(client, message, prompt, reply_to_message_id=None, re
     # Create feedback buttons for the generated images
     feedback_markup = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👍 Love it", callback_data=f"img_feedback_positive_{user_id}"),
-            InlineKeyboardButton("👎 Not good", callback_data=f"img_feedback_negative_{user_id}")
+            InlineKeyboardButton("👍 Love it", callback_data=f"img_feedback_positive_{user_id}_{generation_id}"),
+            InlineKeyboardButton("👎 Not good", callback_data=f"img_feedback_negative_{user_id}_{generation_id}")
         ],
         [InlineKeyboardButton("🔄 Regenerate", callback_data=f"img_regenerate_{user_id}_{prompt}")]
     ])
@@ -181,58 +234,125 @@ async def generate_command(client, message, prompt, reply_to_message_id=None, re
     
     # Store feedback message ID for potential regeneration
     active_generations[generation_id]["feedback_msg_id"] = feedback_msg.id
+    active_generations[generation_id]["status"] = "completed"
     
-    # Log images to log channel
+    # Store image generation metadata in the database
     try:
-        await client.send_media_group(LOG_CHANNEL, media_group)
+        user_images_collection.insert_one({
+            "generation_id": generation_id,
+            "user_id": user_id,
+            "prompt": prompt,
+            "style": style,
+            "timestamp": generation_time,
+            "regenerated": regenerate,
+            "image_count": len(urls)
+        })
+    except Exception as e:
+        logger.error(f"Failed to store image metadata in database: {str(e)}")
+    
+    # Log images to log channel with a standardized format
+    try:
+        # First send the images
+        sent_log_media = await client.send_media_group(LOG_CHANNEL, media_group)
+        
+        # Then send detailed metadata
         await client.send_message(
             LOG_CHANNEL, 
-            f"#ImgLog\nPrompt: {prompt}\nStyle: {style}\n**User**: {message.from_user.mention}\n**User ID**: {message.from_user.id}\n**Time**: {datetime.now()}\n**Chat ID**: {message.chat.id}\n"
+            f"#ImgLog #Generated\n**Prompt**: `{prompt}`\n**Style**: `{style}`\n**User**: {message.from_user.mention}\n**User ID**: {user_id}\n**Time**: {generation_time}\n**Chat ID**: {chat_id}\n**Images**: {len(urls)}\n**Regeneration**: {'Yes' if regenerate else 'No'}\n**Generation ID**: `{generation_id}`"
         )
-    except Exception:
-        pass  # Don't fail if logging fails
+        
+        logger.info(f"Successfully logged image generation to channel. Generation ID: {generation_id}")
+    except Exception as e:
+        logger.error(f"Failed to send log to channel: {str(e)}")
     
     # Clean up image files
     for url in urls:
         try:
             os.remove(url)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to clean up image file {url}: {str(e)}")
     
     return feedback_msg
 
 # Handle image feedback callback
 async def handle_image_feedback(client, callback_query):
     data = callback_query.data
+    user_id = callback_query.from_user.id
+    username = callback_query.from_user.username or f"user_{user_id}"
+    feedback_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Extract user_id and generation_id from the callback data
+    parts = data.split("_")
+    feedback_type = None
+    target_user_id = None
+    generation_id = None
     
     if data.startswith("img_feedback_positive"):
+        feedback_type = "positive"
+        target_user_id = parts[3] if len(parts) > 3 else "unknown"
+        generation_id = parts[4] if len(parts) > 4 else f"{target_user_id}_{int(time.time())}"
+        
+        logger.info(f"Positive image feedback received from user {user_id} for generation {generation_id}")
         await callback_query.answer("Thanks for your positive feedback!")
         await callback_query.message.edit_text(
             callback_query.message.text + "\n\n✅ *Feedback received: You liked the images!*",
             reply_markup=None
         )
         
+        # Log positive feedback to channel
+        try:
+            await client.send_message(
+                LOG_CHANNEL,
+                f"#ImgLog #Feedback #Positive\n**User**: {callback_query.from_user.mention}\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
+            )
+        except Exception as e:
+            logger.error(f"Failed to log positive feedback to channel: {str(e)}")
+        
     elif data.startswith("img_feedback_negative"):
+        feedback_type = "negative"
+        target_user_id = parts[3] if len(parts) > 3 else "unknown"
+        generation_id = parts[4] if len(parts) > 4 else f"{target_user_id}_{int(time.time())}"
+        
+        logger.info(f"Negative image feedback received from user {user_id} for generation {generation_id}")
         await callback_query.answer("Thanks for your feedback. We'll improve!")
         await callback_query.message.edit_text(
             callback_query.message.text + "\n\n📝 *Feedback received: We'll work to improve our image generation.*",
             reply_markup=None
         )
         
+        # Log negative feedback to channel
+        try:
+            await client.send_message(
+                LOG_CHANNEL,
+                f"#ImgLog #Feedback #Negative\n**User**: {callback_query.from_user.mention}\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
+            )
+        except Exception as e:
+            logger.error(f"Failed to log negative feedback to channel: {str(e)}")
+        
     elif data.startswith("img_regenerate"):
         # Get the feedback message for deletion later
         feedback_msg = callback_query.message
+        logger.info(f"Image regeneration requested by user {user_id}")
         await callback_query.answer("Regenerating images...")
         
         # Extract prompt from callback data
         parts = data.split("_")
-        user_id = parts[2]
+        target_user_id = parts[2]
         prompt = "_".join(parts[3:])
         
         # Get the original message that this feedback is replying to
         reply_to_message_id = None
         if hasattr(feedback_msg, 'reply_to_message_id') and feedback_msg.reply_to_message_id:
             reply_to_message_id = feedback_msg.reply_to_message_id
+        
+        # Log regeneration to channel
+        try:
+            await client.send_message(
+                LOG_CHANNEL,
+                f"#ImgLog #Regenerate\n**User**: {callback_query.from_user.mention}\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Prompt**: `{prompt}`"
+            )
+        except Exception as e:
+            logger.error(f"Failed to log regeneration to channel: {str(e)}")
         
         # Generate new images, passing feedback message for deletion
         await generate_command(
@@ -243,6 +363,19 @@ async def handle_image_feedback(client, callback_query):
             regenerate=True,
             feedback_msg=feedback_msg
         )
+    
+    # Store feedback in database if we have valid feedback
+    if feedback_type and target_user_id and generation_id:
+        try:
+            image_feedback_collection.insert_one({
+                "generation_id": generation_id,
+                "user_id": user_id,
+                "feedback_type": feedback_type,
+                "timestamp": feedback_time
+            })
+            logger.info(f"Stored {feedback_type} feedback in database for generation {generation_id}")
+        except Exception as e:
+            logger.error(f"Failed to store feedback in database: {str(e)}")
 
 
 

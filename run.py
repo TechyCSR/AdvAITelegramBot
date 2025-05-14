@@ -20,16 +20,35 @@ from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command, handle_image_feedback
-from modules.chatlogs import channel_log, user_log
+from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.global_setting import global_setting_command
 from modules.speech.voice_to_text import handle_voice_toggle
 import database.user_db as user_db
 import asyncio
+import logging
+import datetime
+from logging.handlers import RotatingFileHandler
+import json
+import time
 
 
-# Create sessions directory if it doesn't exist
+# Create directories if they don't exist
 if not os.path.exists("sessions"):
     os.makedirs("sessions")
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+
+# Configure logging with a single main log file
+MAIN_LOG_FILE = os.path.join("logs", "bot_main.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        RotatingFileHandler(MAIN_LOG_FILE, maxBytes=10*1024*1024, backupCount=5),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 # Initialize the Pyrogram client with improved session handling
@@ -52,11 +71,13 @@ bot_stats = {
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
     bot_stats["active_users"].add(update.from_user.id)
+    logger.info(f"User {update.from_user.id} started the bot")
     await start(bot, update)
     await channel_log(bot, update, "/start")
 
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
+    logger.info(f"User {update.from_user.id} requested help")
     await help(bot, update)
     await channel_log(bot, update, "/help")
 
@@ -72,6 +93,7 @@ def is_chat_text_filter():
 async def handle_message(client, message):
     bot_stats["messages_processed"] += 1
     bot_stats["active_users"].add(message.from_user.id)
+    logger.info(f"Processing message from user {message.from_user.id}")
     await aires(client, message)
 
 
@@ -147,10 +169,13 @@ async def voice(bot, message):
 @advAiBot.on_message(filters.command("gleave"))
 async def leave_group_command(bot, update):
     if update.from_user.id in config.ADMINS:
+        logger.info(f"Admin {update.from_user.id} leaving group {update.chat.id}")
         await leave_group(bot, update)
-        await channel_log(bot, update, "/gleave")
+        await channel_log(bot, update, "/gleave", f"Admin leaving group {update.chat.id if update.chat else 'unknown'}")
     else:
-        await update.reply_text("You are not authorized to use this command.")
+        logger.warning(f"Unauthorized user {update.from_user.id} attempted to use gleave command")
+        await update.reply_text("⛔ You are not authorized to use this command.")
+        await channel_log(bot, update, "/gleave", f"Unauthorized access attempt", level="WARNING")
 
 @advAiBot.on_message(filters.command("rate") & filters.private)
 async def rate_commands(bot, update):
@@ -159,18 +184,24 @@ async def rate_commands(bot, update):
 @advAiBot.on_message(filters.command("invite"))
 async def invite_commands(bot, update):
     if update.from_user.id in config.ADMINS:
+        logger.info(f"Admin {update.from_user.id} used invite command")
         await invite_command(bot, update)
-        await channel_log(bot, update, "/invite")
+        await channel_log(bot, update, "/invite", "Admin used invite command")
     else:
-        await update.reply_text("You are not authorized to use this command.")
+        logger.warning(f"Unauthorized user {update.from_user.id} attempted to use invite command")
+        await update.reply_text("⛔ You are not authorized to use this command.")
+        await channel_log(bot, update, "/invite", f"Unauthorized access attempt", level="WARNING")
 
 @advAiBot.on_message(filters.command("uinfo"))
 async def info_commands(bot, update):
     if update.from_user.id in config.ADMINS:
+        logger.info(f"Admin {update.from_user.id} requested user info")
         await info_command(bot, update)
-        await channel_log(bot, update, "/uinfo")
+        await channel_log(bot, update, "/uinfo", "Admin requested user info")
     else:
-        await update.reply_text("You are not authorized to use this command.")
+        logger.warning(f"Unauthorized user {update.from_user.id} attempted to use uinfo command")
+        await update.reply_text("⛔ You are not authorized to use this command.")
+        await channel_log(bot, update, "/uinfo", f"Unauthorized access attempt", level="WARNING")
         
 @advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
 async def handle_group_message(bot, update):
@@ -192,14 +223,16 @@ async def handle_group_message(bot, update):
 
 @advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
 async def handle_new_chat(client, message):
+    logger.info(f"User {message.from_user.id} started a new chat")
     await new_chat(client, message)
-    await channel_log(client, message, "/newchat")
+    await channel_log(client, message, "/newchat", "User started a new conversation")
 
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
 async def handle_generate(client, message):
     bot_stats["images_generated"] += 1
     bot_stats["active_users"].add(message.from_user.id)
+    logger.info(f"Image generation requested by user {message.from_user.id}")
     
     try:
         if len(message.text.split()) > 1:
@@ -217,6 +250,7 @@ async def handle_generate(client, message):
         await generate_command(client, message, prompt)
         
     except Exception as e:
+        logger.error(f"Error in image generation: {str(e)}")
         await message.reply_text(f"❌ **Error**\n\nFailed to generate images: {str(e)}")
 
 @advAiBot.on_message(filters.photo)
@@ -237,11 +271,13 @@ async def handle_image(bot, update):
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
+    logger.info(f"User {update.from_user.id} accessed settings")
     await global_setting_command(bot, update)
     await channel_log(bot, update, "/settings")
 
 @advAiBot.on_message(filters.command("stats") & filters.user(config.ADMINS))
 async def stats_command(bot, update):
+    logger.info(f"Admin {update.from_user.id} requested stats")
     stats_text = (
         "📊 **Bot Statistics**\n\n"
         f"💬 Messages Processed: {bot_stats['messages_processed']}\n"
@@ -250,24 +286,87 @@ async def stats_command(bot, update):
         f"👥 Active Users: {len(bot_stats['active_users'])}\n"
     )
     await update.reply_text(stats_text)
+    await channel_log(bot, update, "/stats", "Admin requested bot statistics")
 
 @advAiBot.on_message(filters.command(["announce", "broadcast", "acc"]))
 async def announce_command(bot, update):
     if update.from_user.id in config.ADMINS:
         try:
             text = update.text.split(" ", 1)[1]
+            logger.info(f"Admin {update.from_user.id} broadcasting message: {text[:50]}...")
             processing_msg = await update.reply_text("📣 Preparing to broadcast message...")
             await user_db.get_usernames_message(bot, update, text)
+            await channel_log(bot, update, "/announce", f"Admin broadcast message to users", level="WARNING")
         except IndexError:
+            logger.warning(f"Admin {update.from_user.id} attempted announce without message")
             await update.reply_text(
                 "⚠️ Please provide a message to broadcast.\n\n"
                 "Example: `/announce Hello everyone! We've added new features.`"
             )
     else:
+        logger.warning(f"Unauthorized user {update.from_user.id} attempted to use announce command")
         await update.reply_text("⛔ You are not authorized to use this command.")
+        await channel_log(bot, update, "/announce", f"Unauthorized access attempt", level="WARNING")
+
+@advAiBot.on_message(filters.command("logs") & filters.user(config.ADMINS))
+async def logs_command(bot, update):
+    logger.info(f"Admin {update.from_user.id} requested logs")
+    
+    try:
+        # Send status message
+        status_msg = await update.reply_text(
+            "📊 **Retrieving Logs**\n\n"
+            "Preparing the most recent logs... This will take just a moment."
+        )
+        
+        # Get the latest 500 lines from the main log file
+        if os.path.exists(MAIN_LOG_FILE):
+            # Read the log file and get the last 500 lines
+            with open(MAIN_LOG_FILE, 'r', encoding='utf-8') as f:
+                # Read all lines and take the last 500
+                lines = f.readlines()
+                last_lines = lines[-500:] if len(lines) > 500 else lines
+                log_content = ''.join(last_lines)
+            
+            # Create a temporary file with the latest logs
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_log_file = f"logs/latest_logs_{timestamp}.txt"
+            
+            with open(temp_log_file, 'w', encoding='utf-8') as f:
+                f.write(log_content)
+            
+            # Send the file
+            await bot.send_document(
+                chat_id=update.chat.id,
+                document=temp_log_file,
+                caption=f"📋 **Latest Bot Logs**\n\nShowing the most recent 500 log entries as of {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+            # Delete the temporary file
+            try:
+                os.remove(temp_log_file)
+            except Exception as e:
+                logger.error(f"Error removing temporary log file: {str(e)}")
+                
+            # Update status message
+            await status_msg.edit_text("✅ **Logs Retrieved Successfully**")
+            
+        else:
+            await status_msg.edit_text("❌ No log file found. The bot may not have generated any logs yet.")
+        
+        # Log this action
+        await channel_log(bot, update, "/logs", "Admin requested latest logs")
+        
+    except Exception as e:
+        logger.error(f"Error in logs command: {str(e)}")
+        await update.reply_text(f"❌ **Error**\n\nFailed to retrieve logs: {str(e)}")
+        
+        # Log the error
+        await error_log(bot, "LOGS_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
 
 if __name__ == "__main__":
     # Print startup message
+    logger.info("🤖 Advanced AI Telegram Bot starting...")
     print("🤖 Advanced AI Telegram Bot starting...")
     print("✨ Optimized for performance and modern UI")
     
