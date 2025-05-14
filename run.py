@@ -1,41 +1,57 @@
-
-
 import os
 import config
 import pyrogram
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup ,InputMediaPhoto
-from modules.user.start import start , start_inline
-from modules.user.help import help ,help_inline
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from modules.user.start import start, start_inline
+from modules.user.help import help, help_inline
 from modules.user.commands import command_inline
-from modules.user.settings import settings_inline,settings_language_callback,change_voice_setting 
+from modules.user.settings import settings_inline, settings_language_callback, change_voice_setting 
 from modules.user.settings import settings_voice_inlines
-from modules.user.assistant import settings_assistant_callback,change_mode_setting
-from modules.user.lang_settings import settings_langs_callback,change_language_setting
-from modules.user.user_support import settings_support_callback,support_admins_callback
+from modules.user.assistant import settings_assistant_callback, change_mode_setting
+from modules.user.lang_settings import settings_langs_callback, change_language_setting
+from modules.user.user_support import settings_support_callback, support_admins_callback
 from modules.user.dev_support import support_developers_callback
-from modules.speech import  text_to_voice,voice_to_text
-from modules.image.img_to_text import extract_text_res
+from modules.speech import text_to_voice, voice_to_text
+from modules.image.img_to_text import extract_text_res, handle_show_text_callback, handle_followup_callback
 from modules.maintenance import settings_others_callback
-from modules.group.group_settings import leave_group,invite_command
-from modules.feedback_nd_rating import rate_command,handle_rate_callback
+from modules.group.group_settings import leave_group, invite_command
+from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
-from modules.image.image_generation import generate_command
+from modules.image.image_generation import generate_command, handle_image_feedback
 from modules.chatlogs import channel_log, user_log
 from modules.user.global_setting import global_setting_command
+from modules.speech.voice_to_text import handle_voice_toggle
 import database.user_db as user_db
+import asyncio
 
 
-
+# Create sessions directory if it doesn't exist
 if not os.path.exists("sessions"):
     os.makedirs("sessions")
 
 
-advAiBot = pyrogram.Client("AdvChatGptBotV2", bot_token=config.BOT_TOKEN, api_id=config.API_KEY, api_hash=config.API_HASH,workdir="sessions")
+# Initialize the Pyrogram client with improved session handling
+advAiBot = pyrogram.Client(
+    "AdvChatGptBotV2", 
+    bot_token=config.BOT_TOKEN, 
+    api_id=config.API_KEY, 
+    api_hash=config.API_HASH,
+    workdir="sessions"
+)
+
+# Track bot statistics
+bot_stats = {
+    "messages_processed": 0,
+    "images_generated": 0,
+    "voice_messages_processed": 0,
+    "active_users": set()
+}
 
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
+    bot_stats["active_users"].add(update.from_user.id)
     await start(bot, update)
     await channel_log(bot, update, "/start")
 
@@ -54,11 +70,14 @@ def is_chat_text_filter():
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
+    bot_stats["messages_processed"] += 1
+    bot_stats["active_users"].add(message.from_user.id)
     await aires(client, message)
 
 
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
+    # Standard menu callbacks
     if callback_query.data == "help":
         await help_inline(client, callback_query)
     elif callback_query.data == "back":
@@ -90,23 +109,48 @@ async def callback_query(client, callback_query):
     elif callback_query.data=="support_developers":
         await support_developers_callback(client, callback_query)
     elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
-        await handle_rate_callback(client, callback_query) 
-    else:
-        pass
+        await handle_rate_callback(client, callback_query)
+    
+    # Image feedback handlers
+    elif callback_query.data.startswith("img_feedback_"):
+        await handle_image_feedback(client, callback_query)
+    elif callback_query.data.startswith("img_regenerate_"):
+        await handle_image_feedback(client, callback_query)
+    
+    # Voice setting handlers
+    elif callback_query.data.startswith("toggle_voice_"):
+        await handle_voice_toggle(client, callback_query)
+    
+    # Image text handlers
+    elif callback_query.data.startswith("show_text_"):
+        await handle_show_text_callback(client, callback_query)
+    elif callback_query.data.startswith("followup_"):
+        await handle_followup_callback(client, callback_query)
+    elif callback_query.data.startswith("back_to_image_"):
+        # Return to previous message with options
+        user_id = int(callback_query.data.split("_")[3])
+        await callback_query.message.edit_text(
+            "**Need anything else with this image?**",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")],
+                [InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")]
+            ])
+        )
 
 
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
-    # print("Voice message received") #debug
+    bot_stats["voice_messages_processed"] += 1
+    bot_stats["active_users"].add(message.from_user.id)
     await voice_to_text.handle_voice_message(bot, message)
 
-@advAiBot.on_message(filters.command("gleave") )
+@advAiBot.on_message(filters.command("gleave"))
 async def leave_group_command(bot, update):
     if update.from_user.id in config.ADMINS:
         await leave_group(bot, update)
         await channel_log(bot, update, "/gleave")
     else:
-        await update.reply_text("You are not allowed to use this command.")
+        await update.reply_text("You are not authorized to use this command.")
 
 @advAiBot.on_message(filters.command("rate") & filters.private)
 async def rate_commands(bot, update):
@@ -118,77 +162,114 @@ async def invite_commands(bot, update):
         await invite_command(bot, update)
         await channel_log(bot, update, "/invite")
     else:
-        await update.reply_text("You are not allowed to use this command.")
+        await update.reply_text("You are not authorized to use this command.")
 
-@advAiBot.on_message(filters.command("uinfo") )
+@advAiBot.on_message(filters.command("uinfo"))
 async def info_commands(bot, update):
     if update.from_user.id in config.ADMINS:
         await info_command(bot, update)
         await channel_log(bot, update, "/uinfo")
     else:
-        await update.reply_text("You are not allowed to use this command.")
+        await update.reply_text("You are not authorized to use this command.")
         
-@advAiBot.on_message( filters.text & filters.command(["ai","ask","say"]) & filters.group)
-async def handle_message(bot, update):
-    if len(update.text)>3:
-        update.text=update.text[3:]
+@advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
+async def handle_group_message(bot, update):
+    bot_stats["messages_processed"] += 1
+    bot_stats["active_users"].add(update.from_user.id)
+    
+    # Check if the command has any text after it
+    if len(update.text.split()) > 1:
+        update.text = update.text.split(None, 1)[1]
     else:
-        await update.reply_text("Please provide valid text")
+        await update.reply_text("Please provide your query after the command.")
         return
+    
+    # Process the message with typing indicator
+    await bot.send_chat_action(chat_id=update.chat.id, action="typing")
     await user_log(bot, update, update.text)
     await aires(bot, update)
 
 
-
-@advAiBot.on_message(filters.command(["newchat", "reset","new_conversation","clear_chat","new"]))
+@advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
 async def handle_new_chat(client, message):
     await new_chat(client, message)
     await channel_log(client, message, "/newchat")
 
 
-@advAiBot.on_message(filters.command(["generate", "gen", "image","img"]))
-def handle_generate(client, message):
+@advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
+async def handle_generate(client, message):
+    bot_stats["images_generated"] += 1
+    bot_stats["active_users"].add(message.from_user.id)
+    
     try:
-        prompt = message.text.split(" ", 1)[1]
-    except IndexError:
-        message.reply_text("Please provide a prompt to generate images.")
-        return
-    temp= message.reply_text("Generating images. Please wait...")
-    generate_command(client, message, prompt)
-    temp.delete()   
+        if len(message.text.split()) > 1:
+            prompt = message.text.split(None, 1)[1]
+        else:
+            await message.reply_text(
+                "🖼️ **Image Generation**\n\n"
+                "Please provide a prompt to generate images.\n\n"
+                "Example: `/generate a serene mountain landscape at sunset, style:realistic`\n\n"
+                "Available styles: `realistic`, `cartoon`, `artistic`, `3d`, `sketch`"
+            )
+            return
+            
+        # Pass to async generation function
+        await generate_command(client, message, prompt)
+        
+    except Exception as e:
+        await message.reply_text(f"❌ **Error**\n\nFailed to generate images: {str(e)}")
 
 @advAiBot.on_message(filters.photo)
-async def handle_image(bot,update):
+async def handle_image(bot, update):
     if update.from_user.id == bot.me.id:
         return
+        
+    bot_stats["active_users"].add(update.from_user.id)
+    
+    # Handle image in private chat
     if update.chat.type == "private":
         await extract_text_res(bot, update)
     else:
-        #chheck if caption is contains command "ai" or Ai or AI or ask or Ask or ASK
+        # Check if caption contains AI command keywords
         if update.caption:
-            if "ai" in update.caption.lower() or "ask" in update.caption.lower():
+            if any(keyword in update.caption.lower() for keyword in ["ai", "ask"]):
                 await extract_text_res(bot, update)
-        else:
-            return
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
     await global_setting_command(bot, update)
     await channel_log(bot, update, "/settings")
 
-@advAiBot.on_message(filters.command(["announce","broadcast","acc"]))
+@advAiBot.on_message(filters.command("stats") & filters.user(config.ADMINS))
+async def stats_command(bot, update):
+    stats_text = (
+        "📊 **Bot Statistics**\n\n"
+        f"💬 Messages Processed: {bot_stats['messages_processed']}\n"
+        f"🖼️ Images Generated: {bot_stats['images_generated']}\n"
+        f"🎙️ Voice Messages: {bot_stats['voice_messages_processed']}\n"
+        f"👥 Active Users: {len(bot_stats['active_users'])}\n"
+    )
+    await update.reply_text(stats_text)
+
+@advAiBot.on_message(filters.command(["announce", "broadcast", "acc"]))
 async def announce_command(bot, update):
     if update.from_user.id in config.ADMINS:
         try:
             text = update.text.split(" ", 1)[1]
-            # print(text)
+            processing_msg = await update.reply_text("📣 Preparing to broadcast message...")
             await user_db.get_usernames_message(bot, update, text)
         except IndexError:
-            await update.reply_text("Please provide a message to send.")
-            return
+            await update.reply_text(
+                "⚠️ Please provide a message to broadcast.\n\n"
+                "Example: `/announce Hello everyone! We've added new features.`"
+            )
     else:
-        await update.reply_text("You are not allowed to use this command.")
-    
+        await update.reply_text("⛔ You are not authorized to use this command.")
 
 if __name__ == "__main__":
+    # Print startup message
+    print("🤖 Advanced AI Telegram Bot starting...")
+    print("✨ Optimized for performance and modern UI")
+    
+    # Run the bot
     advAiBot.run()

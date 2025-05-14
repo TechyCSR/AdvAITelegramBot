@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import async_translate_to_lang
+from modules.lang import async_translate_to_lang, translate_ui_element, batch_translate, format_with_mention
 from modules.chatlogs import channel_log
 from config import DATABASE_URL
 
@@ -81,34 +81,38 @@ async def settings_inline(client, callback):
     current_mode_label = modes[current_mode]
     current_language_label = languages[current_language]
 
-    translated_text = await async_translate_to_lang(settings_text, user_id)
+    # Get user mention
+    mention = callback.from_user.mention
+    
+    # First safely translate the template with mention preservation
+    translated_text = await format_with_mention(settings_text, mention, user_id, current_language)
+    
+    # Now format with the other variables
     formatted_text = translated_text.format(
-        mention=callback.from_user.mention,
+        mention=mention,
         user_id=callback.from_user.id,
         language=current_language_label,
         voice_setting=voice_setting,
         mode=current_mode_label,
     )
 
-    # Translate button labels
-    language_btn = await async_translate_to_lang("🌐 Language", user_id)
-    voice_btn = await async_translate_to_lang("🎙️ Voice", user_id)
-    assistant_btn = await async_translate_to_lang("🤖 Assistant", user_id)
-    others_btn = await async_translate_to_lang("🔧 Others", user_id)
-    back_btn = await async_translate_to_lang("🔙 Back", user_id)
-
+    # Efficiently translate all button labels at once using the optimized UI element translator
+    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🔧 Others", "🔙 Back"]
+    translated_labels = await batch_translate(button_labels, user_id)
+    
+    # Use the translated button labels
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(language_btn, callback_data="settings_lans"),
-                InlineKeyboardButton(voice_btn, callback_data="settings_v")
+                InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
+                InlineKeyboardButton(translated_labels[1], callback_data="settings_v")
             ],
             [
-                InlineKeyboardButton(assistant_btn, callback_data="settings_assistant"),
-                InlineKeyboardButton(others_btn, callback_data="settings_others")
+                InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
+                InlineKeyboardButton(translated_labels[3], callback_data="settings_others")
             ],
             [
-                InlineKeyboardButton(back_btn, callback_data="back")
+                InlineKeyboardButton(translated_labels[4], callback_data="back")
             ]
         ]
     )
@@ -136,12 +140,15 @@ async def settings_language_callback(client, callback):
 
     print(f"Voice setting for {user_id}: {voice_setting}")
     
-    # Translate base text and options
-    voice_text = await async_translate_to_lang("Voice", user_id)
-    text_option = await async_translate_to_lang("Text", user_id)
-    current_setting = await async_translate_to_lang("Current setting: Answering in", user_id)
-    queries_only = await async_translate_to_lang("queries only.", user_id)
-    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+    # Efficiently translate all text at once
+    texts_to_translate = ["Voice", "Text", "Current setting: Answering in", "queries only.", "🔙 Back"]
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    
+    voice_text = translated_texts[0]
+    text_option = translated_texts[1]
+    current_setting = translated_texts[2]
+    queries_only = translated_texts[3]
+    back_btn = translated_texts[4]
     
     # Update the button texts based on the user's current setting
     voice_button_text = f"🎙️ {voice_text} ✅" if voice_setting == "voice" else f"🎙️ {voice_text}"
@@ -183,12 +190,15 @@ async def change_voice_setting(client, callback):
         upsert=True
     )
 
-    # Translate base text and options
-    voice_text = await async_translate_to_lang("Voice", user_id)
-    text_option = await async_translate_to_lang("Text", user_id)
-    current_setting = await async_translate_to_lang("Current setting: Answering in", user_id)
-    queries_only = await async_translate_to_lang("queries only.", user_id)
-    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+    # Efficiently translate all text at once
+    texts_to_translate = ["Voice", "Text", "Current setting: Answering in", "queries only.", "🔙 Back"]
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    
+    voice_text = translated_texts[0]
+    text_option = translated_texts[1]
+    current_setting = translated_texts[2]
+    queries_only = translated_texts[3]
+    back_btn = translated_texts[4]
 
     # Create the message text with translated components
     message_text = f"{current_setting} {voice_text if new_voice_setting == 'voice' else text_option} {queries_only}"
@@ -258,37 +268,41 @@ You can change your settings from below options.
     current_mode_label = modes[current_mode]
     current_language_label = languages[current_language]
 
-    translated_text = await async_translate_to_lang(settings_text, user_id)
+    # Get user mention
+    mention = callback.from_user.mention
+    
+    # Safely translate the template with mention preservation
+    translated_text = await format_with_mention(settings_text, mention, user_id, current_language)
+    
+    # Format with the remaining variables
     formatted_text = translated_text.format(
-        mention=callback.from_user.mention,
+        mention=mention,
         user_id=callback.from_user.id,
         language=current_language_label,
         voice_setting=voice_setting,
         mode=current_mode_label,
     )
     
-    # Translate button labels
-    language_btn = await async_translate_to_lang("🌐 Language", user_id)
-    voice_btn = await async_translate_to_lang("🎙️ Voice", user_id)
-    assistant_btn = await async_translate_to_lang("🤖 Assistant", user_id)
-    others_btn = await async_translate_to_lang("🔧 Others", user_id)
-    back_btn = await async_translate_to_lang("🔙 Back", user_id)
-    
+    # Efficiently translate all button labels at once
+    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🔧 Others", "🔙 Back"]
+    translated_labels = await batch_translate(button_labels, user_id)
+
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(language_btn, callback_data="settings_lans"),
-                InlineKeyboardButton(voice_btn, callback_data="settings_v")
+                InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
+                InlineKeyboardButton(translated_labels[1], callback_data="settings_v")
             ],
             [
-                InlineKeyboardButton(assistant_btn, callback_data="settings_assistant"),
-                InlineKeyboardButton(others_btn, callback_data="settings_others")
+                InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
+                InlineKeyboardButton(translated_labels[3], callback_data="settings_others")
             ],
             [
-                InlineKeyboardButton(back_btn, callback_data="back")
+                InlineKeyboardButton(translated_labels[4], callback_data="back")
             ]
         ]
     )
+
     await callback.message.edit(
         text=formatted_text,
         reply_markup=keyboard,

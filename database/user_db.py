@@ -6,6 +6,7 @@ import asyncio
 client = MongoClient(DATABASE_URL)
 db = client['aibotdb']
 users_collection = db['users']
+user_lang_collection = db['user_lang']
 
 
 #make it async
@@ -43,6 +44,12 @@ def get_user_ids():
     print(f"Retrieved {len(user_ids)} user IDs.")
     return user_ids
 
+def get_user_language(user_id):
+    """Get user's preferred language from database"""
+    user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
+    if user_lang_doc:
+        return user_lang_doc['language']
+    return 'en'  # Default to English if not set
 
 
 block_users_collection = db['blocked_users']

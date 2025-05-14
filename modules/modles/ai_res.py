@@ -15,25 +15,25 @@ mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
 history_collection = db['history']
 
-# Initialize the GPT-4 client
+# Initialize the GPT client with a more efficient provider
 gpt_client = GPTClient(provider="PollinationsAI")
 
 def get_response(history):  
     try:
         response = gpt_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Using more capable model for higher quality responses
             messages=history
         )
         return response.choices[0].message.content
     except Exception as e:
         print(f"Error generating response: {e}")
-        return "I'm having trouble generating a response right now. Please try again later."
+        return "I'm experiencing technical difficulties. Please try again in a moment."
 
 def get_streaming_response(history):
     try:
         # Stream parameter set to True to get response chunks
         response = gpt_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Using more capable model for higher quality responses
             messages=history,
             stream=True
         )
@@ -44,8 +44,7 @@ def get_streaming_response(history):
 
 def sanitize_markdown(text):
     """
-    Fixes incomplete markdown elements to ensure the message renders properly
-    even during partial streaming updates.
+    Ensures proper markdown formatting in streaming responses
     """
     # Count opening and closing backticks to handle code blocks
     backticks_opened = text.count('```')
@@ -71,10 +70,21 @@ def sanitize_markdown(text):
     
     return text
 
+# Default system message with modern, professional tone
+DEFAULT_SYSTEM_MESSAGE = {
+    "role": "assistant",
+    "content": (
+        "I'm your advanced AI assistant, designed to provide helpful, accurate, and thoughtful responses. "
+        "I can assist with a wide range of tasks including answering questions, creating content, "
+        "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
+        "and improving to better serve your needs. How may I assist you today?"
+    )
+}
+
 async def aires(client, message):
     try:
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
-        temp = await message.reply_text("...")
+        temp = await message.reply_text("⏳")
         user_id = message.from_user.id
         ask = message.text
         
@@ -83,21 +93,7 @@ async def aires(client, message):
         if user_history:
             history = user_history['history']
         else: 
-            history = [
-    {
-        "role": "assistant",
-        "content": (
-            "I am an AI chatbot assistant, developed by CHANDAN SINGH(i.e.@TechyCSR) and a his dedicated team of students from Lovely Professional University (LPU). "
-            "Our core team also includes Ankit and Aarushi. who have all worked together to create a bot that facilitates user tasks and "
-            "improves productivity in various ways. Our goal is to make interactions smoother and more efficient, providing accurate and helpful "
-            "responses to your queries. The bot leverages the latest advancements in AI technology to offer features such as speech-to-text, "
-            "text-to-speech, image generation, and more. Our mission is to continuously enhance the bot's capabilities, ensuring it meets the "
-            "growing needs of our users. The current version is V-2.O, which includes significant improvements in response accuracy and speed, "
-            "as well as a more intuitive user interface. We aim to provide a seamless and intelligent chat experience, making the AI assistant a "
-            "valuable tool for users across various domains. To Reach out Chandan Singh, you can contact him on techycsr.me or on his email csr.info.in@gmail.com."
-        )
-    }
-]
+            history = [DEFAULT_SYSTEM_MESSAGE]
 
         # Add the new user query to the history
         history.append({"role": "user", "content": ask})
@@ -111,10 +107,10 @@ async def aires(client, message):
             buffer = ""
             last_update_time = time.time()
             
-            # Dynamic update interval - start faster, then slow down as response grows
-            base_update_interval = 0.2
-            min_chars_per_update = 10  # Minimum characters before updating
-            typing_action_interval = 3.0  # Show typing action every 3 seconds
+            # Optimized update intervals for smoother streaming experience
+            base_update_interval = 0.1  # Faster initial updates
+            min_chars_per_update = 15  # Increased minimum characters before updating
+            typing_action_interval = 2.0  # Show typing action more frequently
             last_typing_action = time.time()
             
             # Track if we're in a code block to handle formatting properly
@@ -145,9 +141,9 @@ async def aires(client, message):
                                     if in_code_block and len(new_content.split('```')) > 1:
                                         code_lang = new_content.split('```')[1].strip()
                                 
-                                # Calculate dynamic update interval based on response length
-                                update_interval = base_update_interval + (len(complete_response) / 2000)
-                                update_interval = min(update_interval, 1.0)  # Cap at 1 second
+                                # Adaptive update interval based on response length with improved dynamics
+                                update_interval = base_update_interval + (len(complete_response) / 5000)
+                                update_interval = min(update_interval, 0.8)  # Cap at 0.8 second
                                 
                                 # Update message if enough time has passed or buffer is large enough
                                 current_time = time.time()
@@ -156,21 +152,50 @@ async def aires(client, message):
                                     try:
                                         # Apply markdown sanitization to ensure proper rendering
                                         display_text = sanitize_markdown(complete_response)
-                                        await temp.edit_text(display_text)
+                                        
+                                        # Store previous text to compare and avoid MESSAGE_NOT_MODIFIED errors
+                                        prev_message_text = getattr(temp, 'text', '')
+                                        
+                                        # Only update if content has actually changed
+                                        if display_text != prev_message_text:
+                                            await temp.edit_text(display_text)
+                                            # Store the new text for future comparisons
+                                            temp.text = display_text
+                                        
                                         buffer = ""
                                         last_update_time = current_time
                                     except Exception as edit_error:
-                                        print(f"Edit error (will continue): {edit_error}")
+                                        # Ignore MESSAGE_NOT_MODIFIED errors
+                                        if "MESSAGE_NOT_MODIFIED" not in str(edit_error):
+                                            print(f"Edit error (will continue): {edit_error}")
                 
                 # Final update with complete text
                 if complete_response:
-                    await temp.edit_text(complete_response)
+                    try:
+                        final_text = complete_response + " "
+                        
+                        # Only update if content has actually changed
+                        prev_message_text = getattr(temp, 'text', '')
+                        if final_text != prev_message_text:
+                            await temp.edit_text(final_text)
+                    except Exception as final_edit_error:
+                        if "MESSAGE_NOT_MODIFIED" not in str(final_edit_error):
+                            print(f"Final edit error: {final_edit_error}")
                 
             except Exception as stream_error:
                 print(f"Streaming error: {stream_error}")
                 # If streaming fails mid-way, make sure we have the response so far
                 if complete_response:
-                    await temp.edit_text(complete_response)
+                    try:
+                        final_text = complete_response + " "
+                        
+                        # Only update if content has actually changed
+                        prev_message_text = getattr(temp, 'text', '')
+                        if final_text != prev_message_text:
+                            await temp.edit_text(final_text)
+                    except Exception as recovery_error:
+                        if "MESSAGE_NOT_MODIFIED" not in str(recovery_error):
+                            print(f"Recovery edit error: {recovery_error}")
                     
             # Add the AI response to the history
             history.append({"role": "assistant", "content": complete_response})
@@ -211,11 +236,11 @@ async def new_chat(client, message):
         # Delete user history from MongoDB
         history_collection.delete_one({"user_id": user_id})
 
-        # Send confirmation message to the user
-        await message.reply_text("Your chat history has been cleared. You can start a new conversation now.")
+        # Send confirmation message with modern UI
+        await message.reply_text("🔄 **Conversation Reset**\n\nYour chat history has been cleared. Ready for a fresh conversation!")
 
     except Exception as e:
-        await message.reply_text(f"An error occurred while clearing chat history: {e}")
+        await message.reply_text(f"Error clearing chat history: {e}")
         print(f"Error in new_chat function: {e}")
 
 

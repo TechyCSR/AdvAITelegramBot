@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
-from modules.lang import async_translate_to_lang, batch_translate
+from modules.lang import async_translate_to_lang, batch_translate, format_with_mention
 from modules.chatlogs import channel_log
 import database.user_db as user_db
 
@@ -41,18 +41,18 @@ async def start(client, message):
     if message.from_user.username:
         await user_db.check_and_add_username(message.from_user.id, message.from_user.username)
 
-    # Translate welcome text and button texts
+    # Get user info
     user_id = message.from_user.id
+    mention = message.from_user.mention
     
-    # Batch translate all text together for efficiency
-    texts_to_translate = [welcome_text, tip_text] + button_list
-    translated_texts = await batch_translate(texts_to_translate, user_id)
+    # First safely format the welcome text with mention preservation
+    user_lang = user_db.get_user_language(user_id)
+    translated_welcome = await format_with_mention(welcome_text.replace("{user_mention}", "{mention}"), mention, user_id, user_lang)
     
-    # Extract translated results
-    translated_welcome = translated_texts[0]
-    translated_welcome = translated_welcome.format(user_mention=message.from_user.mention)
-    translated_tip = translated_texts[1]
-    translated_buttons = translated_texts[2:]
+    # Translate other texts
+    translated_texts = await batch_translate([tip_text] + button_list, user_id)
+    translated_tip = translated_texts[0]
+    translated_buttons = translated_texts[1:]
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
@@ -76,14 +76,12 @@ async def start_inline(bot, callback):
     user_id = callback.from_user.id
     mention = callback.from_user.mention
 
-    # Batch translate all text together for efficiency
-    texts_to_translate = [welcome_text] + button_list
-    translated_texts = await batch_translate(texts_to_translate, user_id)
+    # First safely format the welcome text with mention preservation
+    user_lang = user_db.get_user_language(user_id)
+    translated_welcome = await format_with_mention(welcome_text.replace("{user_mention}", "{mention}"), mention, user_id, user_lang)
     
-    # Extract translated results
-    translated_welcome = translated_texts[0]
-    translated_welcome = translated_welcome.format(user_mention=mention)
-    translated_buttons = translated_texts[1:]
+    # Translate button texts
+    translated_buttons = await batch_translate(button_list, user_id)
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([

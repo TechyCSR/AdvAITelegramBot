@@ -1,10 +1,10 @@
 <div align="center" style="margin-top:1em;">
     <h1>
-        <a href="https://t.me/AdvChatGptbot" alt="Run Telegram Bot shield"><marquee scrollamount="3" width="60%">Telegram Advanced AI ChatBot</marquee>
+        Advanced AI Telegram Bot
     </h1>
 </div>
+
 <div align="center">
-</h1>
 
 [![GitHub stars](https://img.shields.io/github/stars/TechyCSR/AdvAITelegramBot?style=flat-square)](https://github.com/TechyCSR/AdvAITelegramBot/stargazers)
 &nbsp;&nbsp;
@@ -15,213 +15,132 @@
 [![GitHub license](https://img.shields.io/github/license/TechyCSR/AdvAITelegramBot?style=flat-square)](https://github.com/TechyCSR/AdvAITelegramBot/blob/main/LICENSE)
 &nbsp;&nbsp;
 [![GitHub contributors](https://img.shields.io/github/contributors/TechyCSR/AdvAITelegramBot?style=flat-square)](https://github.com/TechyCSR/AdvAITelegramBot/graphs/contributors)
-&nbsp;&nbsp;
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/TechyCSR/AdvAITelegramBot?style=flat-square)](https://github.com/TechyCSR/AdvAITelegramBot/pulls)
-&nbsp;&nbsp;
-[![GitHub last commit](https://img.shields.io/github/last-commit/TechyCSR/AdvAITelegramBot?style=flat-square)](https://github.com/TechyCSR/AdvAITelegramBot/commits)
 
 </div>
 
-Welcome to the **Telegram Advanced AI ChatBot** project! This bot leverages cutting-edge AI technologies to provide a seamless and intelligent chat experience on Telegram. With features like AI chat, voice interaction, image generation, and visual analysis, this bot is designed to enhance your conversational experience and make interactions more engaging and dynamic.
-
-<br>
-
 <div align="center">
-<a href="https://t.me/AdvChatGptbot" alt="Run Telegram Bot shield"> <img src="https://img.shields.io/badge/RUN-Telegram%20Bot-blue?logo=data:image/svg+xml;base64,PHN2ZyBpZD0iTGl2ZWxsb18xIiBkYXRhLW5hbWU9IkxpdmVsbG8gMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iMCAwIDI0MCAyNDAiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50IiB4MT0iMTIwIiB5MT0iMjQwIiB4Mj0iMTIwIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMWQ5M2QyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMzhiMGUzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPlRlbGVncmFtX2xvZ288L3RpdGxlPjxjaXJjbGUgY3g9IjEyMCIgY3k9IjEyMCIgcj0iMTIwIiBmaWxsPSJ1cmwoI2xpbmVhci1ncmFkaWVudCkiLz48cGF0aCBkPSJNODEuMjI5LDEyOC43NzJsMTQuMjM3LDM5LjQwNnMxLjc4LDMuNjg3LDMuNjg2LDMuNjg3LDMwLjI1NS0yOS40OTIsMzAuMjU1LTI5LjQ5MmwzMS41MjUtNjAuODlMODEuNzM3LDExOC42WiIgZmlsbD0iI2M4ZGFlYSIvPjxwYXRoIGQ9Ik0xMDAuMTA2LDEzOC44NzhsLTIuNzMzLDI5LjA0NnMtMS4xNDQsOC45LDcuNzU0LDAsMTcuNDE1LTE1Ljc2MywxNy40MTUtMTUuNzYzIiBmaWxsPSIjYTljNmQ4Ii8+PHBhdGggZD0iTTgxLjQ4NiwxMzAuMTc4LDUyLjIsMTIwLjYzNnMtMy41LTEuNDItMi4zNzMtNC42NGMuMjMyLS42NjQuNy0xLjIyOSwyLjEtMi4yLDYuNDg5LTQuNTIzLDEyMC4xMDYtNDUuMzYsMTIwLjEwNi00NS4zNnMzLjIwOC0xLjA4MSw1LjEtLjM2MmEyLjc2NiwyLjc2NiwwLDAsMSwxLjg4NSwyLjA1NSw5LjM1Nyw5LjM1NywwLDAsMSwuMjU0LDIuNTg1Yy0uMDA5Ljc1Mi0uMSwxLjQ0OS0uMTY5LDIuNTQyLS42OTIsMTEuMTY1LTIxLjQsOTQuNDkzLTIxLjQsOTQuNDkzcy0xLjIzOSw0Ljg3Ni01LjY3OCw1LjA0M0E4LjEzLDguMTMsMCwwLDEsMTQ2LjEsMTcyLjVjLTguNzExLTcuNDkzLTM4LjgxOS0yNy43MjctNDUuNDcyLTMyLjE3N2ExLjI3LDEuMjcsMCwwLDEtLjU0Ni0uOWMtLjA5My0uNDY5LjQxNy0xLjA1LjQxNy0xLjA1czUyLjQyNi00Ni42LDUzLjgyMS01MS40OTJjLjEwOC0uMzc5LS4zLS41NjYtLjg0OC0uNC0zLjQ4MiwxLjI4MS02My44NDQsMzkuNC03MC41MDYsNDMuNjA3QTMuMjEsMy4yMSwwLDAsMSw4MS40ODYsMTMwLjE3OFoiIGZpbGw9IiNmZmYiLz48L3N2Zz4=" align="center" style="width: 40%" />
+<a href="https://t.me/AdvChatGptbot" alt="Run Telegram Bot"> 
+  <img src="https://img.shields.io/badge/RUN-Telegram%20Bot-blue?logo=data:image/svg+xml;base64,PHN2ZyBpZD0iTGl2ZWxsb18xIiBkYXRhLW5hbWU9IkxpdmVsbG8gMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iMCAwIDI0MCAyNDAiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50IiB4MT0iMTIwIiB5MT0iMjQwIiB4Mj0iMTIwIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMWQ5M2QyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMzhiMGUzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPlRlbGVncmFtX2xvZ288L3RpdGxlPjxjaXJjbGUgY3g9IjEyMCIgY3k9IjEyMCIgcj0iMTIwIiBmaWxsPSJ1cmwoI2xpbmVhci1ncmFkaWVudCkiLz48cGF0aCBkPSJNODEuMjI5LDEyOC43NzJsMTQuMjM3LDM5LjQwNnMxLjc4LDMuNjg3LDMuNjg2LDMuNjg3LDMwLjI1NS0yOS40OTIsMzAuMjU1LTI5LjQ5MmwzMS41MjUtNjAuODlMODEuNzM3LDExOC42WiIgZmlsbD0iI2M4ZGFlYSIvPjxwYXRoIGQ9Ik0xMDAuMTA2LDEzOC44NzhsLTIuNzMzLDI5LjA0NnMtMS4xNDQsOC45LDcuNzU0LDAsMTcuNDE1LTE1Ljc2MywxNy40MTUtMTUuNzYzIiBmaWxsPSIjYTljNmQ4Ii8+PHBhdGggZD0iTTgxLjQ4NiwxMzAuMTc4LDUyLjIsMTIwLjYzNnMtMy41LTEuNDItMi4zNzMtNC42NGMuMjMyLS42NjQuNy0xLjIyOSwyLjEtMi4yLDYuNDg5LTQuNTIzLDEyMC4xMDYtNDUuMzYsMTIwLjEwNi00NS4zNnMzLjIwOC0xLjA4MSw1LjEtLjM2MmEyLjc2NiwyLjc2NiwwLDAsMSwxLjg4NSwyLjA1NSw5LjM1Nyw5LjM1NywwLDAsMSwuMjU0LDIuNTg1Yy0uMDA5Ljc1Mi0uMSwxLjQ0OS0uMTY5LDIuNTQyLS42OTIsMTEuMTY1LTIxLjQsOTQuNDkzLTIxLjQsOTQuNDkzcy0xLjIzOSw0Ljg3Ni01LjY3OCw1LjA0M0E4LjEzLDguMTMsMCwwLDEsMTQ2LjEsMTcyLjVjLTguNzExLTcuNDkzLTM4LjgxOS0yNy43MjctNDUuNDcyLTMyLjE3N2ExLjI3LDEuMjcsMCwwLDEtLjU0Ni0uOWMtLjA5My0uNDY5LjQxNy0xLjA1LjQxNy0xLjA1czUyLjQyNi00Ni42LDUzLjgyMS01MS40OTJjLjEwOC0uMzc5LS4zLS41NjYtLjg0OC0uNC0zLjQ4MiwxLjI4MS02My44NDQsMzkuNC03MC41MDYsNDMuNjA3QTMuMjEsMy4yMSwwLDAsMSw4MS40ODYsMTMwLjE3OFoiIGZpbGw9IiNmZmYiLz48L3N2Zz4=" align="center" style="width: 40%" />
 </a>
 </div>
 
+<br>
 
+# 🚀 Enhanced & Optimized AI Telegram Bot
 
-## ✨ Features
+A powerful, modern Telegram bot leveraging state-of-the-art AI for intelligent conversations, image generation, voice processing, and text extraction. This optimized version features improved performance, modern UI, and a more responsive user experience.
 
-### 🚀 Getting Started:
-- **Direct AI Chat:** Start typing in the chat to interact with the AI instantly.  
-- **Voice and Image Commands:**  
-  - Record a voice message or send an image to chat with the AI.  
-  - In groups, send an image with a caption `"ai"` or `"ask"` to extract text from the image and interact with the AI.
+## ✨ Feature Highlights
 
-### 🔧 Commands:
-- **Text Commands:**  
-  - `/start` - 🚀 Start the Bot  
-  - `/ai` - 🤖 Start a Chat with AI in Groups  
-    _(Eg: `/ai what is the capital of India?`)_  
-  - `/img` or `/image` - 🖼️ Generate an image from the given prompt  
-    _(Eg: `/img Sunset on a beach` or `/image Sunset on a beach`)_  
-  - `/settings` - ⚙️ Configure Bot Settings  
-  - `/new` or `/newchat` - 🔄 Start a New Chat and Clear Previous Chat History  
-  - `/rate` - ⭐️ Rate the Bot  
-  - `/help` - ❓ Show this Help Menu  
+### 💬 Advanced AI Conversations
+- **High-Quality GPT-4o Responses** - Professional, accurate and thoughtful AI interactions
+- **Streaming Responses** - Real-time typing effect for a more natural conversation experience
+- **Context-Aware Memory** - Bot remembers conversation history for coherent dialogue
+- **Optimized Performance** - Faster response times with adaptive update intervals
 
-- **Voice Commands:**  
-  - Record a voice message for seamless interaction.  
+### 🖼️ Enhanced Image Generation
+- **Style Customization** - Create images in various styles (realistic, cartoon, artistic, 3D, sketch)
+- **High-Resolution Output** - Generate detailed, high-quality images
+- **Interactive Feedback** - Rate generated images and request regeneration with one click
+- **Efficient Processing** - Optimized image creation pipeline with improved error handling
 
-- **Image Commands:**  
-  - Send an image with a caption like `"ai"` or `"ask"` for text extraction and interaction.  
+### 🔍 Advanced Image Analysis
+- **Improved OCR Capabilities** - More accurate text extraction from images
+- **Interactive Text Analysis** - View extracted text and ask follow-up questions
+- **Detailed Responses** - Get comprehensive analysis of image content
+- **Visual Feedback** - Modern UI with progress indicators during processing
 
-### 🧠 AI-Powered Features:
-- **💬 Intelligent ChatBot (GPT-4):**  
-  Engage in dynamic, context-aware conversations with the bot.  
-- **🎙️ Voice Interaction:**  
-  Convert speech to text and generate speech from text for a smooth voice experience.  
-- **🖼️ Image Generation (DALL-E 3):**  
-  Transform your ideas into stunning visuals by generating images from textual prompts.  
-- **🔍 Visual Analysis (Google Lens):**  
-  Extract insights and text from any image using cutting-edge AI tools.  
-- **🌐 Multilingual Support:**  
-  Fully localized interface in 6 languages (English, Hindi, Chinese, Arabic, French, Russian) with real-time translation of all bot responses.
+### 🎙️ Enhanced Voice Interaction
+- **High-Quality Voice Recognition** - More accurate speech-to-text conversion
+- **Improved Audio Responses** - Clearer, more natural-sounding text-to-speech
+- **Voice Preferences** - Toggle between voice and text responses with one click
+- **Multilingual Support** - Process speech in multiple languages
 
----
+## 🧩 Commands & Usage
 
+### Chat Interaction
+- Start typing in private chat to interact with the AI instantly
+- Use `/ai <query>` in group chats (e.g., `/ai explain quantum computing`)
+- Use `/newchat` or `/reset` to start a fresh conversation
 
-### 💡 Group & Personal Chat Features:
-- Interact with the bot in **group chats** or private conversations seamlessly.  
-- Leverage powerful commands and AI tools to enhance your experience in any context.  
+### Image Features
+- **Generate Images**: `/generate <prompt>` or `/img <prompt>`
+  - Add style with: `/generate mountain landscape, style:realistic`
+  - Available styles: `realistic`, `cartoon`, `artistic`, `3d`, `sketch`
+- **Extract Text**: Send any image to get text extraction and analysis
+  - In groups, add "ai" or "ask" in the caption
+
+### Voice Features
+- Send voice messages for instant transcription and response
+- Toggle between voice and text responses with the interactive buttons
+- Adjust voice settings in `/settings`
+
+### Utility Commands
+- `/help` - View all commands and features
+- `/settings` - Customize your bot experience
+- `/rate` - Provide feedback on the bot
+- `/stats` - View usage statistics (admin only)
 
 ## 🛠️ Technology Stack
 
-- **Natural Language Processing (NLP):**  
+### AI & Machine Learning
+- **Text Processing**: GPT-4o and GPT-4o-mini via optimized client
+- **Image Generation**: DALL-E 3 with style parameter support
+- **Speech Processing**: Enhanced speech recognition with noise reduction
 
-  - **Models:** GPT-4o, GPT-4o-mini (OpenAI)  
-    [OpenAI GPT-4o](https://chat.openai.com/)  
-  - **Libraries:** NLTK, SpaCy  
-- **Speech Recognition and Synthesis:**  
-  - **Voice Generation Model:** [Google Speech-to-Text](https://cloud.google.com/speech-to-text)  
-  - **Voice Recognition Model:** [Google Text-to-Speech](https://cloud.google.com/text-to-speech)
+### Performance Optimizations
+- Asynchronous processing with `asyncio`
+- Streaming responses for real-time user feedback
+- Temporary file handling for efficient resource usage
+- Adaptive update intervals based on response length
 
-- **Generative AI for Images:**  
-  - **Image Generation Model:** [DALL-E-3 Model](https://openai.com/dall-e/)
-
-- **Image Recognition:**  
-  - **Image to Text Model:** [OCR](https://ocr.space/ocrapi), [Google Cloud Vision API](https://cloud.google.com/vision)
-
-- **Translation and Localization:**
-  - **Translation API:** [Deep Translator](https://deep-translator.readthedocs.io/)
-  - **Languages Supported:** English, Hindi, Chinese, Arabic, French, Russian
-  - **Features:** Automatic UI translation, response translation, placeholder preservation
-
-- **Backend Development:** 
-  - **Framework:** [Flask](https://flask.palletsprojects.com/)  
-  - **APIs:** [Telegram Bot API](https://core.telegram.org/bots/api), [OpenAI API](https://beta.openai.com/docs/)
-
-- **Database Management:**  
-  - **Database:** [MongoDB](https://www.mongodb.com/)
-
-- **Cloud Services:**
-  - Hosting on [Railway](https://railway.app/)  
-  - Additional support: AWS, Google Cloud, Azure
-
-- **Security and Privacy:** SSL/TLS
-
-- **Source Code Management:** [GitHub](https://github.com/TechyCSR/AdvAITelegramBot)
-
----
-## 📂 Project Structure
-
-```plaintext
-AdvAITelegramBot/
-├── assets/                      # Static assets (images, icons, etc.)
-│   ├── logos/                   # Logos for branding
-├── database/                    # Database-related scripts or schema
-│   ├── migrations/              # Database migration scripts
-│   └── models.py                # Database models
-├── modules/                     # Core logic and functionality modules
-│   ├── __init__.py              # Marks 'modules' as a package
-│   ├── group/                   # Group-related functionalities
-│   │   ├── __init__.py          # Marks 'group' as a package
-│   │   ├── group_info.py        # Handles group information
-│   │   ├── group_settings.py    # Manages group settings
-│   │   ├── new_group.py         # Handles new group creation
-│   ├── image/                   # Image processing functionalities
-│   │   ├── __init__.py          # Marks 'image' as a package
-│   │   ├── image_generation.py  # AI-based image generation
-│   │   ├── img_to_text.py       # Extract text from images
-│   ├── speech/                  # Speech processing functionalities
-│   │   ├── __init__.py          # Marks 'speech' as a package
-│   │   ├── text_to_voice.py     # Converts text to speech
-│   │   ├── user_voice.py        # Manages user voice data
-│   │   ├── voice_to_text.py     # Converts voice input to text
-│   ├── user/                    # User-related functionalities
-│   │   ├── __init__.py          # Marks 'user' as a package
-│   │   ├── assistant.py         # AI assistant functionalities
-│   │   ├── commands.py          # Manages user commands
-│   │   ├── dev_support.py       # Developer-specific support logic
-│   │   ├── global_setting.py    # Global user settings
-│   │   ├── help.py              # Help command handling
-│   │   ├── lang_settings.py     # Language-related user settings
-│   │   ├── settings.py          # General user settings management
-│   │   ├── start.py             # User onboarding/start commands
-│   │   ├── user_support.py      # Feedback and support handling
-|   ├── chatlogs.py                  # Chat logging script
-|   ├── feedback_and_ratings.py      # Feedback and ratings handling
-|   ├── maintenance.py               # Maintenance scripts
-|   ├── lang.py                      # Translation and language processing utilities
-├── tests/                       # Test cases for modules
-│   ├── test_speech.py           # Test cases for speech module
-│   ├── test_translation.py      # Test cases for translation module
-├── har_and_cookies/             # Stores HAR files and cookies for debugging
-│   └── ...                      # HAR and cookie files
-├── .env                         # Environment variables (API keys, etc.)
-├── .gitignore                   # Git ignore rules
-├── Dockerfile                   # Docker configuration for the project
-├── LICENSE                      # License for the project
-├── README.md                    # Project documentation
-├── config.py                    # Bot configuration file
-├── requirements.txt             # Python dependencies
-├── run.py                       # Entry point for running the bot
-
-```
-
----
+### User Experience
+- Modern UI with emoji and markdown formatting
+- Interactive buttons for common actions
+- Progress indicators for long-running processes
+- Detailed feedback on operations
 
 ## 🚀 Quick Start
-### 📦 Installation
 
-1. **Clone the Repository:**
+### Installation
+1. Clone the repository
+   ```bash
+   git clone https://github.com/TechyCSR/AdvAITelegramBot.git
+   cd AdvAITelegramBot
+   ```
 
-    ```bash
-    git clone "https:github.com/TechyCSR/AdvAITelegramBot.git"
-    cd AdvAITelegramBot
-    ```
-2. **Install Dependencies:**
+2. Install dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
-3. **Set Environment Variables:**
+3. Configure environment variables in a `.env` file
+   ```
+   API_ID=your_api_id
+   API_HASH=your_api_hash
+   BOT_TOKEN=your_bot_token
+   DATABASE_URL=your_mongodb_connection_string
+   OCR_KEY=your_ocr_api_key
+   LOG_CHANNEL=your_log_channel
+   ADMIN_IDS=comma,separated,ids
+   OWNER_ID=owner_id
+   ```
 
-    Create a `.env` file in the root directory and add the following environment variables:
+4. Run the bot
+   ```bash
+   python run.py
+   ```
 
-    ```plaintext
-    TELEGRAM
-    OPENAI
-    OCR_SPACE
-    MONGO_URI
-    Log_Channel (Mandatory)
-    ```
-4. **Run the Bot:**
+## 💡 Contribution
 
-    ```bash
-    python run.py
-    ```
-5. **Start Chatting:**
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
-    Open the Telegram app and start chatting with the bot!
+## 📄 License
 
----
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Contributors
+## 👥 Maintainers
 
-Maintained by:
 - **[TechyCSR](https://techycsr.me)**
 - **[Ankit](@Ankit-Sharma-Dev)**
 - **[Aarushi](@111Aaru11)**
-
-### License
-
-Licensed under the [MIT License](LICENSE). This open-source project provides no warranties or guaranteed support.
-
-</div>
-
-
-[//]: # (End of file)

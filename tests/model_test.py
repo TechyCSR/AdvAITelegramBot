@@ -11,7 +11,6 @@ gpt_client = GPTClient(provider="PollinationsAI")
 history = []
 history.append({"role": "system", "content": "Hello! I am GPT-4, a chatbot."})
 
-ok ="Blackbox"
 
 def get_response(ask):
         
