@@ -19,7 +19,7 @@ from modules.group.group_settings import leave_group, invite_command
 from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command
 from modules.modles.ai_res import aires, new_chat
-from modules.image.image_generation import generate_command, handle_image_feedback
+from modules.image.image_generation import generate_command, handle_image_feedback, start_cleanup_scheduler, handle_generate_command
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.global_setting import global_setting_command
 from modules.speech.voice_to_text import handle_voice_toggle
@@ -68,8 +68,17 @@ bot_stats = {
     "active_users": set()
 }
 
+# Get the cleanup scheduler function to run later
+cleanup_scheduler = start_cleanup_scheduler()
+
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
+    # Start the cleanup scheduler on first command
+    global cleanup_scheduler_task
+    if not 'cleanup_scheduler_task' in globals() or cleanup_scheduler_task is None:
+        cleanup_scheduler_task = asyncio.create_task(cleanup_scheduler())
+        logger.info("Started image generation cleanup scheduler task")
+        
     bot_stats["active_users"].add(update.from_user.id)
     logger.info(f"User {update.from_user.id} started the bot")
     await start(bot, update)
@@ -133,10 +142,12 @@ async def callback_query(client, callback_query):
     elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
         await handle_rate_callback(client, callback_query)
     
-    # Image feedback handlers
+    # Image feedback and style selection handlers
     elif callback_query.data.startswith("img_feedback_"):
         await handle_image_feedback(client, callback_query)
     elif callback_query.data.startswith("img_regenerate_"):
+        await handle_image_feedback(client, callback_query)
+    elif callback_query.data.startswith("img_style_"):
         await handle_image_feedback(client, callback_query)
     
     # Voice setting handlers
@@ -232,26 +243,11 @@ async def handle_new_chat(client, message):
 async def handle_generate(client, message):
     bot_stats["images_generated"] += 1
     bot_stats["active_users"].add(message.from_user.id)
-    logger.info(f"Image generation requested by user {message.from_user.id}")
     
-    try:
-        if len(message.text.split()) > 1:
-            prompt = message.text.split(None, 1)[1]
-        else:
-            await message.reply_text(
-                "🖼️ **Image Generation**\n\n"
-                "Please provide a prompt to generate images.\n\n"
-                "Example: `/generate a serene mountain landscape at sunset, style:realistic`\n\n"
-                "Available styles: `realistic`, `cartoon`, `artistic`, `3d`, `sketch`"
-            )
-            return
-            
-        # Pass to async generation function
-        await generate_command(client, message, prompt)
-        
-    except Exception as e:
-        logger.error(f"Error in image generation: {str(e)}")
-        await message.reply_text(f"❌ **Error**\n\nFailed to generate images: {str(e)}")
+    # Call the handler from image_generation.py
+    await handle_generate_command(client, message)
+    # Log the command usage
+    await channel_log(client, message, f"/{message.command[0]}", "Image generation requested")
 
 @advAiBot.on_message(filters.photo)
 async def handle_image(bot, update):
@@ -369,6 +365,9 @@ if __name__ == "__main__":
     logger.info("🤖 Advanced AI Telegram Bot starting...")
     print("🤖 Advanced AI Telegram Bot starting...")
     print("✨ Optimized for performance and modern UI")
+    
+    # Create global variable for the cleanup task
+    cleanup_scheduler_task = None
     
     # Run the bot
     advAiBot.run()
