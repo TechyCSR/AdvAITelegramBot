@@ -1,22 +1,20 @@
 import os
 import asyncio
 import tempfile
-from pymongo import MongoClient
 import soundfile as sf
 import speech_recognition as sr
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from config import DATABASE_URL, LOG_CHANNEL
+from config import LOG_CHANNEL
 
 from modules.speech.text_to_voice import handle_text_message 
-from modules.modles.ai_res import get_response, get_streaming_response
+from modules.models.ai_res import get_response, get_streaming_response
 from modules.chatlogs import user_log
+from modules.core.database import db_service
 
-mongo_client = MongoClient(DATABASE_URL)
-
-db = mongo_client['aibotdb']
-user_voice_setting_collection = db['user_voice_setting']
-history_collection = db['history']
+# Get collections from the database service
+user_voice_setting_collection = db_service.get_collection('user_voice_setting')
+history_collection = db_service.get_collection('history')
 
 # Enhanced audio processing to support multiple formats and languages
 async def process_audio_file(input_path, output_path=None, language="en-US"):

@@ -18,19 +18,20 @@ from modules.maintenance import settings_others_callback
 from modules.group.group_settings import leave_group, invite_command
 from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command
-from modules.modles.ai_res import aires, new_chat
+from modules.models.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command, handle_image_feedback, start_cleanup_scheduler, handle_generate_command
 from modules.image.inline_image_generation import handle_inline_query, cleanup_ongoing_generations
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.global_setting import global_setting_command
 from modules.speech.voice_to_text import handle_voice_toggle
-import database.user_db as user_db
+import modules.models.user_db as user_db
 import asyncio
 import logging
 import datetime
 from logging.handlers import RotatingFileHandler
 import json
 import time
+from modules.models.image_service import ImageService
 
 
 # Create directories if they don't exist
@@ -154,6 +155,11 @@ async def callback_query(client, callback_query):
         await support_developers_callback(client, callback_query)
     elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
         await handle_rate_callback(client, callback_query)
+    
+    # Onboarding tour handlers
+    elif callback_query.data.startswith("onboarding_"):
+        from modules.user.start import handle_onboarding
+        await handle_onboarding(client, callback_query)
     
     # Image feedback and style selection handlers
     elif callback_query.data.startswith("img_feedback_"):
@@ -372,6 +378,22 @@ async def logs_command(bot, update):
         
         # Log the error
         await error_log(bot, "LOGS_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
+
+@advAiBot.on_message(filters.command(["clear_cache", "clearcache", "clear_images"]))
+async def clear_user_cache(client, message):
+    """Handle request to clear user's image cache"""
+    user_id = message.from_user.id
+    logger.info(f"User {user_id} requested to clear their image cache")
+    
+    # Clear the user's image cache
+    success = await ImageService.clear_user_image_cache(user_id)
+    
+    if success:
+        await message.reply_text("✅ **Your image cache has been cleared**\n\nAll stored image data has been removed.")
+    else:
+        await message.reply_text("ℹ️ **No image cache found**\n\nYou don't have any cached images to clear.")
+    
+    await channel_log(client, message, "/clear_cache", f"User cleared their image cache")
 
 if __name__ == "__main__":
     # Print startup message

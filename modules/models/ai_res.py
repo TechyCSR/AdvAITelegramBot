@@ -2,23 +2,27 @@ import os
 import asyncio
 import time
 import re
-from pymongo import MongoClient
+from typing import List, Dict, Any, Optional, Generator, Union
 from pyrogram import Client, filters, enums
+from pyrogram.types import Message
 from g4f.client import Client as GPTClient
-from config import DATABASE_URL
+from modules.core.database import get_history_collection
 from modules.chatlogs import user_log
 
-
-mongo_client = MongoClient(DATABASE_URL)
-
-# Access or create the database and collection
-db = mongo_client['aibotdb']
-history_collection = db['history']
 
 # Initialize the GPT client with a more efficient provider
 gpt_client = GPTClient(provider="PollinationsAI")
 
-def get_response(history):  
+def get_response(history: List[Dict[str, str]]) -> str:  
+    """
+    Get a non-streaming response from the AI model
+    
+    Args:
+        history: Conversation history in the format expected by the AI model
+        
+    Returns:
+        String response from the AI model
+    """
     try:
         response = gpt_client.chat.completions.create(
             model="gpt-4o",  # Using more capable model for higher quality responses
@@ -29,7 +33,16 @@ def get_response(history):
         print(f"Error generating response: {e}")
         return "I'm experiencing technical difficulties. Please try again in a moment."
 
-def get_streaming_response(history):
+def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]:
+    """
+    Get a streaming response from the AI model
+    
+    Args:
+        history: Conversation history in the format expected by the AI model
+        
+    Returns:
+        Generator yielding response chunks or None if there's an error
+    """
     try:
         # Stream parameter set to True to get response chunks
         response = gpt_client.chat.completions.create(
@@ -42,9 +55,15 @@ def get_streaming_response(history):
         print(f"Error generating streaming response: {e}")
         return None
 
-def sanitize_markdown(text):
+def sanitize_markdown(text: str) -> str:
     """
     Ensures proper markdown formatting in streaming responses
+    
+    Args:
+        text: Raw text that may contain incomplete markdown
+        
+    Returns:
+        Text with proper markdown formatting
     """
     # Count opening and closing backticks to handle code blocks
     backticks_opened = text.count('```')
@@ -71,7 +90,7 @@ def sanitize_markdown(text):
     return text
 
 # Default system message with modern, professional tone
-DEFAULT_SYSTEM_MESSAGE = {
+DEFAULT_SYSTEM_MESSAGE: Dict[str, str] = {
     "role": "assistant",
     "content": (
         "I'm your advanced AI assistant, designed to provide helpful, accurate, and thoughtful responses. "
@@ -81,12 +100,22 @@ DEFAULT_SYSTEM_MESSAGE = {
     )
 }
 
-async def aires(client, message):
+async def aires(client: Client, message: Message) -> None:
+    """
+    Handle user messages and generate AI responses
+    
+    Args:
+        client: Pyrogram client instance
+        message: Message from the user
+    """
     try:
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         temp = await message.reply_text("⏳")
         user_id = message.from_user.id
         ask = message.text
+        
+        # Access MongoDB collection through the DatabaseService
+        history_collection = get_history_collection()
         
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
@@ -230,9 +259,20 @@ async def aires(client, message):
         await message.reply_text(f"An error occurred: {e}")
         print(f"Error in aires function: {e}")
 
-async def new_chat(client, message):
+async def new_chat(client: Client, message: Message) -> None:
+    """
+    Reset a user's chat history
+    
+    Args:
+        client: Pyrogram client instance
+        message: Message from the user
+    """
     try:
         user_id = message.from_user.id
+        
+        # Access MongoDB collection through the DatabaseService
+        history_collection = get_history_collection()
+        
         # Delete user history from MongoDB
         history_collection.delete_one({"user_id": user_id})
 
@@ -241,6 +281,4 @@ async def new_chat(client, message):
 
     except Exception as e:
         await message.reply_text(f"Error clearing chat history: {e}")
-        print(f"Error in new_chat function: {e}")
-
-
+        print(f"Error in new_chat function: {e}") 
