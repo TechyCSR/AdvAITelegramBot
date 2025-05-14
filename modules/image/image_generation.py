@@ -360,11 +360,14 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 reply_markup=None
             )
             
+            # Get user info for mention
+            user_mention = f"[User {user_id}](tg://user?id={user_id})"
+            
             # Log positive feedback
             try:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"#ImgLog #Feedback #Positive\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
+                    f"#ImgLog #Feedback #Positive\n**User**: {user_mention}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
                 )
                 
                 # Store in database
@@ -392,11 +395,14 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 reply_markup=None
             )
             
+            # Get user info for mention
+            user_mention = f"[User {user_id}](tg://user?id={user_id})"
+            
             # Log negative feedback
             try:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"#ImgLog #Feedback #Negative\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
+                    f"#ImgLog #Feedback #Negative\n**User**: {user_mention}\n**Time**: {feedback_time}\n**Generation ID**: `{generation_id}`"
                 )
                 
                 # Store in database
@@ -442,11 +448,14 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             except Exception as e:
                 logger.error(f"Error deleting feedback message: {e}")
                 
+            # Get user info for mention
+            user_mention = f"[User {user_id}](tg://user?id={user_id})"
+                
             # Log regeneration
             try:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"#ImgLog #Regenerate\n**User ID**: {user_id}\n**Time**: {feedback_time}\n**Prompt**: `{prompt}`"
+                    f"#ImgLog #Regenerate\n**User**: {user_mention}\n**Time**: {feedback_time}\n**Prompt**: `{prompt}`"
                 )
             except Exception as e:
                 logger.error(f"Failed to log regeneration: {str(e)}")
@@ -667,12 +676,15 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
                 text=f"❌ **Image Generation Failed**\n\n{error}\n\nPlease try a different prompt or style."
             )
             
+            # Get user info for mention
+            user_mention = f"[User {user_id}](tg://user?id={user_id})"
+            
             # Log the error
             try:
                 await client.send_message(
                     LOG_CHANNEL,
                     f"#ImgLog #Rejected\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"\
-                    f"**User ID**: {user_id}\n**Time**: {generation_time}\n**Error**: {error}"
+                    f"**User**: {user_mention}\n**Time**: {generation_time}\n**Error**: {error}"
                 )
             except Exception as e:
                 logger.error(f"Failed to log error to channel: {str(e)}")
@@ -734,6 +746,9 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         except Exception as e:
             logger.error(f"Failed to store image metadata: {str(e)}")
         
+        # Get user info for mention
+        user_mention = f"[User {user_id}](tg://user?id={user_id})"
+        
         # Log to channel
         try:
             # Send images to log channel
@@ -743,7 +758,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             await client.send_message(
                 LOG_CHANNEL,
                 f"#ImgLog #Generated\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"\
-                f"**User ID**: {user_id}\n**Time**: {generation_time}\n"\
+                f"**User**: {user_mention}\n**Time**: {generation_time}\n"\
                 f"**Images**: {len(urls)}\n**Generation ID**: `{generation_id}`"
             )
         except Exception as e:
