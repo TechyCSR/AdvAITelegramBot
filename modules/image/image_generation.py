@@ -334,6 +334,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
     """Handle feedback and regeneration callbacks"""
     data = callback_query.data
     user_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id  # Get the actual chat ID
     feedback_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     try:
@@ -424,6 +425,11 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             target_user_id = int(parts[2])
             prompt_id = parts[3]
             
+            # Verify user
+            if user_id != target_user_id:
+                await callback_query.answer("You can only regenerate your own images.")
+                return
+            
             # Retrieve the original prompt from storage
             prompt = get_prompt(prompt_id)
             if not prompt:
@@ -431,11 +437,6 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 await callback_query.answer("Error: Could not find the original prompt. Please try a new image generation.")
                 return
             
-            # Verify user
-            if user_id != target_user_id:
-                await callback_query.answer("You can only regenerate your own images.")
-                return
-                
             # Check if already processing
             if user_id in user_states and user_states[user_id].is_processing:
                 await callback_query.answer("Already generating images, please wait...")
@@ -460,9 +461,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             except Exception as e:
                 logger.error(f"Failed to log regeneration: {str(e)}")
                 
-            # Show style selection again - don't use message object approach
-            # Instead, send a new style selection directly
-            # Create or update the user's generation state first
+            # Create or update the user's generation state
             user_states[user_id] = UserGenerationState(user_id, prompt)
             
             # Create style selection buttons
@@ -482,9 +481,9 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             
             style_markup = InlineKeyboardMarkup(keyboard)
             
-            # Send the style selection message directly
+            # Send the style selection message in the same chat where the regeneration was requested
             style_msg = await client.send_message(
-                chat_id=callback_query.message.chat.id,
+                chat_id=chat_id,  # Use the actual chat ID where regeneration was requested
                 text=f"🎭 **Choose Image Style for Regeneration**\n\n"
                 f"Your prompt: `{prompt}`\n\n"
                 f"Please select a style for your image:",
@@ -493,7 +492,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             
             # Save message info in user state
             user_states[user_id].style_msg_id = style_msg.id
-            user_states[user_id].style_msg_chat_id = style_msg.chat.id
+            user_states[user_id].style_msg_chat_id = chat_id
             
             logger.info(f"Sent regeneration style selection for user {user_id} with prompt: '{prompt}'")
             
@@ -552,6 +551,7 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         # Extract data from callback
         data = callback_query.data
         clicked_user_id = callback_query.from_user.id
+        chat_id = callback_query.message.chat.id  # Get the actual chat ID where the interaction is happening
         
         # Check callback format (img_style_{style}_{user_id})
         parts = data.split("_")
@@ -566,16 +566,13 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         
         # Only allow users to select styles for their own requests
         # For regeneration, we should always match the current user
-        if clicked_user_id != target_user_id and target_user_id != clicked_user_id:
+        if clicked_user_id != target_user_id:
             logger.warning(f"User mismatch: clicked_user={clicked_user_id}, target_user={target_user_id}")
             await callback_query.answer("This isn't your image request.")
             return
             
-        # Use the current user's ID as the real target (important for regeneration flow)
-        real_user_id = clicked_user_id
-            
         # Check if the user has an active state
-        if real_user_id not in user_states:
+        if clicked_user_id not in user_states:
             # If there's no state yet but this is a valid request from the user,
             # create a new state for them (helpful for regeneration flow)
             if callback_query.message and callback_query.message.text:
@@ -584,8 +581,8 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
                 if match:
                     prompt = match.group(1)
                     # Create a new state for this user
-                    user_states[real_user_id] = UserGenerationState(real_user_id, prompt)
-                    logger.info(f"Created new state for user {real_user_id} with prompt: {prompt}")
+                    user_states[clicked_user_id] = UserGenerationState(clicked_user_id, prompt)
+                    logger.info(f"Created new state for user {clicked_user_id} with prompt: {prompt}")
                 else:
                     await callback_query.answer("Your request has expired. Please make a new request.")
                     return
@@ -594,7 +591,7 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
                 return
             
         # Get the user's state
-        state = user_states[real_user_id]
+        state = user_states[clicked_user_id]
         
         # Check if already processing
         if state.is_processing:
@@ -612,8 +609,8 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         await callback_query.answer(f"Generating images in {style_info['name']} style...")
         
         # Update the message to show processing
-        await client.edit_message_text(
-            chat_id=callback_query.message.chat.id,
+        processing_message = await client.edit_message_text(
+            chat_id=chat_id,  # Use the actual chat ID
             message_id=callback_query.message.id,
             text=f"🎭 **Generating Images**\n\n"
             f"Your prompt: `{state.prompt}`\n\n"
@@ -625,8 +622,8 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         progress_task = asyncio.create_task(
             update_generation_progress(
                 client, 
-                callback_query.message.chat.id, 
-                callback_query.message.id, 
+                chat_id,  # Use the actual chat ID
+                processing_message.id, 
                 state.prompt, 
                 style
             )
@@ -635,7 +632,7 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         # Start the actual image generation
         await generate_and_send_images(
             client,
-            callback_query.message,  
+            processing_message,  # Pass the new processing message
             state.prompt,
             style,
             progress_task

@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2024 CHANDAN SINGH
+Copyright (c) 2024-2025 CHANDAN SINGH
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+ADDITIONAL DISCLAIMER:
+TechyCSR (the author/maintainer) is not responsible for any usage, deployments, or implementations of this software. Users of this software assume all responsibility for any technical issues, security vulnerabilities, or damages that may arise from its use. This includes but is not limited to:
+- Production deployments
+- Integration with other systems
+- Data handling and processing
+- Security implementations
+- Third-party service interactions
