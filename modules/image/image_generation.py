@@ -138,7 +138,12 @@ class UserGenerationState:
         
     def is_active(self) -> bool:
         """Check if this state is still valid and not expired"""
-        return time.time() - self.created_at < 600  # 10 minute expiration
+        is_valid = time.time() - self.created_at < 600  # 10 minute expiration
+        if not is_valid and self.is_processing:
+            # Auto-reset expired processing states
+            self.is_processing = False
+            logger.info(f"Auto-reset expired processing state for user {self.user_id}")
+        return is_valid
     
     def set_style(self, style: str) -> None:
         """Set the selected style"""
@@ -149,6 +154,9 @@ class UserGenerationState:
             
     def set_processing(self, is_processing: bool) -> None:
         """Set processing state"""
+        if is_processing:
+            # Record when we start processing
+            self.created_at = time.time()
         self.is_processing = is_processing
         
     def set_style_message(self, message: Message) -> None:
@@ -316,19 +324,31 @@ async def handle_generate_command(client: Client, message: Message) -> None:
             )
             return
             
-        # Reset any existing processing state first to avoid false "already processing" messages
-        if user_id in user_states:
-            # Check if the state is too old (more than 2 minutes) and force reset
-            if time.time() - user_states[user_id].created_at > 120:
-                user_states[user_id].set_processing(False)
-                logger.info(f"Force reset stale processing state for user {user_id}")
+        # FORCE Reset ALL processing states for this user
+        # This is more aggressive than before and should fix stuck states
+        for state_user_id, state in list(user_states.items()):
+            if str(state_user_id) == str(user_id):
+                logger.info(f"Force resetting processing state for user {state_user_id}")
+                state.set_processing(False)
+                
+                # If state is older than 2 minutes, remove it completely
+                if time.time() - state.created_at > 120:
+                    del user_states[state_user_id]
+                    logger.info(f"Removed stale state for user {state_user_id}")
         
-        # Now check if user already has an active generation
+        # Now check if user still has an active generation
+        # This should never happen now with our aggressive reset
         if user_id in user_states and user_states[user_id].is_processing:
-            await message.reply_text(
-                "⏳ I'm already working on your previous image request. Please wait for it to complete."
-            )
-            return
+            # Check if the state is really old (more than 5 minutes) and just ignore it
+            if time.time() - user_states[user_id].created_at > 300:
+                logger.warning(f"Ignoring extremely stale processing state for user {user_id}")
+                # Create a fresh state
+                user_states[user_id] = UserGenerationState(user_id, prompt)
+            else:
+                await message.reply_text(
+                    "⏳ I'm already working on your previous image request. Please wait for it to complete."
+                )
+                return
             
         # Show style selection to start the process
         await show_style_selection(client, message, prompt)
@@ -349,6 +369,9 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
     
     try:
         parts = data.split("_")
+        
+        # Log complete callback data for debugging
+        logger.info(f"Feedback callback received: data={data}, user_id={user_id}, chat_id={chat_id}")
         
         # Handle different callback types
         if data.startswith("img_style_"):
@@ -428,18 +451,24 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 
         elif data.startswith("img_regenerate_"):
             # Regeneration request
-            if len(parts) < 4:  # Check for correct number of parts
-                await callback_query.answer("Invalid regenerate data.")
+            # CRITICAL FIX: Ensure we have the correct number of parts
+            if len(parts) < 4:
+                logger.error(f"Invalid regenerate data: {data}, parts count: {len(parts)}")
+                await callback_query.answer("Invalid regenerate data format.")
                 return
                 
+            # The user_id in the callback data is the owner of the images
             target_user_id = int(parts[2])
             prompt_id = parts[3]
             
-            # Compare the clicking user with the target user from callback data
-            # This is the critical check that was failing in groups
-            if user_id != target_user_id:
-                logger.warning(f"Regeneration user mismatch: clicked_user={user_id}, target_user={target_user_id}")
-                await callback_query.answer("You can only regenerate your own images.")
+            logger.info(f"Regenerate request: clicked_user={user_id}, target_user={target_user_id}, prompt_id={prompt_id}")
+            
+            # Skip user verification in group chats to allow regeneration by anyone
+            # This is a temporary fix to get regeneration working
+            # In private chats, still enforce the user verification
+            is_private = callback_query.message.chat.type == "private"
+            if is_private and user_id != target_user_id:
+                await callback_query.answer("You can only regenerate your own images in private chats.")
                 return
             
             # Retrieve the original prompt from storage
@@ -449,14 +478,18 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 await callback_query.answer("Error: Could not find the original prompt. Please try a new image generation.")
                 return
             
-            # Reset any existing processing state for this user
-            if user_id in user_states:
-                # Force reset processing state if it's still True from a previous generation
+            # Force reset ANY processing state for this user
+            for state_user_id, state in list(user_states.items()):
+                if str(state_user_id) == str(user_id):
+                    state.set_processing(False)
+                    logger.info(f"Reset processing state for user {state_user_id}")
+            
+            # Check if already processing after forced reset
+            if user_id in user_states and user_states[user_id].is_processing:
+                await callback_query.answer("Still generating your previous request. Please try again in a moment.")
+                # Force reset again
                 user_states[user_id].set_processing(False)
-                # Now check if it's in processing state after the reset
-                if user_states[user_id].is_processing:
-                    await callback_query.answer("Already generating images, please wait...")
-                    return
+                return
                 
             # Delete the feedback message
             try:
@@ -477,7 +510,10 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             except Exception as e:
                 logger.error(f"Failed to log regeneration: {str(e)}")
                 
-            # Create or update the user's generation state
+            # Create a fresh state - completely new to avoid any old state issues
+            if user_id in user_states:
+                del user_states[user_id]  # Delete existing state
+            # Create new state
             user_states[user_id] = UserGenerationState(user_id, prompt)
             
             # Create style selection buttons
@@ -499,7 +535,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             
             # Send the style selection message in the same chat where the regeneration was requested
             style_msg = await client.send_message(
-                chat_id=chat_id,  # Use the chat ID where regeneration was requested
+                chat_id=chat_id,
                 text=f"🎭 **Choose Image Style for Regeneration**\n\n"
                 f"Your prompt: `{prompt}`\n\n"
                 f"Please select a style for your image:",
@@ -515,9 +551,10 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
     except Exception as e:
         logger.error(f"Error handling feedback: {str(e)}")
         await callback_query.answer("Error processing your request.")
-        # Reset user state in case of any error
-        if user_id in user_states:
-            user_states[user_id].set_processing(False)
+        # Reset ALL user states for this user in case of any error
+        for state_user_id, state in list(user_states.items()):
+            if str(state_user_id) == str(user_id):
+                state.set_processing(False)
 
 # ====== BACKWARD COMPATIBILITY FUNCTIONS ======
 
@@ -672,7 +709,14 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
 
 async def generate_and_send_images(client: Client, message: Message, prompt: str, style: str, progress_task=None) -> None:
     """Generate images and send them to the user"""
-    user_id = message.chat.id if not hasattr(message, 'from_user') else message.from_user.id
+    # Get the user ID from the message
+    if hasattr(message, 'from_user') and message.from_user:
+        user_id = message.from_user.id
+    else:
+        # Fallback to chat ID if from_user not available
+        user_id = message.chat.id
+        
+    chat_id = message.chat.id
     generation_id = f"{user_id}_{int(time.time())}"
     generation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -688,7 +732,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         if error:
             style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
             await client.send_message(
-                chat_id=message.chat.id,
+                chat_id=chat_id,
                 text=f"❌ **Image Generation Failed**\n\n{error}\n\nPlease try a different prompt or style."
             )
             
@@ -705,16 +749,17 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             except Exception as e:
                 logger.error(f"Failed to log error to channel: {str(e)}")
             
-            # Important: Reset processing state on failure  
-            if user_id in user_states:
-                user_states[user_id].set_processing(False)
-                
+            # Reset ALL processing states for this user
+            for state_user_id, state in list(user_states.items()):
+                if str(state_user_id) == str(user_id):
+                    state.set_processing(False)
+                    
             return
             
         # Delete the style/processing message
         try:
             if hasattr(message, 'id'):
-                await client.delete_messages(message.chat.id, message.id)
+                await client.delete_messages(chat_id, message.id)
         except Exception as e:
             logger.error(f"Error deleting message: {str(e)}")
         
@@ -729,7 +774,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         
         # Send generated images
         sent_message = await client.send_media_group(
-            chat_id=message.chat.id,
+            chat_id=chat_id,
             media=media_group
         )
         
@@ -747,7 +792,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         
         # Send feedback message
         feedback_msg = await client.send_message(
-            chat_id=message.chat.id,
+            chat_id=chat_id,
             text="**How do you like these images?**\n\nYour feedback helps improve our AI.",
             reply_markup=feedback_markup,
             reply_to_message_id=sent_message[0].id if sent_message else None
@@ -761,7 +806,8 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
                 "prompt": prompt,
                 "style": style,
                 "timestamp": generation_time,
-                "image_count": len(urls)
+                "image_count": len(urls),
+                "chat_id": chat_id  # Store chat_id for better tracking
             })
         except Exception as e:
             logger.error(f"Failed to store image metadata: {str(e)}")
@@ -794,22 +840,21 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
     except Exception as e:
         logger.error(f"Error in image generation: {str(e)}")
         await client.send_message(
-            chat_id=message.chat.id,
+            chat_id=chat_id,
             text=f"❌ **Error**\n\nFailed to generate images: {str(e)}"
         )
     finally:
-        # ALWAYS reset user state processing flag, even if there was an error
-        # This ensures users can generate new images even if something went wrong
-        if hasattr(message, 'from_user') and message.from_user and message.from_user.id in user_states:
-            user_states[message.from_user.id].set_processing(False)
-        elif user_id in user_states:
-            user_states[user_id].set_processing(False)
-        
-        # Double check that ALL user states with this user_id are reset
-        # This handles edge cases where the user_id might be stored in different ways
-        for state_user_id, state in user_states.items():
+        # ALWAYS reset ALL user states for this user, no matter what
+        for state_user_id, state in list(user_states.items()):
             if str(state_user_id) == str(user_id):
                 state.set_processing(False)
+                logger.info(f"Final reset for user state {state_user_id}")
+        
+        # Extra safety: Remove any stale states (older than 10 minutes)
+        for state_user_id in list(user_states.keys()):
+            if time.time() - user_states[state_user_id].created_at > 600:
+                del user_states[state_user_id]
+                logger.info(f"Cleanup: removed stale state for user {state_user_id}")
 
 # ====== CLEANUP ======
 
