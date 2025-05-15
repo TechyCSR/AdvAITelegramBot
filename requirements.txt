@@ -21,6 +21,9 @@ Pillow>=10.0.0
 deep-translator>=1.11.4  # More reliable translations with placeholder support
 regex>=2023.10.3  # For regex pattern matching in placeholder detection
 
+# System monitoring
+psutil>=5.9.5  # System statistics for admin panel
+
 # Performance optimization
 uvloop>=0.17.0; platform_system != "Windows"  # High-performance event loop (non-Windows)
 orjson>=3.9.5  # Faster JSON serialization/deserialization

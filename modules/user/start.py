@@ -8,31 +8,36 @@ from modules.lang import async_translate_to_lang, batch_translate, format_with_m
 from modules.chatlogs import channel_log
 import database.user_db as user_db
 
-# Define button texts
+# Define button texts with emojis
 button_list = [
-    "Add to Group",
-    "Commands",
-    "Help",
-    "Settings",
-    "Support"
+    "➕ Add to Group",
+    "🛠️ Commands",
+    "❓ Help",
+    "⚙️ Settings",
+    "📞 Support"
 ]
 
 welcome_text = """
-**Welcome {user_mention}!** 👋
+✨ **Welcome {user_mention}!** ✨
 
-I'm an advanced AI-powered Telegram bot that can:
-- Chat intelligently using GPT-4
-- Convert voice messages to text and vice versa
-- Generate images from text descriptions
-- Extract text from images
-- Support multiple languages
+🤖 **Advanced AI Bot **
 
-Use the buttons below to explore my features!
+I can help you with:
 
-**@AdvChatGptBot**
+🧠 **Smart Chat** - Intelligent conversations with GPT-4o
+🗣️ **Voice & Text** - Convert voice to text and back
+🖼️ **Image Creation** - Generate stunning visuals from text
+📝 **Text Extraction** - Analyze text from any image
+🌐 **Multilingual** - Communicate in your language
+
+━━━━━━━━━━━━━━━━━━━━━
+
+👨‍💻 **Created by [Chandan Singh](https://techycsr.me)**(**@techycsr**)
+
+**Select a button below to get started!**
 """
 
-tip_text = "💡 Tip: You can use /help to see all available commands!"
+tip_text = "💡 **Pro Tip:** Type any message to start chatting with me, or use /help to see all commands!"
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
@@ -56,11 +61,11 @@ async def start(client, message):
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(translated_buttons[0] + " 🔥 ", url=f"https://t.me/{client.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1] + " 🛠️ ", callback_data="commands"),
-         InlineKeyboardButton(translated_buttons[2] + " 💬 ", callback_data="help")],
-        [InlineKeyboardButton(translated_buttons[3] + " ⚙️ ", callback_data="settings"),
-         InlineKeyboardButton(translated_buttons[4] + " 🆘 ", callback_data="support")]
+        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
+         InlineKeyboardButton(translated_buttons[2], callback_data="help")],
+        [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
+         InlineKeyboardButton(translated_buttons[4], callback_data="support")]
     ])
 
     # Send the welcome message with the GIF and the keyboard
@@ -85,11 +90,11 @@ async def start_inline(bot, callback):
 
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(translated_buttons[0] + " 🔥 ", url=f"https://t.me/{bot.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1] + " 🛠️ ", callback_data="commands"),
-         InlineKeyboardButton(translated_buttons[2] + " 💬 ", callback_data="help")],
-        [InlineKeyboardButton(translated_buttons[3] + " ⚙️ ", callback_data="settings"),
-         InlineKeyboardButton(translated_buttons[4] + " 🆘 ", callback_data="support")]
+        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
+         InlineKeyboardButton(translated_buttons[2], callback_data="help")],
+        [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
+         InlineKeyboardButton(translated_buttons[4], callback_data="support")]
     ])
 
     # Send the welcome message with the GIF and the keyboard

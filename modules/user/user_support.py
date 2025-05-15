@@ -1,52 +1,55 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from modules.lang import async_translate_to_lang
+from modules.maintenance import maintenance_settings, is_admin_user
 
-from config import ADMINS as admin_ids
+from config import ADMINS as admin_ids, OWNER_ID
 
 support_text="""
-About the bot:
+🤖 **Advanced AI Bot Information**
 
-**Suports Image to Text, Text to Image, Voice to Text, Text to Voice, Chatbot, and many more features.**
+This versatile AI assistant supports a wide range of capabilities:
 
-**Version:** V-2.O
-**ChatGpt Model:** [Gpt-4o and Gpt-4o-mini (OpenAi)](https://chat.openai.com/)
-**Image Generation Model:** [DALL-E-3 Model](https://openai.com/dall-e/)
-**Voice Generation Model:** [Google Speech to Text](https://cloud.google.com/speech-to-text)
-**Voice Recognition Model:** [Google Text to Speech](https://cloud.google.com/text-to-speech)
-**Image to Text Model:** [OCR](https://ocr.space/ocrapi)
-**Databse:** [MongoDB](https://www.mongodb.com)
-**Hosting:** [Railway](https://railway.app)
-**Source Code:** [GitHub](https://github.com/TechyCSR/AdvAITelegramBot)
+• 🖼️ Image Generation (DALL-E-3)
+• 🎙️ Voice Interactions
+• 📝 Image-to-Text Analysis
+• 💬 Advanced Conversational AI
+• 🌐 Multi-language Support
 
-**Support Options:**
+**Developed by:** [Chandan Singh](https://techycsr.me)
+**Technology:** GPT-4o and GPT-4o-mini
+**Version:** 2.0
 
-
-
-
+**Need assistance?** Choose an option below.
 """
 
-
-
-# print(admin_ids)
 # Function to handle settings support callback
-async def settings_support_callback(client, CallbackQuery):
-    user_id = CallbackQuery.from_user.id
+async def settings_support_callback(client, callback_query):
+    user_id = callback_query.from_user.id
     
     # Translate support text
     translated_support_text = await async_translate_to_lang(support_text, user_id)
     
     # Translate button labels
-    admins_btn = await async_translate_to_lang("👥 Admins", user_id)
-    developers_btn = await async_translate_to_lang("💻 Developers", user_id)
+    admins_btn = await async_translate_to_lang("👥 Contact Admin", user_id)
+    developers_btn = await async_translate_to_lang("💻 Developer Info", user_id)
     community_btn = await async_translate_to_lang("🌐 Community", user_id)
-    source_code_btn = await async_translate_to_lang("⌨ Source Code", user_id)
+    source_code_btn = await async_translate_to_lang("⌨️ Source Code", user_id)
+    system_status_btn = await async_translate_to_lang("📊 System Status", user_id)
     back_btn = await async_translate_to_lang("🔙 Back", user_id)
+
+    # Determine which button to show based on admin status
+    is_admin = await is_admin_user(user_id)
+    admin_button_text = await async_translate_to_lang("⚙️ Admin Panel", user_id) if is_admin else admins_btn
+    admin_button_callback = "admin_panel" if is_admin else "support_admins"
+    
+    # Add a subtle "Admin Mode" indicator for admins
+    admin_indicator = "\n\n🔑 **Admin Access Granted**" if is_admin else ""
 
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(admins_btn, callback_data="support_admins"),
+                InlineKeyboardButton(admin_button_text, callback_data=admin_button_callback),
                 InlineKeyboardButton(developers_btn, callback_data="support_developers")
             ],
             [
@@ -54,21 +57,84 @@ async def settings_support_callback(client, CallbackQuery):
                 InlineKeyboardButton(source_code_btn, url="https://github.com/TechyCSR/AdvAITelegramBot")
             ],
             [
+                InlineKeyboardButton(system_status_btn, callback_data="settings_others")
+            ],
+            [
                 InlineKeyboardButton(back_btn, callback_data="back")
             ]
         ]
     )
 
-    await CallbackQuery.message.edit(
-        text=translated_support_text,
+    await callback_query.message.edit(
+        text=translated_support_text + admin_indicator,
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
 
+# Function to handle support_admins callback
+async def support_admins_callback(client, callback: CallbackQuery):
+    user_id = callback.from_user.id
 
+    # Get admin contact information
+    admin_contact_info = """
+👤 **Developer & Admin Contact**
 
+**Chandan Singh** (@techycsr)
+Tech Enthusiast & Student Developer
 
+• **Portfolio:** [techycsr.me](https://techycsr.me)
+• **GitHub:** [TechyCSR](https://github.com/TechyCSR)
+• **Email:** csr.info.in@gmail.com
 
+**About Me:**
+I'm a tech enthusiast with a strong passion for Python, AI/ML, and open-source development. I specialize in building Telegram bots using Pyrogram and MongoDB, developing AI-powered applications, and managing web development projects.
+
+**Support Channels:**
+• Community: @AdvChatGpt
+• Issues: [GitHub Repository](https://github.com/TechyCSR/AdvAITelegramBot/issues)
+
+Feel free to reach out for assistance, feature requests, or to report issues.
+    """
+    
+    # Translate the admin info and button
+    translated_admin_info = await async_translate_to_lang(admin_contact_info, user_id)
+    back_btn = await async_translate_to_lang("🔙 Back", user_id)
+    contact_btn = await async_translate_to_lang("💬 Message Developer", user_id)
+    website_btn = await async_translate_to_lang("🌐 Visit Website", user_id)
+    
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(contact_btn, url="https://t.me/techycsr"),
+                InlineKeyboardButton(website_btn, url="https://techycsr.me")
+            ],
+            [
+                InlineKeyboardButton(back_btn, callback_data="support")
+            ]
+        ]
+    )
+    
+    await callback.message.edit(
+        text=translated_admin_info,
+        reply_markup=keyboard,
+        disable_web_page_preview=False  # Enable preview to show website card
+    )
+
+# Function to redirect to admin panel
+async def admin_panel_callback(client, callback: CallbackQuery):
+    """Redirect to the admin panel via maintenance settings"""
+    user_id = callback.from_user.id
+    
+    # Verify user is admin before proceeding
+    if not await is_admin_user(user_id):
+        alert_message = await async_translate_to_lang(
+            "⚠️ Unauthorized access attempt. This action has been logged.", 
+            user_id
+        )
+        await callback.answer(alert_message, show_alert=True)
+        return
+        
+    await maintenance_settings(client, callback)
 
 # Feature states (defaults)
 feature_states = {
@@ -76,60 +142,6 @@ feature_states = {
     "voice_feature": "off",
     "premium_service": "off"
 }
-
-# Function to handle support_admins callback
-async def support_admins_callback(client, callback: CallbackQuery):
-    user_id = callback.from_user.id
-
-    if user_id not in admin_ids:
-        # Translate the alert message
-        alert_message = await async_translate_to_lang("This section is for admins only.", user_id)
-        await callback.answer(alert_message, show_alert=True)
-        return
-
-    # Translate admin panel title and labels
-    admin_panel_title = await async_translate_to_lang("🔧 **Admin Panel** 🔧\n\nManage the features below:", user_id)
-    image_generation_text = await async_translate_to_lang("🖼️ Image Generation", user_id)
-    voice_feature_text = await async_translate_to_lang("🎙️ Voice Feature", user_id)
-    premium_service_text = await async_translate_to_lang("💎 Premium Service", user_id)
-    on_text = await async_translate_to_lang("🔊 On", user_id)
-    off_text = await async_translate_to_lang("🔇 Off", user_id)
-    back_btn = await async_translate_to_lang("🔙 Back", user_id)
-
-    keyboard = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(f"{image_generation_text} ({feature_states['image_generation']})", callback_data="toggle_image_generation")
-            ],
-            [
-                InlineKeyboardButton(on_text, callback_data="set_image_generation_on"),
-                InlineKeyboardButton(off_text, callback_data="set_image_generation_off")
-            ],
-            [
-                InlineKeyboardButton(f"{voice_feature_text} ({feature_states['voice_feature']})", callback_data="toggle_voice_feature")
-            ],
-            [
-                InlineKeyboardButton(on_text, callback_data="set_voice_feature_on"),
-                InlineKeyboardButton(off_text, callback_data="set_voice_feature_off")
-            ],
-            [
-                InlineKeyboardButton(f"{premium_service_text} ({feature_states['premium_service']})", callback_data="toggle_premium_service")
-            ],
-            [
-                InlineKeyboardButton(on_text, callback_data="set_premium_service_on"),
-                InlineKeyboardButton(off_text, callback_data="set_premium_service_off")
-            ],
-            [
-                InlineKeyboardButton(back_btn, callback_data="support")
-            ]
-        ]
-    )
-
-    await callback.message.edit(
-        text=admin_panel_title,
-        reply_markup=keyboard,
-        disable_web_page_preview=True
-    )
 
 # # Function to handle feature state toggling
 # async def toggle_feature(client, callback: CallbackQuery, feature: str, state: str):

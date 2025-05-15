@@ -15,6 +15,7 @@ from pymongo import MongoClient
 from ImgGenModel.g4f.client import Client as ImageClient
 from ImgGenModel.g4f.Provider import PollinationsAI
 from config import DATABASE_URL, LOG_CHANNEL
+from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 
 # Get the logger
 logger = logging.getLogger(__name__)
@@ -304,7 +305,19 @@ async def update_generation_progress(client: Client, chat_id: int, message_id: i
 # ====== HANDLERS ======
 
 async def handle_generate_command(client: Client, message: Message) -> None:
-    """Handler for /generate, /gen, /image, /img commands"""
+    """
+    Handle image generation commands
+    
+    Args:
+        client: Telegram client
+        message: Message with command
+    """
+    # Check maintenance mode and image generation feature
+    if await maintenance_check(message.from_user.id) or not await is_feature_enabled("image_generation"):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
     if not isinstance(message, Message):
         logger.error(f"Invalid message object in handle_generate_command: {type(message)}")
         return

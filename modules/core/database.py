@@ -113,4 +113,8 @@ def get_prompt_storage_collection() -> Collection:
 
 def get_user_images_collection() -> Collection:
     """Get the user images collection"""
-    return db_service.get_collection('user_images') 
+    return db_service.get_collection('user_images')
+
+def get_feature_settings_collection() -> Collection:
+    """Get the feature settings collection"""
+    return db_service.get_collection('feature_settings') 

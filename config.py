@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 # Load the environment variables
 load_dotenv()
 
+# Bot start time for uptime tracking
+START_TIME = time.time()
+
 #Preferences os >> env >> default
 
 API_KEY = os.environ.get('API_ID') or os.getenv('API_ID') or "API_KEY"

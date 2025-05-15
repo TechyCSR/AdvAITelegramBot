@@ -8,6 +8,7 @@ from pyrogram.types import Message
 from g4f.client import Client as GPTClient
 from modules.core.database import get_history_collection
 from modules.chatlogs import user_log
+from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 
 
 # Initialize the GPT client with a more efficient provider
@@ -96,7 +97,11 @@ DEFAULT_SYSTEM_MESSAGE: Dict[str, str] = {
         "I'm your advanced AI assistant, designed to provide helpful, accurate, and thoughtful responses. "
         "I can assist with a wide range of tasks including answering questions, creating content, "
         "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
-        "and improving to better serve your needs. How may I assist you today?"
+        "and improving to better serve your needs. How may I assist you today?\n\n"
+        "This bot was created by Chandan Singh (@techycsr), a tech enthusiast and student developer "
+        "with a strong passion for Python, AI/ML, and open-source development. Specializing in Telegram bots "
+        "using Pyrogram and MongoDB, he developed this AI-powered application. You can learn more about "
+        "the creator at techycsr.me or connect with him on Telegram @techycsr."
     )
 }
 
@@ -108,6 +113,12 @@ async def aires(client: Client, message: Message) -> None:
         client: Pyrogram client instance
         message: Message from the user
     """
+    # Check maintenance mode and AI response feature
+    if await maintenance_check(message.from_user.id) or not await is_feature_enabled("ai_response"):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+
     try:
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         temp = await message.reply_text("⏳")
@@ -167,6 +178,12 @@ async def new_chat(client: Client, message: Message) -> None:
         
         # Delete user history from MongoDB
         history_collection.delete_one({"user_id": user_id})
+        
+        # Create a new history entry with just the default system message
+        history_collection.insert_one({
+            "user_id": user_id,
+            "history": [DEFAULT_SYSTEM_MESSAGE]
+        })
 
         # Send confirmation message with modern UI
         await message.reply_text("🔄 **Conversation Reset**\n\nYour chat history has been cleared. Ready for a fresh conversation!")

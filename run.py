@@ -11,11 +11,11 @@ from modules.user.settings import settings_inline, settings_language_callback, c
 from modules.user.settings import settings_voice_inlines
 from modules.user.assistant import settings_assistant_callback, change_mode_setting
 from modules.user.lang_settings import settings_langs_callback, change_language_setting
-from modules.user.user_support import settings_support_callback, support_admins_callback
+from modules.user.user_support import settings_support_callback, support_admins_callback, admin_panel_callback
 from modules.user.dev_support import support_developers_callback
 from modules.speech import text_to_voice, voice_to_text
 from modules.image.img_to_text import extract_text_res, handle_show_text_callback, handle_followup_callback
-from modules.maintenance import settings_others_callback
+from modules.maintenance import settings_others_callback, handle_feature_toggle, handle_feature_info, maintenance_check, maintenance_message, handle_donation
 from modules.group.group_settings import leave_group, invite_command
 from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command
@@ -124,6 +124,12 @@ def is_reply_to_bot_filter():
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
+    # Check for maintenance mode
+    if await maintenance_check(message.from_user.id):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
     bot_stats["messages_processed"] += 1
     bot_stats["active_users"].add(message.from_user.id)
     logger.info(f"Processing message from user {message.from_user.id}")
@@ -140,76 +146,169 @@ async def inline_query_handler(client, inline_query):
 
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
-    # Standard menu callbacks
-    if callback_query.data == "help":
-        await help_inline(client, callback_query)
-    elif callback_query.data == "back":
-        await start_inline(client, callback_query)
-    elif callback_query.data == "commands":
-        await command_inline(client, callback_query)
-    elif callback_query.data == "settings":
-        await settings_inline(client, callback_query)
-    elif callback_query.data == "settings_v":
-        await settings_language_callback(client, callback_query)
-    elif callback_query.data in ["settings_voice", "settings_text"]:
-        await change_voice_setting(client, callback_query)
-    elif callback_query.data == "settings_back":
-        await settings_voice_inlines(client, callback_query)
-    elif callback_query.data == "settings_lans":
-        await settings_langs_callback(client, callback_query)
-    elif callback_query.data in ["language_hi", "language_en", "language_zh", "language_ar", "language_fr", "language_ru"]:
-        await change_language_setting(client, callback_query)
-    elif callback_query.data=="settings_assistant":
-        await settings_assistant_callback(client, callback_query)
-    elif callback_query.data in ["mode_chatbot", "mode_coder", "mode_professional", "mode_teacher", "mode_therapist", "mode_assistant", "mode_gamer", "mode_translator"]:
-        await change_mode_setting(client, callback_query)
-    elif callback_query.data=="settings_others" or callback_query.data=="support_donate":
-        await settings_others_callback(client, callback_query)
-    elif callback_query.data=="support":
-         await settings_support_callback(client, callback_query)
-    elif callback_query.data=="support_admins":
-        await support_admins_callback(client, callback_query)
-    elif callback_query.data=="support_developers":
-        await support_developers_callback(client, callback_query)
-    elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
-        await handle_rate_callback(client, callback_query)
-    
-    # Onboarding tour handlers
-    elif callback_query.data.startswith("onboarding_"):
-        from modules.user.start import handle_onboarding
-        await handle_onboarding(client, callback_query)
-    
-    # Image feedback and style selection handlers
-    elif callback_query.data.startswith("img_feedback_"):
-        await handle_image_feedback(client, callback_query)
-    elif callback_query.data.startswith("img_regenerate_"):
-        await handle_image_feedback(client, callback_query)
-    elif callback_query.data.startswith("img_style_"):
-        await handle_image_feedback(client, callback_query)
-    
-    # Voice setting handlers
-    elif callback_query.data.startswith("toggle_voice_"):
-        await handle_voice_toggle(client, callback_query)
-    
-    # Image text handlers
-    elif callback_query.data.startswith("show_text_"):
-        await handle_show_text_callback(client, callback_query)
-    elif callback_query.data.startswith("followup_"):
-        await handle_followup_callback(client, callback_query)
-    elif callback_query.data.startswith("back_to_image_"):
-        # Return to previous message with options
-        user_id = int(callback_query.data.split("_")[3])
-        await callback_query.message.edit_text(
-            "**Need anything else with this image?**",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")],
-                [InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")]
-            ])
-        )
+    try:
+        # Handle maintenance mode toggle and feature callbacks
+        if callback_query.data.startswith("toggle_") and callback_query.data.count("_") >= 2:
+            await handle_feature_toggle(client, callback_query)
+            return
+        elif callback_query.data.startswith("feature_info_"):
+            await handle_feature_info(client, callback_query)
+            return
+        elif callback_query.data == "admin_panel":
+            from modules.user.user_support import admin_panel_callback
+            await admin_panel_callback(client, callback_query)
+            return
+        elif callback_query.data == "support_donate":
+            from modules.maintenance import handle_donation
+            await handle_donation(client, callback_query)
+            return
+        # Advanced statistics panel
+        elif callback_query.data == "admin_view_stats":
+            from modules.admin import handle_stats_panel
+            await handle_stats_panel(client, callback_query)
+            return
+        elif callback_query.data == "admin_refresh_stats":
+            from modules.admin import handle_refresh_stats
+            await handle_refresh_stats(client, callback_query)
+            return
+        elif callback_query.data == "admin_export_stats":
+            from modules.admin import handle_export_stats
+            await handle_export_stats(client, callback_query)
+            return
+        # User management panel
+        elif callback_query.data == "admin_users":
+            from modules.admin import handle_user_management
+            await handle_user_management(client, callback_query)
+            return
+        elif callback_query.data.startswith("admin_users_filter_"):
+            from modules.admin import handle_user_management
+            # Extract filter type and page from callback data
+            try:
+                parts = callback_query.data.split("_")
+                if len(parts) >= 5:  # admin_users_filter_TYPE_PAGE
+                    filter_type = parts[3]
+                    page = int(parts[4])
+                    # Support all filter types
+                    valid_filters = ["all", "recent", "active", "new", "inactive", "groups"]
+                    if filter_type in valid_filters:
+                        await handle_user_management(client, callback_query, page, filter_type)
+                    else:
+                        # Default to recent if invalid filter
+                        await handle_user_management(client, callback_query, page, "recent")
+                else:
+                    # Default to first page, recent filter
+                    await handle_user_management(client, callback_query)
+            except Exception as e:
+                logger.error(f"Error in user filter handling: {str(e)}")
+                # Default to first page, recent filter
+                await handle_user_management(client, callback_query)
+            return
+        elif callback_query.data == "admin_header" or callback_query.data == "features_header" or callback_query.data == "admin_tools_header":
+            # Just acknowledge the click for the headers
+            await callback_query.answer()
+            return
+        
+        # Standard menu callbacks
+        if callback_query.data == "help":
+            from modules.user.help import help_inline
+            await help_inline(client, callback_query)
+        elif callback_query.data == "back":
+            await start_inline(client, callback_query)
+        elif callback_query.data == "commands":
+            await command_inline(client, callback_query)
+        elif callback_query.data == "settings":
+            await settings_inline(client, callback_query)
+        elif callback_query.data == "settings_v":
+            await settings_language_callback(client, callback_query)
+        elif callback_query.data in ["settings_voice", "settings_text"]:
+            await change_voice_setting(client, callback_query)
+        elif callback_query.data == "settings_back":
+            await settings_voice_inlines(client, callback_query)
+        elif callback_query.data == "settings_lans":
+            await settings_langs_callback(client, callback_query)
+        elif callback_query.data in ["language_hi", "language_en", "language_zh", "language_ar", "language_fr", "language_ru"]:
+            await change_language_setting(client, callback_query)
+        elif callback_query.data=="settings_assistant":
+            await settings_assistant_callback(client, callback_query)
+        elif callback_query.data in ["mode_chatbot", "mode_coder", "mode_professional", "mode_teacher", "mode_therapist", "mode_assistant", "mode_gamer", "mode_translator"]:
+            await change_mode_setting(client, callback_query)
+        elif callback_query.data=="settings_others" or callback_query.data=="support_donate":
+            await settings_others_callback(client, callback_query)
+        elif callback_query.data=="support":
+             await settings_support_callback(client, callback_query)
+        elif callback_query.data=="support_admins":
+            await support_admins_callback(client, callback_query)
+        elif callback_query.data=="support_developers":
+            await support_developers_callback(client, callback_query)
+        elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
+            await handle_rate_callback(client, callback_query)
+        
+        # Interactive command menu handlers
+        elif callback_query.data.startswith("cmd_"):
+            from modules.user.commands import handle_command_callbacks
+            await handle_command_callbacks(client, callback_query)
+            
+        # Interactive help menu handlers
+        elif callback_query.data.startswith("help_"):
+            from modules.user.help import handle_help_category
+            await handle_help_category(client, callback_query)
+        
+        # Onboarding tour handlers
+        elif callback_query.data.startswith("onboarding_"):
+            from modules.user.start import handle_onboarding
+            await handle_onboarding(client, callback_query)
+        
+        # Image feedback and style selection handlers
+        elif callback_query.data.startswith("img_feedback_"):
+            await handle_image_feedback(client, callback_query)
+        elif callback_query.data.startswith("img_regenerate_"):
+            await handle_image_feedback(client, callback_query)
+        elif callback_query.data.startswith("img_style_"):
+            await handle_image_feedback(client, callback_query)
+        
+        # Voice setting handlers
+        elif callback_query.data.startswith("toggle_voice_"):
+            await handle_voice_toggle(client, callback_query)
+        
+        # Image text handlers
+        elif callback_query.data.startswith("show_text_"):
+            await handle_show_text_callback(client, callback_query)
+        elif callback_query.data.startswith("followup_"):
+            await handle_followup_callback(client, callback_query)
+        elif callback_query.data.startswith("back_to_image_"):
+            # Return to previous message with options
+            user_id = int(callback_query.data.split("_")[3])
+            await callback_query.message.edit_text(
+                "**Need anything else with this image?**",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")],
+                    [InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")]
+                ])
+            )
+    except Exception as e:
+        # Log the error but don't crash
+        error_msg = f"Error in callback_query handler: {str(e)}"
+        logger.error(error_msg)
+        try:
+            # Try to inform the user something went wrong
+            await callback_query.answer(f"Error: {str(e)[:20]}...", show_alert=True)
+        except:
+            # If we can't even answer the callback, just log and continue
+            pass
+        # Log detailed error to the error log
+        await error_log(client, "CALLBACK_ERROR", str(e), context=callback_query.data, user_id=callback_query.from_user.id)
+        return
 
 
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
+    # Check for maintenance mode and voice feature toggle
+    from modules.maintenance import is_feature_enabled
+    if await maintenance_check(message.from_user.id) or not await is_feature_enabled("voice_features"):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
     bot_stats["voice_messages_processed"] += 1
     bot_stats["active_users"].add(message.from_user.id)
     await voice_to_text.handle_voice_message(bot, message)
@@ -217,6 +316,13 @@ async def voice(bot, message):
 # Add a new handler for replies to bot messages in groups
 @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
 async def handle_reply_to_bot(bot, message):
+    # Check for maintenance mode and AI response toggle
+    from modules.maintenance import is_feature_enabled
+    if await maintenance_check(message.from_user.id) or not await is_feature_enabled("ai_response"):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
     bot_stats["messages_processed"] += 1
     bot_stats["active_users"].add(message.from_user.id)
     
@@ -270,54 +376,67 @@ async def info_commands(bot, update):
         
 @advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
 async def handle_group_message(bot, update):
+    # Check for maintenance mode and AI response feature
+    from modules.maintenance import is_feature_enabled
+    if await maintenance_check(update.from_user.id) or not await is_feature_enabled("ai_response"):
+        maint_msg = await maintenance_message(update.from_user.id)
+        await update.reply(maint_msg)
+        return
+        
+    logger.info(f"Processing group command from user {update.from_user.id}")
     bot_stats["messages_processed"] += 1
     bot_stats["active_users"].add(update.from_user.id)
     
-    # Check if the command has any text after it
-    if len(update.text.split()) > 1:
-        update.text = update.text.split(None, 1)[1]
-    else:
-        await update.reply_text("Please provide your query after the command.")
-        return
-    
-    # Process the message with typing indicator
+    # Show typing indicator while the AI generates a response
     await bot.send_chat_action(chat_id=update.chat.id, action=ChatAction.TYPING)
+    
+    # Log the interaction
+    command = update.text.split()[0]
+    await channel_log(bot, update, command)
     await user_log(bot, update, update.text)
+    
+    # Process the query using the AI response function
     await aires(bot, update)
 
 
 @advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
 async def handle_new_chat(client, message):
-    logger.info(f"User {message.from_user.id} started a new chat")
+    bot_stats["active_users"].add(message.from_user.id)
     await new_chat(client, message)
-    await channel_log(client, message, "/newchat", "User started a new conversation")
+    await channel_log(client, message, "/newchat")
 
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
 async def handle_generate(client, message):
-    bot_stats["images_generated"] += 1
-    bot_stats["active_users"].add(message.from_user.id)
-    
-    # Call the handler from image_generation.py
+    # Check for maintenance mode and image generation toggle
+    from modules.maintenance import is_feature_enabled
+    if await maintenance_check(message.from_user.id) or not await is_feature_enabled("image_generation"):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
+    logger.info(f"User {message.from_user.id} using image generation")
     await handle_generate_command(client, message)
     # Log the command usage
     await channel_log(client, message, f"/{message.command[0]}", "Image generation requested")
 
 @advAiBot.on_message(filters.photo)
 async def handle_image(bot, update):
-    if update.from_user.id == bot.me.id:
+    # Check for maintenance mode
+    if await maintenance_check(update.from_user.id):
+        maint_msg = await maintenance_message(update.from_user.id)
+        await update.reply(maint_msg)
         return
         
     bot_stats["active_users"].add(update.from_user.id)
+    user_id = update.from_user.id
     
-    # Handle image in private chat
-    if update.chat.type == "private":
-        await extract_text_res(bot, update)
-    else:
-        # Check if caption contains AI command keywords
-        if update.caption:
-            if any(keyword in update.caption.lower() for keyword in ["ai", "ask"]):
-                await extract_text_res(bot, update)
+    # Process the image with OCR
+    await extract_text_res(bot, update)
+    
+    # Log usage
+    await channel_log(bot, update, "Image Analysis")
+    logger.info(f"Image analysis for user {user_id}")
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
@@ -429,6 +548,52 @@ async def clear_user_cache(client, message):
         await message.reply_text("ℹ️ **No image cache found**\n\nYou don't have any cached images to clear.")
     
     await channel_log(client, message, "/clear_cache", f"User cleared their image cache")
+
+async def stats_alert(client, callback_query):
+    """Show bot statistics in an alert popup"""
+    from modules.maintenance import is_admin_user
+    
+    if not await is_admin_user(callback_query.from_user.id):
+        await callback_query.answer("You don't have permission to view stats.", show_alert=True)
+        return
+    
+    stats_text = (
+        f"Messages: {bot_stats['messages_processed']}\n"
+        f"Images: {bot_stats['images_generated']}\n"
+        f"Voice: {bot_stats['voice_messages_processed']}\n"
+        f"Users: {len(bot_stats['active_users'])}"
+    )
+    
+    try:
+        await callback_query.answer(stats_text, show_alert=True)
+    except Exception as e:
+        # If too long, try a shorter version
+        if "MESSAGE_TOO_LONG" in str(e):
+            short_stats = f"Msgs: {bot_stats['messages_processed']}, Users: {len(bot_stats['active_users'])}"
+            await callback_query.answer(short_stats, show_alert=True)
+        else:
+            # Just acknowledge the callback
+            await callback_query.answer("Could not display stats")
+    
+    # Refresh the admin panel with error handling
+    try:
+        from modules.maintenance import show_admin_panel
+        await show_admin_panel(client, callback_query)
+    except Exception as e:
+        logger.error(f"Error refreshing admin panel: {str(e)}")
+        # Don't re-raise as this is a non-critical refresh
+
+@advAiBot.on_message(filters.group & filters.command(["pin", "unpin", "promote", "demote", "ban", "warn"]))
+async def handle_group_admin_commands(bot, message):
+    """Handle admin commands in groups with maintenance mode check"""
+    # Check maintenance mode - exempt admins
+    if await maintenance_check(message.from_user.id):
+        maint_msg = await maintenance_message(message.from_user.id)
+        await message.reply(maint_msg)
+        return
+        
+    # Let normal Telegram permission system handle the actual execution
+    pass
 
 if __name__ == "__main__":
     # Print startup message
