@@ -316,7 +316,14 @@ async def handle_generate_command(client: Client, message: Message) -> None:
             )
             return
             
-        # Check if user already has an active generation
+        # Reset any existing processing state first to avoid false "already processing" messages
+        if user_id in user_states:
+            # Check if the state is too old (more than 2 minutes) and force reset
+            if time.time() - user_states[user_id].created_at > 120:
+                user_states[user_id].set_processing(False)
+                logger.info(f"Force reset stale processing state for user {user_id}")
+        
+        # Now check if user already has an active generation
         if user_id in user_states and user_states[user_id].is_processing:
             await message.reply_text(
                 "⏳ I'm already working on your previous image request. Please wait for it to complete."
@@ -329,12 +336,15 @@ async def handle_generate_command(client: Client, message: Message) -> None:
     except Exception as e:
         logger.error(f"Error in image generation command handler: {str(e)}")
         await message.reply_text(f"❌ **Error**\n\nFailed to process image generation request: {str(e)}")
+        # Reset user state in case of error
+        if user_id in user_states:
+            user_states[user_id].set_processing(False)
 
 async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None:
     """Handle feedback and regeneration callbacks"""
     data = callback_query.data
     user_id = callback_query.from_user.id
-    chat_id = callback_query.message.chat.id  # Get the actual chat ID
+    chat_id = callback_query.message.chat.id
     feedback_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     try:
@@ -352,7 +362,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 await callback_query.answer("Invalid feedback data.")
                 return
                 
-            target_user_id = parts[3]
+            target_user_id = int(parts[3])
             generation_id = parts[4]
             
             await callback_query.answer("Thanks for your positive feedback!")
@@ -387,7 +397,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 await callback_query.answer("Invalid feedback data.")
                 return
                 
-            target_user_id = parts[3]
+            target_user_id = int(parts[3])
             generation_id = parts[4]
             
             await callback_query.answer("Thanks for your feedback. We'll improve!")
@@ -418,15 +428,17 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 
         elif data.startswith("img_regenerate_"):
             # Regeneration request
-            if len(parts) < 3:
+            if len(parts) < 4:  # Check for correct number of parts
                 await callback_query.answer("Invalid regenerate data.")
                 return
                 
             target_user_id = int(parts[2])
             prompt_id = parts[3]
             
-            # Verify user
+            # Compare the clicking user with the target user from callback data
+            # This is the critical check that was failing in groups
             if user_id != target_user_id:
+                logger.warning(f"Regeneration user mismatch: clicked_user={user_id}, target_user={target_user_id}")
                 await callback_query.answer("You can only regenerate your own images.")
                 return
             
@@ -437,10 +449,14 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 await callback_query.answer("Error: Could not find the original prompt. Please try a new image generation.")
                 return
             
-            # Check if already processing
-            if user_id in user_states and user_states[user_id].is_processing:
-                await callback_query.answer("Already generating images, please wait...")
-                return
+            # Reset any existing processing state for this user
+            if user_id in user_states:
+                # Force reset processing state if it's still True from a previous generation
+                user_states[user_id].set_processing(False)
+                # Now check if it's in processing state after the reset
+                if user_states[user_id].is_processing:
+                    await callback_query.answer("Already generating images, please wait...")
+                    return
                 
             # Delete the feedback message
             try:
@@ -483,7 +499,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
             
             # Send the style selection message in the same chat where the regeneration was requested
             style_msg = await client.send_message(
-                chat_id=chat_id,  # Use the actual chat ID where regeneration was requested
+                chat_id=chat_id,  # Use the chat ID where regeneration was requested
                 text=f"🎭 **Choose Image Style for Regeneration**\n\n"
                 f"Your prompt: `{prompt}`\n\n"
                 f"Please select a style for your image:",
@@ -499,6 +515,9 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
     except Exception as e:
         logger.error(f"Error handling feedback: {str(e)}")
         await callback_query.answer("Error processing your request.")
+        # Reset user state in case of any error
+        if user_id in user_states:
+            user_states[user_id].set_processing(False)
 
 # ====== BACKWARD COMPATIBILITY FUNCTIONS ======
 
@@ -653,7 +672,7 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
 
 async def generate_and_send_images(client: Client, message: Message, prompt: str, style: str, progress_task=None) -> None:
     """Generate images and send them to the user"""
-    user_id = message.chat.id
+    user_id = message.chat.id if not hasattr(message, 'from_user') else message.from_user.id
     generation_id = f"{user_id}_{int(time.time())}"
     generation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -685,6 +704,10 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
                 )
             except Exception as e:
                 logger.error(f"Failed to log error to channel: {str(e)}")
+            
+            # Important: Reset processing state on failure  
+            if user_id in user_states:
+                user_states[user_id].set_processing(False)
                 
             return
             
@@ -775,9 +798,18 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             text=f"❌ **Error**\n\nFailed to generate images: {str(e)}"
         )
     finally:
-        # Clear user state processing flag
-        if user_id in user_states:
+        # ALWAYS reset user state processing flag, even if there was an error
+        # This ensures users can generate new images even if something went wrong
+        if hasattr(message, 'from_user') and message.from_user and message.from_user.id in user_states:
+            user_states[message.from_user.id].set_processing(False)
+        elif user_id in user_states:
             user_states[user_id].set_processing(False)
+        
+        # Double check that ALL user states with this user_id are reset
+        # This handles edge cases where the user_id might be stored in different ways
+        for state_user_id, state in user_states.items():
+            if str(state_user_id) == str(user_id):
+                state.set_processing(False)
 
 # ====== CLEANUP ======
 
