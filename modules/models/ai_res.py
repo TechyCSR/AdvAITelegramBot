@@ -127,133 +127,25 @@ async def aires(client: Client, message: Message) -> None:
         # Add the new user query to the history
         history.append({"role": "user", "content": ask})
 
-        # Get streaming response
-        streaming_response = get_streaming_response(history)
+        # Use non-streaming approach for all chats to avoid flood control
+        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         
-        if streaming_response:
-            # Initialize variables for accumulated response
-            complete_response = ""
-            buffer = ""
-            last_update_time = time.time()
-            
-            # Optimized update intervals for smoother streaming experience
-            base_update_interval = 0.1  # Faster initial updates
-            min_chars_per_update = 15  # Increased minimum characters before updating
-            typing_action_interval = 2.0  # Show typing action more frequently
-            last_typing_action = time.time()
-            
-            # Track if we're in a code block to handle formatting properly
-            in_code_block = False
-            code_lang = ""
-            
-            try:
-                # Process streaming response chunks
-                for chunk in streaming_response:
-                    # Maintain typing indicator
-                    current_time = time.time()
-                    if current_time - last_typing_action >= typing_action_interval:
-                        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
-                        last_typing_action = current_time
-                    
-                    if hasattr(chunk, 'choices') and chunk.choices:
-                        choice = chunk.choices[0]
-                        if hasattr(choice, 'delta') and choice.delta:
-                            if hasattr(choice.delta, 'content') and choice.delta.content:
-                                # Add new content to buffer and complete response
-                                new_content = choice.delta.content
-                                buffer += new_content
-                                complete_response += new_content
-                                
-                                # Check for code block markers to track formatting
-                                if '```' in new_content:
-                                    in_code_block = not in_code_block
-                                    if in_code_block and len(new_content.split('```')) > 1:
-                                        code_lang = new_content.split('```')[1].strip()
-                                
-                                # Adaptive update interval based on response length with improved dynamics
-                                update_interval = base_update_interval + (len(complete_response) / 5000)
-                                update_interval = min(update_interval, 0.8)  # Cap at 0.8 second
-                                
-                                # Update message if enough time has passed or buffer is large enough
-                                current_time = time.time()
-                                if (current_time - last_update_time >= update_interval or 
-                                    len(buffer) >= min_chars_per_update):
-                                    try:
-                                        # Apply markdown sanitization to ensure proper rendering
-                                        display_text = sanitize_markdown(complete_response)
-                                        
-                                        # Store previous text to compare and avoid MESSAGE_NOT_MODIFIED errors
-                                        prev_message_text = getattr(temp, 'text', '')
-                                        
-                                        # Only update if content has actually changed
-                                        if display_text != prev_message_text:
-                                            await temp.edit_text(display_text)
-                                            # Store the new text for future comparisons
-                                            temp.text = display_text
-                                        
-                                        buffer = ""
-                                        last_update_time = current_time
-                                    except Exception as edit_error:
-                                        # Ignore MESSAGE_NOT_MODIFIED errors
-                                        if "MESSAGE_NOT_MODIFIED" not in str(edit_error):
-                                            print(f"Edit error (will continue): {edit_error}")
-                
-                # Final update with complete text
-                if complete_response:
-                    try:
-                        final_text = complete_response + " "
-                        
-                        # Only update if content has actually changed
-                        prev_message_text = getattr(temp, 'text', '')
-                        if final_text != prev_message_text:
-                            await temp.edit_text(final_text)
-                    except Exception as final_edit_error:
-                        if "MESSAGE_NOT_MODIFIED" not in str(final_edit_error):
-                            print(f"Final edit error: {final_edit_error}")
-                
-            except Exception as stream_error:
-                print(f"Streaming error: {stream_error}")
-                # If streaming fails mid-way, make sure we have the response so far
-                if complete_response:
-                    try:
-                        final_text = complete_response + " "
-                        
-                        # Only update if content has actually changed
-                        prev_message_text = getattr(temp, 'text', '')
-                        if final_text != prev_message_text:
-                            await temp.edit_text(final_text)
-                    except Exception as recovery_error:
-                        if "MESSAGE_NOT_MODIFIED" not in str(recovery_error):
-                            print(f"Recovery edit error: {recovery_error}")
-                    
-            # Add the AI response to the history
-            history.append({"role": "assistant", "content": complete_response})
-            
-            # Update the user's history in MongoDB
-            history_collection.update_one(
-                {"user_id": user_id},
-                {"$set": {"history": history}},
-                upsert=True
-            )
-            
-            await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ complete_response)
-        else:
-            # Fallback to non-streaming method if streaming fails
-            ai_response = get_response(history)
-            
-            # Add the AI response to the history
-            history.append({"role": "assistant", "content": ai_response})
-            
-            # Update the user's history in MongoDB
-            history_collection.update_one(
-                {"user_id": user_id},
-                {"$set": {"history": history}},
-                upsert=True
-            )
-            
-            # Edit the temporary message with the AI response
-            await temp.edit_text(ai_response)
-            await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
+        # Use non-streaming approach
+        ai_response = get_response(history)
+        
+        # Add the AI response to the history
+        history.append({"role": "assistant", "content": ai_response})
+        
+        # Update the user's history in MongoDB
+        history_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"history": history}},
+            upsert=True
+        )
+        
+        # Edit the temporary message with the AI response
+        await temp.edit_text(ai_response)
+        await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
         await message.reply_text(f"An error occurred: {e}")

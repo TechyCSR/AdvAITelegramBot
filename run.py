@@ -3,6 +3,7 @@ import config
 import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from pyrogram.enums import ChatAction
 from modules.user.start import start, start_inline
 from modules.user.help import help, help_inline
 from modules.user.commands import command_inline
@@ -104,6 +105,23 @@ def is_chat_text_filter():
         return False
     return filters.create(funcc)
 
+# Add a custom filter for non-command messages
+def is_not_command_filter():
+    async def func(_, __, message):
+        if message.text:
+            return not message.text.startswith('/')
+        return True  # Non-text messages are not commands
+    return filters.create(func)
+
+# Add a custom filter for replies to bot messages
+def is_reply_to_bot_filter():
+    async def func(_, __, message):
+        if message.reply_to_message and message.reply_to_message.from_user:
+            # Check if the message is replying to the bot
+            return message.reply_to_message.from_user.id == advAiBot.me.id
+        return False
+    return filters.create(func)
+
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
     bot_stats["messages_processed"] += 1
@@ -196,6 +214,23 @@ async def voice(bot, message):
     bot_stats["active_users"].add(message.from_user.id)
     await voice_to_text.handle_voice_message(bot, message)
 
+# Add a new handler for replies to bot messages in groups
+@advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
+async def handle_reply_to_bot(bot, message):
+    bot_stats["messages_processed"] += 1
+    bot_stats["active_users"].add(message.from_user.id)
+    
+    logger.info(f"Processing reply to bot in group {message.chat.id} from user {message.from_user.id}")
+    
+    # Show typing indicator
+    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+    
+    # Log the interaction
+    await user_log(bot, message, message.text)
+    
+    # Process the query using the AI response function
+    await aires(bot, message)
+
 @advAiBot.on_message(filters.command("gleave"))
 async def leave_group_command(bot, update):
     if update.from_user.id in config.ADMINS:
@@ -246,7 +281,7 @@ async def handle_group_message(bot, update):
         return
     
     # Process the message with typing indicator
-    await bot.send_chat_action(chat_id=update.chat.id, action="typing")
+    await bot.send_chat_action(chat_id=update.chat.id, action=ChatAction.TYPING)
     await user_log(bot, update, update.text)
     await aires(bot, update)
 
