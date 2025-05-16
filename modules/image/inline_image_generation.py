@@ -4,6 +4,7 @@ import logging
 import time
 import uuid
 import hashlib
+import re
 from datetime import datetime
 from typing import List, Optional, Dict, Tuple
 import requests
@@ -40,6 +41,10 @@ pending_generations = {}
 # Format: {user_id: {"file_ids": [file_id1, file_id2...], "prompts": [prompt1, prompt2...], "timestamps": [time1, time2...]}}
 image_cache = {}
 MAX_CACHE_PER_USER = 5  # Maximum number of cached images per user
+
+# Temporary query cache for handling inline query timeouts
+# Format: {user_id: {"query": query, "file_id": file_id, "prompt": prompt, "timestamp": time}}
+temp_query_cache = {}
 
 async def generate_inline_image(prompt: str) -> List[str]:
     """Generate images for inline query
@@ -222,13 +227,21 @@ def get_cached_image(user_id: int, prompt: str = None) -> Optional[str]:
         if cached_prompt.lower() == prompt.lower():
             return user_cache["file_ids"][i]
     
+    # Check for prompt with extra spaces (user might be adding spaces while waiting)
+    stripped_prompt = re.sub(r'\s+', ' ', prompt.lower()).strip()
+    for i, cached_prompt in enumerate(user_cache["prompts"]):
+        stripped_cached = re.sub(r'\s+', ' ', cached_prompt.lower()).strip()
+        if stripped_prompt == stripped_cached:
+            return user_cache["file_ids"][i]
+    
     # No exact match, try to find a similar prompt (contains the same keywords)
-    prompt_keywords = set(prompt.lower().split())
+    prompt_keywords = set(stripped_prompt.split())
     best_match = None
     best_match_score = 0
     
     for i, cached_prompt in enumerate(user_cache["prompts"]):
-        cached_keywords = set(cached_prompt.lower().split())
+        stripped_cached = re.sub(r'\s+', ' ', cached_prompt.lower()).strip()
+        cached_keywords = set(stripped_cached.split())
         common_keywords = prompt_keywords.intersection(cached_keywords)
         
         # Calculate match score based on common keywords
@@ -236,12 +249,20 @@ def get_cached_image(user_id: int, prompt: str = None) -> Optional[str]:
             best_match_score = len(common_keywords)
             best_match = user_cache["file_ids"][i]
     
-    # Only return if there's a reasonable match (at least 3 common keywords)
-    if best_match_score >= 3:
+    # Only return if there's a reasonable match (at least 3 common keywords or 75% match)
+    min_keywords = min(len(prompt_keywords), len(cached_keywords)) if 'cached_keywords' in locals() else 0
+    if best_match_score >= 3 or (min_keywords > 0 and best_match_score / min_keywords >= 0.75):
         return best_match
     
-    # No good match, return the most recent image
-    return user_cache["file_ids"][0]
+    # Check temporary query cache
+    if user_id in temp_query_cache:
+        temp_cache = temp_query_cache[user_id]
+        stripped_temp = re.sub(r'\s+', ' ', temp_cache["prompt"].lower()).strip()
+        if stripped_prompt == stripped_temp:
+            return temp_cache["file_id"]
+    
+    # No good match found, don't return a cached image
+    return None
 
 def add_to_cache(user_id: int, file_id: str, prompt: str) -> None:
     """Add a generated image to the cache
@@ -282,6 +303,14 @@ def add_to_cache(user_id: int, file_id: str, prompt: str) -> None:
         user_cache["timestamps"].pop()
         
     logger.info(f"Added image to cache for user {user_id}, prompt: '{prompt}'")
+    
+    # Also add to temporary query cache for quick recovery
+    temp_query_cache[user_id] = {
+        "query": prompt,
+        "file_id": file_id,
+        "prompt": prompt,
+        "timestamp": time.time()
+    }
 
 def clear_user_cache(user_id: int) -> None:
     """Clear the cache for a specific user
@@ -291,13 +320,18 @@ def clear_user_cache(user_id: int) -> None:
     """
     if user_id in image_cache:
         del image_cache[user_id]
-        logger.info(f"Cleared cache for user {user_id}")
+        logger.info(f"Cleared image cache for user {user_id}")
+        
+    if user_id in temp_query_cache:
+        del temp_query_cache[user_id]
+        logger.info(f"Cleared temporary query cache for user {user_id}")
 
 async def handle_inline_query(client: Client, inline_query: InlineQuery) -> None:
-    """Handle inline queries for image generation
+    """Handle inline queries for image generation and AI responses
     
-    This function processes inline queries and generates images when
-    a prompt ends with a period to indicate it's complete.
+    This function processes inline queries and:
+    1. Routes to image generation if the prompt starts with "image" and ends with "."
+    2. Routes to AI response for all other prompts that end with "." or "?"
     """
     query = inline_query.query.strip()
     user_id = inline_query.from_user.id
@@ -310,13 +344,15 @@ async def handle_inline_query(client: Client, inline_query: InlineQuery) -> None
             await inline_query.answer(
                 results=[
                     InlineQueryResultArticle(
-                        title="Generate an image",
-                        description="Type your prompt and end with a period (.) to generate an image",
+                        title="Generate an image or get AI response",
+                        description="Images: Start with 'image' and end with a period (.)\nAI: End with a period (.) or question mark (?)",
                         input_message_content=InputTextMessageContent(
-                            "To generate an image, type your prompt and end with a period (.).\n"
-                            "Example: @YourBot beautiful landscape with mountains."
+                            "**📝 How to use inline features:**\n\n"
+                            "• For **AI images**: Type `image your prompt.`\n"
+                            "• For **AI responses**: Type `your question?` or `your prompt.`\n\n"
+                            "End your query with `.` or `?` when ready."
                         ),
-                        thumb_url="https://img.icons8.com/color/452/picture.png"
+                        thumb_url="https://img.icons8.com/color/452/artificial-intelligence.png"
                     )
                 ],
                 cache_time=1
@@ -327,32 +363,88 @@ async def handle_inline_query(client: Client, inline_query: InlineQuery) -> None
             logger.error(f"Error answering empty inline query: {str(e)}")
         return
     
-    # Check if the query ends with a period (indicating the prompt is complete)
-    if not query.endswith("."):
-        # Show waiting message
-        try:
-            await inline_query.answer(
-                results=[
-                    InlineQueryResultArticle(
-                        title="Continue typing your prompt...",
-                        description="End your prompt with a period (.) to generate",
-                        input_message_content=InputTextMessageContent(
-                            f"Your current prompt: {query}\n\n"
-                            "Add a period (.) at the end when you're done to generate the image."
-                        ),
-                        thumb_url="https://img.icons8.com/color/452/hourglass.png"
-                    )
-                ],
-                cache_time=1
-            )
-        except QueryIdInvalid:
-            logger.warning(f"Query ID invalid for incomplete prompt from user {user_id}")
-        except Exception as e:
-            logger.error(f"Error answering incomplete inline query: {str(e)}")
+    # Import here to avoid circular imports
+    from modules.models.inline_ai_response import handle_inline_ai_query
+    
+    # Check if it's an image generation request (starts with "image" and ends with ".")
+    is_image_request = query.lower().startswith("image ") and query.endswith(".")
+    
+    # Check if it's an AI response request (ends with "." or "?")
+    is_ai_request = query.endswith(".") or query.endswith("?")
+    
+    # If not properly formatted, show instructions based on what they're trying to do
+    if not (is_image_request or is_ai_request):
+        # Show appropriate waiting message based on what they seem to be typing
+        if query.lower().startswith("image "):
+            # Seems to be typing an image prompt
+            try:
+                await inline_query.answer(
+                    results=[
+                        InlineQueryResultArticle(
+                            title="Continue typing your image prompt...",
+                            description="End your prompt with a period (.) to generate",
+                            input_message_content=InputTextMessageContent(
+                                f"Your current image prompt: {query}\n\n"
+                                "Add a period (.) at the end when you're done to generate the image."
+                            ),
+                            thumb_url="https://img.icons8.com/color/452/picture.png"
+                        )
+                    ],
+                    cache_time=1
+                )
+            except QueryIdInvalid:
+                logger.warning(f"Query ID invalid for incomplete image prompt from user {user_id}")
+            except Exception as e:
+                logger.error(f"Error answering incomplete image query: {str(e)}")
+        else:
+            # Seems to be typing an AI query
+            try:
+                await inline_query.answer(
+                    results=[
+                        InlineQueryResultArticle(
+                            title="Continue typing your question...",
+                            description="End with a period (.) or question mark (?) to get AI response",
+                            input_message_content=InputTextMessageContent(
+                                f"Your current prompt: {query}\n\n"
+                                "Add a period (.) or question mark (?) at the end when you're done."
+                            ),
+                            thumb_url="https://img.icons8.com/color/452/chatgpt.png"
+                        )
+                    ],
+                    cache_time=1
+                )
+            except QueryIdInvalid:
+                logger.warning(f"Query ID invalid for incomplete AI prompt from user {user_id}")
+            except Exception as e:
+                logger.error(f"Error answering incomplete AI query: {str(e)}")
         return
     
-    # Remove the period from the end of the prompt
-    prompt = query[:-1].strip()
+    # Handle image generation request
+    if is_image_request:
+        # Remove "image " prefix and ending "." from the prompt
+        prompt = query[6:-1].strip()
+        
+        # Call the original image generation function
+        await handle_image_generation_query(client, inline_query, prompt)
+    else:
+        # Handle AI response request
+        # Remove the ending "." or "?" from the prompt
+        prompt = query[:-1].strip()
+        
+        # Call the AI response handler
+        await handle_inline_ai_query(client, inline_query, prompt)
+
+# Extract the original image generation logic into a separate function
+async def handle_image_generation_query(client: Client, inline_query: InlineQuery, prompt: str) -> None:
+    """Handle inline queries specifically for image generation
+    
+    Args:
+        client: Pyrogram client instance
+        inline_query: The inline query object
+        prompt: The processed prompt text (without the ending period)
+    """
+    user_id = inline_query.from_user.id
+    query_id = inline_query.id
     
     # If prompt is too short, ask for more detail
     if len(prompt) < 3:
@@ -626,6 +718,17 @@ async def handle_inline_query(client: Client, inline_query: InlineQuery) -> None
                     
         except QueryIdInvalid:
             logger.warning(f"Query ID invalid for final results from user {user_id}")
+            
+            # Store in temp cache for later retrieval if user adds spaces to query
+            if file_ids:
+                temp_query_cache[user_id] = {
+                    "query": prompt,
+                    "file_id": file_ids[0],  # Just keep the first one
+                    "prompt": prompt,
+                    "timestamp": time.time()
+                }
+                logger.info(f"Saved image to temporary cache for user {user_id} for query recovery")
+                
             # Clean up files
             for path in local_paths:
                 try:
@@ -768,6 +871,18 @@ async def cleanup_ongoing_generations():
             if to_remove:
                 logger.info(f"Cleaned up {len(to_remove)} stale inline generations")
                 
+            # Clean up temporary query cache (after 20 seconds)
+            temp_cache_to_remove = []
+            for user_id, data in temp_query_cache.items():
+                if current_time - data["timestamp"] > 20:  # 20 seconds expiry
+                    temp_cache_to_remove.append(user_id)
+            
+            for user_id in temp_cache_to_remove:
+                del temp_query_cache[user_id]
+                
+            if temp_cache_to_remove:
+                logger.info(f"Cleaned up temporary query cache for {len(temp_cache_to_remove)} users")
+                
             # Clean up old cache entries (older than 24 hours)
             cache_cleanup_count = 0
             for user_id in list(image_cache.keys()):
@@ -790,7 +905,7 @@ async def cleanup_ongoing_generations():
                     del image_cache[user_id]
             
             if cache_cleanup_count > 0:
-                logger.info(f"Cleaned up {cache_cleanup_count} old cache entries")
+                logger.info(f"Cleaned up {cache_cleanup_count} old AI cache entries")
                 
             # Check for any stray files in the generated_images directory
             try:
@@ -813,4 +928,4 @@ async def cleanup_ongoing_generations():
         except Exception as e:
             logger.error(f"Error in cleanup task: {str(e)}")
             
-        await asyncio.sleep(30)  # Run every 30 seconds 
+        await asyncio.sleep(5)  # Run every 5 seconds for more responsive cleanup 

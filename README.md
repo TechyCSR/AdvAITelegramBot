@@ -44,6 +44,12 @@
     <td align="center">👥</td>
     <td><b>Group Integration</b><br>Full AI functionality in group chats</td>
   </tr>
+  <tr>
+    <td align="center">📱</td>
+    <td><b>Inline Mode</b><br>Generate AI responses and images in any chat</td>
+    <td align="center">⚡</td>
+    <td><b>Fast Response</b><br>Optimized for quick, efficient interactions</td>
+  </tr>
 </table>
 
 > 📱 **Try it now**: [t.me/AdvChatGptBot](https://t.me/AdvChatGptBot)
@@ -84,6 +90,30 @@ python run.py
 | `/rate` | ⭐ Rate your experience |
 | `/clear_cache` | 🧹 Clear your stored images |
 
+## 💡 Inline Features
+
+The bot offers powerful inline mode capabilities:
+
+### Inline AI Responses
+Type `@YourBot your question?` in any chat to quickly get AI responses without leaving the conversation.
+
+### Inline Image Generation
+Type `@YourBot image your description.` to generate and share images instantly in any chat.
+
+**Pro Tip:** End your AI queries with `.` or `?` and your image prompts with `.` to trigger generation. If the response takes time, simply add a space every 5-7 seconds to refresh the query without losing your prompt.
+
+<details>
+<summary>How to use inline mode effectively</summary>
+
+1. **AI Responses**: Type `@YourBot What is quantum computing?` in any chat
+2. **Image Generation**: Type `@YourBot image beautiful sunset over mountains.` 
+3. Select the result when it appears to send it to the chat
+4. For complex queries, wait a few seconds and you'll see "Still generating..." which will update with your response
+5. **If no response appears**: Add a space after your prompt every 5-7 seconds to refresh the query while maintaining your place in the generation queue
+6. You can use this in private chats, group conversations, or channels
+
+</details>
+
 ## 🏗️ Project Structure
 
 <details>
@@ -98,6 +128,7 @@ AdvAITelegramBot/
 │   ├── models/               # Data models and services
 │   │   ├── ai_res.py         # AI conversation functionality
 │   │   ├── user_db.py        # User data operations
+│   │   ├── inline_ai_response.py # Inline mode AI responses
 │   │   └── image_service.py  # Image generation and management
 │   ├── user/                 # User interaction modules
 │   │   ├── start.py          # Bot start and onboarding
@@ -143,6 +174,7 @@ The bot employs a modern, modular architecture with several key design patterns:
 - **💉 Service Container**: Centralized dependency injection for clean, testable code
 - **🔄 Singleton Database Service**: Efficient MongoDB connection pooling
 - **📊 Model-View Pattern**: Separation of data and presentation layers
+- **🔄 Async Processing**: Non-blocking operations for inline queries and image generation
 
 ## 🛠️ Setup Guide
 
