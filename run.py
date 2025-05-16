@@ -26,6 +26,7 @@ from modules.models.inline_ai_response import cleanup_ongoing_generations as ai_
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.global_setting import global_setting_command
 from modules.speech.voice_to_text import handle_voice_toggle
+from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
 import modules.models.user_db as user_db
 import asyncio
 import logging
@@ -90,6 +91,12 @@ async def start_command(bot, update):
     if not 'ai_ongoing_generations_cleanup_task' in globals() or ai_ongoing_generations_cleanup_task is None:
         ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
         logger.info("Started inline AI generations cleanup scheduler task")
+    
+    # Check for restart marker file on first command
+    if not hasattr(advAiBot, "_restart_checked"):
+        logger.info("Checking for restart marker on first command")
+        await check_restart_marker(bot)
+        setattr(advAiBot, "_restart_checked", True)
         
     bot_stats["active_users"].add(update.from_user.id)
     logger.info(f"User {update.from_user.id} started the bot")
@@ -152,6 +159,11 @@ async def inline_query_handler(client, inline_query):
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
     try:
+        # Handle restart callbacks
+        if callback_query.data == "confirm_restart" or callback_query.data == "cancel_restart":
+            await handle_restart_callback(client, callback_query)
+            return
+        
         # Handle maintenance mode toggle and feature callbacks
         if callback_query.data.startswith("toggle_") and callback_query.data.count("_") >= 2:
             await handle_feature_toggle(client, callback_query)
@@ -599,6 +611,13 @@ async def handle_group_admin_commands(bot, message):
         
     # Let normal Telegram permission system handle the actual execution
     pass
+
+@advAiBot.on_message(filters.command("restart") & filters.user(config.ADMINS))
+async def handle_restart_command(bot, update):
+    """Handler for the restart command"""
+    logger.info(f"Admin {update.from_user.id} used restart command")
+    await restart_command(bot, update)
+    await channel_log(bot, update, "/restart", "Admin initiated restart command")
 
 if __name__ == "__main__":
     # Print startup message

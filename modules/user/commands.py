@@ -6,6 +6,7 @@ from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
 from modules.lang import async_translate_to_lang, batch_translate, translate_ui_element
 from modules.chatlogs import channel_log
+from config import ADMINS
 
 
 command__text = """
@@ -75,6 +76,24 @@ main_commands_text = """
 **@AdvChatGptBot**
 """
 
+admin_commands_text = """
+**⚙️ Admin Commands**
+
+These commands are restricted to bot administrators only.
+
+**/restart** - Restart the bot (requires confirmation)
+**/stats** - View bot statistics and usage data 
+**/logs** - Get the most recent log entries
+**/announce** - Send a message to all users
+**/gleave** - Leave a group chat
+**/invite** - Add the bot to a group
+**/uinfo** - Get information about users
+
+**Note:** These commands are only available to authorized administrators listed in the configuration.
+
+**@AdvChatGptBot**
+"""
+
 
 async def command_inline(client, callback):
     user_id = callback.from_user.id
@@ -90,12 +109,22 @@ async def command_inline(client, callback):
     main_btn = translated_texts[3]
     back_btn = translated_texts[4]
     
-    keyboard = InlineKeyboardMarkup([
+    # Create base keyboard
+    keyboard_buttons = [
         [InlineKeyboardButton(ai_btn, callback_data="cmd_ai")],
         [InlineKeyboardButton(img_btn, callback_data="cmd_img")],
-        [InlineKeyboardButton(main_btn, callback_data="cmd_main")],
-        [InlineKeyboardButton(back_btn, callback_data="back")]
-    ])
+        [InlineKeyboardButton(main_btn, callback_data="cmd_main")]
+    ]
+    
+    # Add admin button if user is an admin
+    if user_id in ADMINS:
+        admin_btn = "⚙️ Admin Commands"
+        keyboard_buttons.append([InlineKeyboardButton(admin_btn, callback_data="cmd_admin")])
+    
+    # Add back button
+    keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="back")])
+    
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
 
     await client.edit_message_text(
         chat_id=callback.message.chat.id,
@@ -162,6 +191,26 @@ async def handle_command_callbacks(client, callback):
             reply_markup=keyboard,
             disable_web_page_preview=True
         )
+    
+    elif callback_data == "cmd_admin":
+        # Show admin commands (only for admins)
+        if user_id in ADMINS:
+            back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(back_btn, callback_data="commands")]
+            ])
+            
+            await client.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.id,
+                text=admin_commands_text,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        else:
+            # User is not an admin, show unauthorized message
+            await callback.answer("You don't have permission to view admin commands", show_alert=True)
     
     await callback.answer()
     return
