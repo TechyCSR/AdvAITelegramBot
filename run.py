@@ -307,7 +307,11 @@ async def callback_query(client, callback_query):
             await handle_followup_callback(client, callback_query)
         elif callback_query.data.startswith("rate_"):
             await handle_rate_callback(client, callback_query)
-        elif callback_query.data.startswith("feedback_"):
+        elif callback_query.data.startswith("feedback_") or \
+             callback_query.data.startswith("img_feedback_positive_") or \
+             callback_query.data.startswith("img_feedback_negative_") or \
+             callback_query.data.startswith("img_regenerate_") or \
+             callback_query.data.startswith("img_style_"):
             await handle_image_feedback(client, callback_query)
         elif callback_query.data == "group_commands":
             # Handle group command menu
@@ -368,6 +372,30 @@ async def callback_query(client, callback_query):
         elif callback_query.data.startswith("cmd_"):
             from modules.user.commands import handle_command_callbacks
             await handle_command_callbacks(client, callback_query)
+            return
+        # Image text back button handler
+        elif callback_query.data.startswith("back_to_image_"):
+            # Get the user ID from the callback data
+            user_id = int(callback_query.data.split("_")[3])
+            # Create action buttons again
+            action_markup = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")
+                ],
+                [
+                    InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")
+                ]
+            ])
+            # Edit message back to original prompt
+            await callback_query.message.edit_text(
+                "**Need anything else with this image?**",
+                reply_markup=action_markup
+            )
+            return
+        # Group start back button handler
+        elif callback_query.data == "back_to_group_start":
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
             return
         else:
             # Unknown callback, just acknowledge it
