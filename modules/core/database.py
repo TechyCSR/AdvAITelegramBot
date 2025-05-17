@@ -117,4 +117,8 @@ def get_user_images_collection() -> Collection:
 
 def get_feature_settings_collection() -> Collection:
     """Get the feature settings collection"""
-    return db_service.get_collection('feature_settings') 
+    return db_service.get_collection('feature_settings')
+
+def get_session_collection() -> Collection:
+    """Get the session collection for storing temporary user session data"""
+    return db_service.get_collection('user_sessions') 

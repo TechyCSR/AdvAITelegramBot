@@ -319,6 +319,44 @@ async def callback_query(client, callback_query):
             # Handle other group menu buttons
             from modules.user.group_start import handle_group_callbacks
             await handle_group_callbacks(client, callback_query)
+        elif callback_query.data == "admin_view_history":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data.startswith("history_user_"):
+            from modules.admin.user_history import handle_history_user_selection
+            user_id = int(callback_query.data.split("_")[2])
+            await handle_history_user_selection(client, callback_query, user_id)
+            return
+        elif callback_query.data.startswith("history_page_"):
+            from modules.admin.user_history import handle_history_pagination
+            parts = callback_query.data.split("_")
+            user_id = int(parts[2])
+            page = int(parts[3])
+            await handle_history_pagination(client, callback_query, user_id, page)
+            return
+        elif callback_query.data == "history_search":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data == "history_back":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data.startswith("history_download_"):
+            from modules.admin.user_history import get_history_download
+            user_id = int(callback_query.data.split("_")[2])
+            await get_history_download(client, callback_query, user_id)
+            return
+        elif callback_query.data == "admin_search_user":
+            from modules.admin.user_history import show_user_search_form
+            await show_user_search_form(client, callback_query)
+            return
+        elif callback_query.data == "support":
+            # Handle the support callback
+            from modules.user.user_support import settings_support_callback
+            await settings_support_callback(client, callback_query)
+            return
         else:
             # Unknown callback, just acknowledge it
             await callback_query.answer("Unknown command")
@@ -740,6 +778,107 @@ async def handle_new_chat_members(client, message):
         await channel_log(client, message, "new_members")
     except Exception as e:
         logger.error(f"Error logging new chat members: {e}")
+
+@advAiBot.on_message(filters.command("history") & filters.user(config.ADMINS))
+async def history_command(bot, update):
+    """Handler for the history command to view a user's chat history"""
+    logger.info(f"Admin {update.from_user.id} requested chat history")
+    
+    # Check if user ID is provided
+    if len(update.command) != 2:
+        await update.reply_text(
+            "⚠️ **Usage**: `/history USER_ID`\n\n"
+            "Please provide the user ID to view chat history."
+        )
+        return
+    
+    try:
+        # Get the target user ID
+        target_user_id = int(update.command[1])
+        
+        # Send status message
+        status_msg = await update.reply_text(
+            f"🔍 **Retrieving Chat History**\n\n"
+            f"Fetching chat logs for user {target_user_id}... Please wait."
+        )
+        
+        # Call the function to get user chat history
+        from modules.admin.user_history import get_user_chat_history
+        await get_user_chat_history(bot, update, target_user_id, status_msg)
+        
+        # Log this admin action
+        await channel_log(bot, update, "/history", f"Admin requested chat history for user {target_user_id}")
+        
+    except ValueError:
+        await update.reply_text("❌ **Error**: User ID must be a valid integer.")
+    except Exception as e:
+        logger.error(f"Error retrieving chat history: {e}")
+        await update.reply_text(f"❌ **Error retrieving chat history**: {str(e)}")
+        await error_log(bot, "HISTORY_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
+
+@advAiBot.on_message(filters.text & filters.private & filters.user(config.ADMINS))
+async def handle_admin_text_input(bot, message):
+    """Handler for admin text input, including user ID for history search"""
+    # Check if the user is awaiting user ID input for history
+    from modules.core.database import get_session_collection
+    session_collection = get_session_collection()
+    
+    try:
+        # Debug logging to help trace issues
+        logger.debug(f"Admin text handler received message: {message.text[:20]}...")
+        
+        user_session = session_collection.find_one({"user_id": message.from_user.id})
+        if user_session and user_session.get("awaiting_user_id_for_history"):
+            logger.info(f"Admin {message.from_user.id} providing user ID for history search: {message.text}")
+            
+            # Clear the session flag
+            session_collection.update_one(
+                {"user_id": message.from_user.id},
+                {"$unset": {
+                    "awaiting_user_id_for_history": "",
+                    "message_id": ""
+                }}
+            )
+            
+            # Try to parse the user ID
+            try:
+                target_user_id = int(message.text.strip())
+                
+                # Send status message
+                status_msg = await message.reply_text(
+                    f"🔍 **Retrieving Chat History**\n\n"
+                    f"Fetching chat logs for user {target_user_id}... Please wait."
+                )
+                
+                # Call the function to get user chat history
+                from modules.admin.user_history import get_user_chat_history
+                await get_user_chat_history(bot, message, target_user_id, status_msg)
+                
+                # Log this admin action
+                await channel_log(bot, message, "history_search", f"Admin searched chat history for user {target_user_id}")
+                
+            except ValueError:
+                await message.reply_text("❌ **Error**: User ID must be a valid integer.")
+            except Exception as e:
+                logger.error(f"Error retrieving chat history: {e}")
+                await message.reply_text(f"❌ **Error retrieving chat history**: {str(e)}")
+                
+            # Try to delete the original message to clean up
+            try:
+                await message.delete()
+            except Exception as e:
+                logger.debug(f"Could not delete message: {e}")
+                
+            # Return True to indicate we've handled this message and prevent passing to regular message handler
+            return
+            
+        # Debug message to confirm we're continuing to normal message handling
+        logger.debug(f"Admin text not for history search, proceeding to normal handling")
+    except Exception as e:
+        logger.error(f"Error in admin text input handler: {e}")
+    
+    # If we reach here, it's not a special admin action, so proceed with normal message handling
+    await handle_message(bot, message)
 
 if __name__ == "__main__":
     # Print startup message

@@ -326,7 +326,7 @@ async def show_admin_panel(client, callback: CallbackQuery):
             pass
         else:
             # For other errors, log and notify
-            logger.error(f"Error showing admin panel: {str(e)}")
+            # logger.error(f"Error showing admin panel: {str(e)}")
             await callback.answer(f"Error: {str(e)[:20]}...", show_alert=True)
 
 async def handle_feature_toggle(client, callback: CallbackQuery):

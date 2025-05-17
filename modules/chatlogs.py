@@ -2,7 +2,7 @@ import os
 import logging
 import json
 from datetime import datetime, timedelta
-from config import LOG_CHANNEL
+from config import LOG_CHANNEL, DATABASE_URL
 from pymongo import MongoClient
 
 # Setup logging
@@ -64,7 +64,7 @@ async def user_log(bot, message, query, response=None):
         user_id = message.from_user.id if message.from_user else None
         chat_id = message.chat.id if message.chat else None
         chat_type = message.chat.type if message.chat else None
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now()
         
         # Truncate query and response for logging
         truncated_query = query[:500] + "..." if query and len(query) > 500 else query
@@ -76,7 +76,7 @@ async def user_log(bot, message, query, response=None):
                 f"#UserQuery\n"
                 f"**User**: {message.from_user.mention}\n"
                 f"**User ID**: `{user_id}`\n"
-                f"**Time**: {timestamp}\n"
+                f"**Time**: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"**Query**: ```{truncated_query}```\n"
             )
             
@@ -89,8 +89,27 @@ async def user_log(bot, message, query, response=None):
         log_entry = f"User {user_id} in {chat_id} ({chat_type}): {truncated_query}"
         logger.info(log_entry)
         
+        # Save to database - ensure user_id is consistently stored as integer
+        client = MongoClient(DATABASE_URL)
+        db = client['aibotdb']
+        logs_collection = db.user_logs
+        
+        # Store the log with user_id as integer
+        log_data = {
+            "user_id": int(user_id) if user_id else None,
+            "chat_id": chat_id,
+            "chat_type": chat_type,
+            "message": query,
+            "response": response,
+            "timestamp": timestamp
+        }
+        
+        logs_collection.insert_one(log_data)
+        logger.debug(f"Saved log to database for user {user_id}")
+        
     except Exception as e:
         logger.error(f"Failed to log user interaction: {str(e)}")
+        logger.exception("Detailed error in user_log:")
 
 async def error_log(bot, error_type, error_message, context=None, user_id=None):
     """
