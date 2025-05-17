@@ -279,12 +279,14 @@ async def callback_query(client, callback_query):
             await settings_language_callback(client, callback_query)
         elif callback_query.data in ["settings_voice", "settings_text"]:
             await change_voice_setting(client, callback_query)
-        elif callback_query.data == "settings_languages":
+        elif callback_query.data == "settings_lans":
             await settings_langs_callback(client, callback_query)
-        elif callback_query.data.startswith("set_lang_"):
+        elif callback_query.data.startswith("language_"):
             await change_language_setting(client, callback_query)
         elif callback_query.data == "settings_voice_inlines":
             await settings_voice_inlines(client, callback_query)
+        elif callback_query.data == "settings_back":
+            await settings_inline(client, callback_query)
         elif callback_query.data == "settings_assistant":
             await settings_assistant_callback(client, callback_query)
         elif callback_query.data == "settings_support":
@@ -356,6 +358,16 @@ async def callback_query(client, callback_query):
             # Handle the support callback
             from modules.user.user_support import settings_support_callback
             await settings_support_callback(client, callback_query)
+            return
+        # Help menu category callbacks
+        elif callback_query.data.startswith("help_") and callback_query.data != "help":
+            from modules.user.help import handle_help_category
+            await handle_help_category(client, callback_query)
+            return
+        # Command menu category callbacks
+        elif callback_query.data.startswith("cmd_"):
+            from modules.user.commands import handle_command_callbacks
+            await handle_command_callbacks(client, callback_query)
             return
         else:
             # Unknown callback, just acknowledge it
