@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 import pyrogram.errors
+from pyrogram.enums import ChatType
 import asyncio
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from config import LOG_CHANNEL as STCLOG, DATABASE_URL, ADMINS, OWNER_ID
@@ -63,9 +64,11 @@ async def leave_group(client: Client, message: Message) -> None:
     chat_id = message.chat.id
     
     # Check if the message is in a group
-    if message.chat.type not in ["group", "supergroup"]:
+    if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        print(message.chat.type)    
         await message.reply_text("This command can only be used in groups.")
         return
+    
     
     # Check if admin (custom check in case ADMINS list is outdated)
     if user_id in ADMINS or user_id == OWNER_ID or await is_group_admin(client, chat_id, user_id):

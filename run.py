@@ -4,7 +4,7 @@ import pyrogram
 import time
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from pyrogram.enums import ChatAction
+from pyrogram.enums import ChatAction, ChatType
 from modules.user.start import start, start_inline
 from modules.user.help import help, help_inline
 from modules.user.commands import command_inline
@@ -28,7 +28,6 @@ from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.global_setting import global_setting_command
 from modules.speech.voice_to_text import handle_voice_toggle
 from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
-from modules.user.group_start import group_start
 import modules.models.user_db as user_db
 import asyncio
 import logging
@@ -78,7 +77,7 @@ bot_stats = {
 # Get the cleanup scheduler function to run later
 cleanup_scheduler = start_cleanup_scheduler()
 
-@advAiBot.on_message(filters.command("start") & filters.private)
+@advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
     # Start the cleanup scheduler on first command
     global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task
@@ -103,40 +102,18 @@ async def start_command(bot, update):
     bot_stats["active_users"].add(update.from_user.id)
     
     # Differentiate between private chats and group chats
+    if update.chat.type == ChatType.PRIVATE:
+        logger.info(f"User {update.from_user.id} started the bot in private chat")
+        await start(bot, update)
+    else:
+        # This is a group chat
+        logger.info(f"User {update.from_user.id} started the bot in group chat {update.chat.id} ({update.chat.title})")
+        # Import the group_start function from the newly created file
+        from modules.user.group_start import group_start
+        await group_start(bot, update)
     
-    logger.info(f"User {update.from_user.id} started the bot in private chat")
-    await start(bot, update)
     await channel_log(bot, update, "/start")
 
-@advAiBot.on_message(filters.command("start") & filters.group)
-async def start_command(bot, update):
-    # Start the cleanup scheduler on first command
-    global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task
-    if not 'cleanup_scheduler_task' in globals() or cleanup_scheduler_task is None:
-        cleanup_scheduler_task = asyncio.create_task(cleanup_scheduler())
-        logger.info("Started image generation cleanup scheduler task")
-        
-    if not 'ongoing_generations_cleanup_task' in globals() or ongoing_generations_cleanup_task is None:
-        ongoing_generations_cleanup_task = asyncio.create_task(cleanup_ongoing_generations())
-        logger.info("Started inline generations cleanup scheduler task")
-        
-    if not 'ai_ongoing_generations_cleanup_task' in globals() or ai_ongoing_generations_cleanup_task is None:
-        ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
-        logger.info("Started inline AI generations cleanup scheduler task")
-    
-    # Check for restart marker file on first command
-    if not hasattr(advAiBot, "_restart_checked"):
-        logger.info("Checking for restart marker on first command")
-        await check_restart_marker(bot)
-        setattr(advAiBot, "_restart_checked", True)
-        
-    bot_stats["active_users"].add(update.from_user.id)
-    
-   
-    logger.info(f"User {update.from_user.id} started the bot in group chat {update.chat.id} ({update.chat.title})")
-    await group_start(bot, update)
-    
-    await channel_log(bot, update, "/start")
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
     logger.info(f"User {update.from_user.id} requested help")
