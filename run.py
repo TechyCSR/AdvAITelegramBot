@@ -1,6 +1,7 @@
 import os
 import config
 import pyrogram
+import time
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from pyrogram.enums import ChatAction
@@ -99,8 +100,18 @@ async def start_command(bot, update):
         setattr(advAiBot, "_restart_checked", True)
         
     bot_stats["active_users"].add(update.from_user.id)
-    logger.info(f"User {update.from_user.id} started the bot")
-    await start(bot, update)
+    
+    # Differentiate between private chats and group chats
+    if update.chat.type == "private":
+        logger.info(f"User {update.from_user.id} started the bot in private chat")
+        await start(bot, update)
+    else:
+        # This is a group chat
+        logger.info(f"User {update.from_user.id} started the bot in group chat {update.chat.id} ({update.chat.title})")
+        # Import the group_start function from the newly created file
+        from modules.user.group_start import group_start
+        await group_start(bot, update)
+    
     await channel_log(bot, update, "/start")
 
 @advAiBot.on_message(filters.command("help"))
@@ -220,6 +231,35 @@ async def callback_query(client, callback_query):
                 # Default to first page, recent filter
                 await handle_user_management(client, callback_query)
             return
+        # Group permissions help callback
+        elif callback_query.data == "group_permissions_help":
+            from modules.group.group_permissions import handle_permissions_help
+            await handle_permissions_help(client, callback_query)
+            return
+        elif callback_query.data == "dismiss_permissions_help":
+            # Just acknowledge and close the message
+            await callback_query.answer("Permissions help dismissed")
+            # Try to delete the message if possible
+            try:
+                await client.delete_messages(
+                    chat_id=callback_query.message.chat.id,
+                    message_ids=callback_query.message.id
+                )
+            except Exception:
+                # If can't delete, just edit to a simple confirmation
+                await callback_query.edit_message_text("✅ Thanks for reviewing the permissions info!")
+            return
+        elif callback_query.data == "group_start":
+            # Import the group_start function from user directory
+            from modules.user.group_start import group_start
+            # Create a simulated message object for group_start
+            simulated_message = callback_query.message
+            simulated_message.from_user = callback_query.from_user
+            # Call group_start with the simulated message
+            await group_start(client, simulated_message)
+            # Answer the callback query
+            await callback_query.answer("Starting bot in this group")
+            return
         elif callback_query.data == "admin_header" or callback_query.data == "features_header" or callback_query.data == "admin_tools_header":
             # Just acknowledge the click for the headers
             await callback_query.answer()
@@ -239,82 +279,58 @@ async def callback_query(client, callback_query):
             await settings_language_callback(client, callback_query)
         elif callback_query.data in ["settings_voice", "settings_text"]:
             await change_voice_setting(client, callback_query)
-        elif callback_query.data == "settings_back":
-            await settings_voice_inlines(client, callback_query)
-        elif callback_query.data == "settings_lans":
+        elif callback_query.data == "settings_languages":
             await settings_langs_callback(client, callback_query)
-        elif callback_query.data in ["language_hi", "language_en", "language_zh", "language_ar", "language_fr", "language_ru"]:
+        elif callback_query.data.startswith("set_lang_"):
             await change_language_setting(client, callback_query)
-        elif callback_query.data=="settings_assistant":
+        elif callback_query.data == "settings_voice_inlines":
+            await settings_voice_inlines(client, callback_query)
+        elif callback_query.data == "settings_assistant":
             await settings_assistant_callback(client, callback_query)
-        elif callback_query.data in ["mode_chatbot", "mode_coder", "mode_professional", "mode_teacher", "mode_therapist", "mode_assistant", "mode_gamer", "mode_translator"]:
-            await change_mode_setting(client, callback_query)
-        elif callback_query.data=="settings_others" or callback_query.data=="support_donate":
-            await settings_others_callback(client, callback_query)
-        elif callback_query.data=="support":
-             await settings_support_callback(client, callback_query)
-        elif callback_query.data=="support_admins":
-            await support_admins_callback(client, callback_query)
-        elif callback_query.data=="support_developers":
+        elif callback_query.data == "settings_support":
+            await settings_support_callback(client, callback_query)
+        elif callback_query.data == "support_developers":
             await support_developers_callback(client, callback_query)
-        elif callback_query.data in ["rate_1", "rate_2", "rate_3", "rate_4", "rate_5"]:
-            await handle_rate_callback(client, callback_query)
-        
-        # Interactive command menu handlers
-        elif callback_query.data.startswith("cmd_"):
-            from modules.user.commands import handle_command_callbacks
-            await handle_command_callbacks(client, callback_query)
-            
-        # Interactive help menu handlers
-        elif callback_query.data.startswith("help_"):
-            from modules.user.help import handle_help_category
-            await handle_help_category(client, callback_query)
-        
-        # Onboarding tour handlers
-        elif callback_query.data.startswith("onboarding_"):
-            from modules.user.start import handle_onboarding
-            await handle_onboarding(client, callback_query)
-        
-        # Image feedback and style selection handlers
-        elif callback_query.data.startswith("img_feedback_"):
-            await handle_image_feedback(client, callback_query)
-        elif callback_query.data.startswith("img_regenerate_"):
-            await handle_image_feedback(client, callback_query)
-        elif callback_query.data.startswith("img_style_"):
-            await handle_image_feedback(client, callback_query)
-        
-        # Voice setting handlers
-        elif callback_query.data.startswith("toggle_voice_"):
+        elif callback_query.data == "support_admins":
+            await support_admins_callback(client, callback_query)
+        elif callback_query.data == "settings_others":
+            await settings_others_callback(client, callback_query)
+        elif callback_query.data.startswith("voice_toggle_"):
             await handle_voice_toggle(client, callback_query)
-        
-        # Image text handlers
+        elif callback_query.data.startswith("mode_"):
+            await change_mode_setting(client, callback_query)
         elif callback_query.data.startswith("show_text_"):
             await handle_show_text_callback(client, callback_query)
         elif callback_query.data.startswith("followup_"):
             await handle_followup_callback(client, callback_query)
-        elif callback_query.data.startswith("back_to_image_"):
-            # Return to previous message with options
-            user_id = int(callback_query.data.split("_")[3])
-            await callback_query.message.edit_text(
-                "**Need anything else with this image?**",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")],
-                    [InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")]
-                ])
-            )
+        elif callback_query.data.startswith("rate_"):
+            await handle_rate_callback(client, callback_query)
+        elif callback_query.data.startswith("feedback_"):
+            await handle_image_feedback(client, callback_query)
+        elif callback_query.data == "group_commands":
+            # Handle group command menu
+            from modules.user.group_start import handle_group_command_inline
+            await handle_group_command_inline(client, callback_query)
+        elif callback_query.data.startswith("group_cmd_"):
+            # Handle specific group command sections
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
+        elif callback_query.data == "about_bot" or callback_query.data == "group_support":
+            # Handle other group menu buttons
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
+        else:
+            # Unknown callback, just acknowledge it
+            await callback_query.answer("Unknown command")
+            
     except Exception as e:
-        # Log the error but don't crash
-        error_msg = f"Error in callback_query handler: {str(e)}"
-        logger.error(error_msg)
+        logger.error(f"Error in callback query handler: {e}")
+        await error_log(client, f"Callback Query Error: {e}")
+        # Acknowledge the callback query to prevent hanging UI
         try:
-            # Try to inform the user something went wrong
-            await callback_query.answer(f"Error: {str(e)[:20]}...", show_alert=True)
+            await callback_query.answer("An error occurred. Please try again later.")
         except:
-            # If we can't even answer the callback, just log and continue
             pass
-        # Log detailed error to the error log
-        await error_log(client, "CALLBACK_ERROR", str(e), context=callback_query.data, user_id=callback_query.from_user.id)
-        return
 
 
 @advAiBot.on_message(filters.voice)
@@ -437,8 +453,9 @@ async def handle_generate(client, message):
     # Log the command usage
     await channel_log(client, message, f"/{message.command[0]}", "Image generation requested")
 
-@advAiBot.on_message(filters.photo)
-async def handle_image(bot, update):
+@advAiBot.on_message(filters.photo & filters.private)
+async def handle_private_image(bot, update):
+    """Handler for images in private chats"""
     # Check for maintenance mode
     if await maintenance_check(update.from_user.id):
         maint_msg = await maintenance_message(update.from_user.id)
@@ -448,12 +465,104 @@ async def handle_image(bot, update):
     bot_stats["active_users"].add(update.from_user.id)
     user_id = update.from_user.id
     
-    # Process the image with OCR
+    logger.info(f"Processing private chat image for user {user_id}")
+    
+    # For private chats, process all images
     await extract_text_res(bot, update)
     
     # Log usage
-    await channel_log(bot, update, "Image Analysis")
-    logger.info(f"Image analysis for user {user_id}")
+    await channel_log(bot, update, "Private Image Analysis")
+    logger.info(f"Image analysis for user {user_id} in private chat")
+
+@advAiBot.on_message(filters.photo & filters.group)
+async def handle_group_image(bot, update):
+    """Handler for images in group chats"""
+    # Check for maintenance mode
+    if await maintenance_check(update.from_user.id):
+        maint_msg = await maintenance_message(update.from_user.id)
+        await update.reply(maint_msg)
+        return
+        
+    bot_stats["active_users"].add(update.from_user.id)
+    user_id = update.from_user.id
+    
+    logger.info(f"Group image received - Chat ID: {update.chat.id}, Title: {update.chat.title}, Caption: {update.caption}")
+    
+    # Skip processing if no caption
+    if not update.caption:
+        logger.info(f"Image in group {update.chat.id} ignored - no caption")
+        return
+        
+    # Check if caption contains "AI" or "/ai" trigger
+    caption_lower = update.caption.lower()
+    has_ai_trigger = "ai" in caption_lower or "/ai" in caption_lower
+    
+    if not has_ai_trigger:
+        logger.info(f"Image in group {update.chat.id} ignored - caption doesn't contain AI trigger: {update.caption}")
+        return
+    
+    # Extract user question from caption (everything after the AI trigger)
+    user_question = ""
+    if "/ai" in caption_lower:
+        # Get text after /ai command
+        parts = update.caption.split("/ai", 1)
+        if len(parts) > 1:
+            user_question = parts[1].strip()
+    elif "ai" in caption_lower:
+        # Find the position of "ai" and extract text after it
+        ai_pos = caption_lower.find("ai")
+        if ai_pos >= 0:
+            user_question = update.caption[ai_pos + 2:].strip()
+    
+    # Send typing action
+    await bot.send_chat_action(chat_id=update.chat.id, action=ChatAction.TYPING)
+    
+    # Process the image with OCR and include the user's question
+    logger.info(f"Processing group image with AI trigger and question: '{user_question}'")
+    
+    # We'll modify how we call extract_text_res to include the user question
+    from modules.image.img_to_text import extract_text_from_image
+    
+    # First get the image file
+    photo_file = await bot.download_media(
+        message=update.photo.file_id,
+        file_name=f"temp_{user_id}_{int(time.time())}.jpg"
+    )
+    
+    try:
+        # Extract text from image
+        extracted_text = await extract_text_from_image(photo_file)
+        
+        # Combine extracted text with user's question
+        if user_question:
+            message_text = f"Text from image:\n\n{extracted_text}\n\nUser's question: {user_question}"
+        else:
+            message_text = f"Text from image:\n\n{extracted_text}"
+        
+        # Create reply markup for showing extracted text
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Analyze with AI", callback_data=f"followup_{user_id}")]
+        ])
+        
+        # Send response with the text and buttons
+        await update.reply_text(
+            message_text,
+            reply_markup=markup
+        )
+    except Exception as e:
+        logger.error(f"Error processing group image: {e}")
+        await update.reply_text(f"Error processing the image: {str(e)}")
+    finally:
+        # Clean up downloaded file
+        try:
+            if os.path.exists(photo_file):
+                os.remove(photo_file)
+        except Exception as e:
+            logger.error(f"Error removing temporary file: {e}")
+    
+    # Log usage
+    await channel_log(bot, update, "Group Image Analysis", "AI-triggered image text extraction in group")
+    logger.info(f"AI-triggered image analysis in group {update.chat.id} by user {user_id}")
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
@@ -618,6 +727,19 @@ async def handle_restart_command(bot, update):
     logger.info(f"Admin {update.from_user.id} used restart command")
     await restart_command(bot, update)
     await channel_log(bot, update, "/restart", "Admin initiated restart command")
+
+@advAiBot.on_message(filters.new_chat_members)
+async def handle_new_chat_members(client, message):
+    """Handle when new members are added to a group, including the bot itself"""
+    # Import the new_chat_members function from the group module
+    from modules.group.new_group import new_chat_members
+    await new_chat_members(client, message)
+    
+    # Log the event
+    try:
+        await channel_log(client, message, "new_members")
+    except Exception as e:
+        logger.error(f"Error logging new chat members: {e}")
 
 if __name__ == "__main__":
     # Print startup message

@@ -84,6 +84,24 @@ async def extract_text_res(bot, update):
         update: The message containing the image
     """
     try:
+        # Check if this is a group chat and if so, check caption requirement
+        is_group_chat = update.chat.type in ["group", "supergroup"]
+        
+        # For group chats, require caption with AI or /ai
+        if is_group_chat:
+            # Ensure the image has a caption
+            if not update.caption:
+                logger.info(f"Image in group {update.chat.id} ignored - no caption")
+                return
+                
+            # Ensure the caption contains AI or /ai
+            caption_lower = update.caption.lower()
+            if not ("ai" in caption_lower or "/ai" in caption_lower):
+                logger.info(f"Image in group {update.chat.id} ignored - caption doesn't contain AI trigger: {update.caption}")
+                return
+            
+            logger.info(f"Processing image in group {update.chat.id} with AI trigger in caption: {update.caption}")
+        
         # Show processing status with a modern UI
         processing_msg = await update.reply_text(
             "🔍 **Processing Image**\n\n"
@@ -94,8 +112,12 @@ async def extract_text_res(bot, update):
         # Extract caption if available
         caption_prompt = ""
         if update.caption:
-            if update.caption.lower().startswith(("ai", "ask")):
-                caption_prompt = update.caption.split(" ", 1)[1] if len(update.caption.split(" ")) > 1 else ""
+            # Remove the AI trigger word from the caption for processing
+            caption_lower = update.caption.lower()
+            if "ai" in caption_lower or "/ai" in caption_lower:
+                # Extract the text after the trigger
+                parts = update.caption.split(" ", 1)
+                caption_prompt = parts[1] if len(parts) > 1 else ""
             else:
                 caption_prompt = update.caption
         
@@ -163,11 +185,10 @@ async def extract_text_res(bot, update):
                     logger.error(f"Error sending log: {str(e)}")
                 return
             
-            # Combine extracted text with caption if available
+            # If text extraction is successful, append the caption to the extracted text
             if caption_prompt:
-                full_prompt = f"{extracted_text}\n\n{caption_prompt}"
-            else:
-                full_prompt = extracted_text
+                # Append the caption to the extracted text
+                extracted_text = f"{extracted_text}\n\n[User's question: {caption_prompt}]"
             
             # Update processing message
             await processing_msg.edit_text(
@@ -192,7 +213,7 @@ async def extract_text_res(bot, update):
 
                 # Create context-aware prompt
                 if caption_prompt:
-                    prompt = f"The following text was extracted from an image:\n\n{extracted_text}\n\nUser's question about this text: {caption_prompt}"
+                    prompt = f"The following text was extracted from an image:\n\n{extracted_text}"
                 else:
                     prompt = f"The following text was extracted from an image. Please analyze it and provide relevant information or respond appropriately:\n\n{extracted_text}"
                 
@@ -202,46 +223,12 @@ async def extract_text_res(bot, update):
                 # Show typing indicator
                 await bot.send_chat_action(chat_id=update.chat.id, action=enums.ChatAction.TYPING)
                 
-                # Get streaming response for better UX
-                streaming_response = get_streaming_response(history)
-                if streaming_response:
-                    complete_response = ""
-                    buffer = ""
-                    last_update_time = asyncio.get_event_loop().time()
-                    
-                    # Process streaming response
-                    for chunk in streaming_response:
-                        if hasattr(chunk, 'choices') and chunk.choices:
-                            choice = chunk.choices[0]
-                            if hasattr(choice, 'delta') and choice.delta:
-                                if hasattr(choice.delta, 'content') and choice.delta.content:
-                                    buffer += choice.delta.content
-                                    complete_response += choice.delta.content
-                                    
-                                    current_time = asyncio.get_event_loop().time()
-                                    if current_time - last_update_time >= 0.8 or len(buffer) >= 50:
-                                        try:
-                                            await processing_msg.edit_text(
-                                                f"📝 **Image Text Analysis**\n\n{complete_response}"
-                                            )
-                                            buffer = ""
-                                            last_update_time = current_time
-                                            await bot.send_chat_action(chat_id=update.chat.id, action=enums.ChatAction.TYPING)
-                                        except Exception as e:
-                                            logger.error(f"Edit error: {e}")
-                    
-                    # Final update
-                    if complete_response:
-                        await processing_msg.edit_text(
-                            f"📝 **Image Text Analysis**\n\n{complete_response}"
-                        )
-                else:
-                    # Fallback to non-streaming response
-                    ai_response = get_response(history)
-                    await processing_msg.edit_text(
-                        f"📝 **Image Text Analysis**\n\n{ai_response}"
-                    )
-                    complete_response = ai_response
+                # Use non-streaming response for all image processing (both private and group chats)
+                ai_response = get_response(history)
+                await processing_msg.edit_text(
+                    f"📝 **Image Text Analysis**\n\n{ai_response}"
+                )
+                complete_response = ai_response
                 
                 # Create action buttons
                 action_markup = InlineKeyboardMarkup([
