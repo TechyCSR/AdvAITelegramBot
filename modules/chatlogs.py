@@ -71,7 +71,7 @@ async def user_log(bot, message, query, response=None):
         truncated_response = response[:500] + "..." if response and len(response) > 500 else response
         
         # Log to channel only if in direct chat (for privacy)
-        if chat_type == "private":
+        if str(chat_type) == "private":
             channel_msg = (
                 f"#UserQuery\n"
                 f"**User**: {message.from_user.mention}\n"
@@ -94,11 +94,11 @@ async def user_log(bot, message, query, response=None):
         db = client['aibotdb']
         logs_collection = db.user_logs
         
-        # Store the log with user_id as integer
+        # Store the log with user_id as integer and chat_type as string
         log_data = {
             "user_id": int(user_id) if user_id else None,
             "chat_id": chat_id,
-            "chat_type": chat_type,
+            "chat_type": str(chat_type),
             "message": query,
             "response": response,
             "timestamp": timestamp

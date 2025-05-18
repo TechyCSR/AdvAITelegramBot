@@ -56,25 +56,25 @@ async def get_user_chat_history(bot: Client, message: Message, user_id: int, sta
         # Add debug logging
         logger.info(f"Found user: {user_data.get('first_name', '')} {user_data.get('last_name', '')}")
         
-        # Get chat history from the correct collection
-        user_history = history_collection.find_one({"user_id": user_id})
-        if not user_history:
-            # Try with integer user_id
-            user_history = history_collection.find_one({"user_id": int(user_id)})
+        # Get chat history from the history collection
+        # Ensure we're using an integer user_id for consistency
+        int_user_id = int(user_id)
+        user_history = history_collection.find_one({"user_id": int_user_id})
         
         chat_logs = []
         if user_history and 'history' in user_history:
-            # Extract the history from the document
+            # Extract the conversation history from the document
             history_data = user_history['history']
             
             # Filter to only include user and assistant messages (skip system messages)
             for entry in history_data:
                 if entry.get('role') in ['user', 'assistant']:
+                    # Create a chat log entry with the message and timestamp
                     chat_logs.append({
                         'role': entry.get('role'),
                         'content': entry.get('content', ''),
-                        # Since we don't have timestamps, use the current time
-                        'timestamp': datetime.now() 
+                        # We don't have timestamps in the history collection, use current time as fallback
+                        'timestamp': datetime.now()
                     })
             
             logger.info(f"Found {len(chat_logs)} chat entries for user {user_id}")
@@ -180,9 +180,9 @@ async def show_history_search_panel(client: Client, callback_query: CallbackQuer
         callback_query: The callback query
     """
     try:
-        # Get users who have chat history
+        # Get users who have chat history from the history collection
         users_with_history = list(history_collection.find({}, {"user_id": 1}))
-        user_ids = [user.get("user_id") for user in users_with_history if user.get("user_id")]
+        user_ids = [int(user.get("user_id")) for user in users_with_history if user.get("user_id")]
         
         logger.info(f"Found {len(user_ids)} users with chat history")
         
@@ -275,15 +275,14 @@ async def handle_history_user_selection(client: Client, callback_query: Callback
             )
             return
         
-        # Get chat history from the correct collection
-        user_history = history_collection.find_one({"user_id": user_id})
-        if not user_history:
-            # Try with integer user_id
-            user_history = history_collection.find_one({"user_id": int(user_id)})
+        # Get chat history from the history collection
+        # Ensure we're using an integer user_id for consistency
+        int_user_id = int(user_id)
+        user_history = history_collection.find_one({"user_id": int_user_id})
         
         chat_logs = []
         if user_history and 'history' in user_history:
-            # Extract the history from the document
+            # Extract the conversation history from the document
             history_data = user_history['history']
             
             # Filter to only include user and assistant messages (skip system messages)
@@ -292,7 +291,7 @@ async def handle_history_user_selection(client: Client, callback_query: Callback
                     chat_logs.append({
                         'role': entry.get('role'),
                         'content': entry.get('content', ''),
-                        # Since we don't have timestamps, use the current time
+                        # We don't have timestamps in the history collection, use current time as fallback
                         'timestamp': datetime.now() 
                     })
             
@@ -423,15 +422,14 @@ async def handle_history_pagination(client: Client, callback_query: CallbackQuer
             )
             return
         
-        # Get chat history from the correct collection
-        user_history = history_collection.find_one({"user_id": user_id})
-        if not user_history:
-            # Try with integer user_id
-            user_history = history_collection.find_one({"user_id": int(user_id)})
+        # Get chat history from the history collection
+        # Ensure we're using an integer user_id for consistency
+        int_user_id = int(user_id)
+        user_history = history_collection.find_one({"user_id": int_user_id})
         
         chat_logs = []
         if user_history and 'history' in user_history:
-            # Extract the history from the document
+            # Extract the conversation history from the document
             history_data = user_history['history']
             
             # Filter to only include user and assistant messages (skip system messages)
@@ -440,7 +438,7 @@ async def handle_history_pagination(client: Client, callback_query: CallbackQuer
                     chat_logs.append({
                         'role': entry.get('role'),
                         'content': entry.get('content', ''),
-                        # Since we don't have timestamps, use the current time
+                        # We don't have timestamps in the history collection, use current time as fallback
                         'timestamp': datetime.now() 
                     })
             
@@ -578,15 +576,14 @@ async def get_history_download(client: Client, callback_query: CallbackQuery, us
             )
             return
         
-        # Get chat history from the correct collection
-        user_history = history_collection.find_one({"user_id": user_id})
-        if not user_history:
-            # Try with integer user_id
-            user_history = history_collection.find_one({"user_id": int(user_id)})
+        # Get chat history from the history collection
+        # Ensure we're using an integer user_id for consistency
+        int_user_id = int(user_id)
+        user_history = history_collection.find_one({"user_id": int_user_id})
         
         chat_logs = []
         if user_history and 'history' in user_history:
-            # Extract the history from the document
+            # Extract the conversation history from the document
             history_data = user_history['history']
             
             # Filter to only include user and assistant messages (skip system messages)
@@ -595,7 +592,7 @@ async def get_history_download(client: Client, callback_query: CallbackQuery, us
                     chat_logs.append({
                         'role': entry.get('role'),
                         'content': entry.get('content', ''),
-                        # Since we don't have timestamps, use the current time
+                        # We don't have timestamps in the history collection, use current time as fallback
                         'timestamp': datetime.now() 
                     })
             
