@@ -166,7 +166,7 @@ async def aires(client: Client, message: Message) -> None:
         )
         
         # Edit the temporary message with the AI response
-        await temp.edit_text(ai_response)
+        await temp.edit_text(ai_response,disable_web_page_preview=True)
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:

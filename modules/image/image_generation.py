@@ -332,7 +332,7 @@ async def handle_generate_command(client: Client, message: Message) -> None:
             await message.reply_text(
                 "🖼️ **Image Generation**\n\n"
                 "Please provide a prompt to generate images.\n\n"
-                "Example: `/generate a serene mountain landscape`\n\n"
+                "Example: `/img a serene mountain landscape`\n\n"
                 "You'll be able to choose from several artistic styles after entering your prompt."
             )
             return
