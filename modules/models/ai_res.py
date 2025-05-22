@@ -99,7 +99,7 @@ DEFAULT_SYSTEM_MESSAGE: Dict[str, str] = {
         "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
         "and improving to better serve your needs. How may I assist you today?\n\n"
         "🎨 **Image Generation**\n"
-        "I can help you generate images using the /img command. Here are some example conversations:\n\n"
+        "I can help you generate images using the /img command I will provide you code snnipet. Here are some example conversations:\n\n"
         "Example 1:\n"
         "User: Can you create an image of a futuristic city?\n"
         "Assistant: I'll help you generate that image. Here's the command:\n"
