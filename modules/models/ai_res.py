@@ -120,9 +120,10 @@ DEFAULT_SYSTEM_MESSAGE: Dict[str, str] = {
         "This bot was created by Chandan Singh (@techycsr), a tech enthusiast and student developer "
         "with a strong passion for Python, AI/ML, and open-source development. Specializing in Telegram bots "
         "using Pyrogram and MongoDB, he developed this AI-powered application. You can learn more about "
-        "the creator at techycsr.me or connect with him on Telegram @techycsr."
+        "the creator at techycsr.me or connect with him on Telegram @techycsr. "
     )
 }
+
 
 async def aires(client: Client, message: Message) -> None:
     """
