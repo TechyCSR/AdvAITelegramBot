@@ -25,6 +25,19 @@ def get_response(history: List[Dict[str, str]]) -> str:
         String response from the AI model
     """
     try:
+        # Ensure history is a list
+        if not isinstance(history, list):
+            history = [history]
+            
+        # If history is empty, use the default system message
+        if not history:
+            history = DEFAULT_SYSTEM_MESSAGE.copy()  # Create a copy to avoid modifying the original
+            
+        # Ensure each message in history is a dictionary
+        for i, msg in enumerate(history):
+            if not isinstance(msg, dict):
+                history[i] = {"role": "user", "content": str(msg)}
+                
         response = gpt_client.chat.completions.create(
             model="gpt-4o",  # Using more capable model for higher quality responses
             messages=history
@@ -45,6 +58,19 @@ def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]
         Generator yielding response chunks or None if there's an error
     """
     try:
+        # Ensure history is a list
+        if not isinstance(history, list):
+            history = [history]
+            
+        # If history is empty, use the default system message
+        if not history:
+            history = DEFAULT_SYSTEM_MESSAGE.copy()  # Create a copy to avoid modifying the original
+            
+        # Ensure each message in history is a dictionary
+        for i, msg in enumerate(history):
+            if not isinstance(msg, dict):
+                history[i] = {"role": "user", "content": str(msg)}
+                
         # Stream parameter set to True to get response chunks
         response = gpt_client.chat.completions.create(
             model="gpt-4o",  # Using more capable model for higher quality responses
@@ -95,7 +121,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     {
         "role": "system",
         "content": (
-            "I'm your advanced AI assistant, designed to provide helpful, accurate, and thoughtful responses. "
+            "I'm your advanced AI assistant (**@AdvChatGptBot**), designed to provide helpful, accurate, and thoughtful responses. "
             "I can assist with a wide range of tasks including answering questions, creating content, "
             "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
             "and improving to better serve your needs. This bot was developed by Chandan Singh (@techycsr)."
@@ -131,7 +157,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     },
     {
         "role": "assistant",
-        "content": "I'll help you generate that image. Here's the command:\n```\n/img a futuristic city with flying cars, neon lights, and towering skyscrapers, cyberpunk style\n```\nJust copy and paste this command to generate your image."
+        "content": "I'll help you generate that image. Here's the command:\n```\n/img a futuristic city with flying cars, neon lights, and towering skyscrapers, cyberpunk style\n```\nJust copy and paste this command in chat to generate your image."
     },
     {
         "role": "user",
@@ -139,7 +165,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     },
     {
         "role": "assistant",
-        "content": "Here's a command to create a peaceful nature scene:\n```\n/img a serene forest landscape with a crystal clear lake, morning mist, and golden sunlight filtering through trees\n```\nJust copy and paste this command to generate your image."
+        "content": "Here's a command to create a peaceful nature scene:\n```\n/img a serene forest landscape with a crystal clear lake, morning mist, and golden sunlight filtering through trees\n```\nJust copy and paste this command in chat to generate your image."
     },
     {
         "role": "user",
@@ -180,6 +206,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
             "• Telegram: @techycsr\n"
             "• Website: techycsr.me\n"
             "• GitHub: github.com/techycsr\n\n"
+            "• LinkedIn: linkedin.com/in/techycsr\n\n"
             "This bot is one of his many projects showcasing his expertise in AI and bot development."
         )
     },
@@ -219,10 +246,14 @@ async def aires(client: Client, message: Message) -> None:
         
         # Fetch user history from MongoDB
         user_history = history_collection.find_one({"user_id": user_id})
-        if user_history:
+        if user_history and 'history' in user_history:
+            # Ensure history is a list
             history = user_history['history']
+            if not isinstance(history, list):
+                history = [history]
         else: 
-            history = [DEFAULT_SYSTEM_MESSAGE]
+            # Use a copy of the default system message
+            history = DEFAULT_SYSTEM_MESSAGE.copy()
 
         # Add the new user query to the history
         history.append({"role": "user", "content": ask})
@@ -244,12 +275,12 @@ async def aires(client: Client, message: Message) -> None:
         )
         
         # Edit the temporary message with the AI response
-        await temp.edit_text(ai_response,disable_web_page_preview=True)
+        await temp.edit_text(ai_response, disable_web_page_preview=True)
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
-        await message.reply_text(f"An error occurred: {e}")
         print(f"Error in aires function: {e}")
+        await message.reply_text("I'm experiencing technical difficulties. Please try again in a moment.")
 
 async def new_chat(client: Client, message: Message) -> None:
     """
@@ -268,10 +299,10 @@ async def new_chat(client: Client, message: Message) -> None:
         # Delete user history from MongoDB
         history_collection.delete_one({"user_id": user_id})
         
-        # Create a new history entry with just the default system message
+        # Create a new history entry with the default system message list
         history_collection.insert_one({
             "user_id": user_id,
-            "history": [DEFAULT_SYSTEM_MESSAGE]
+            "history": DEFAULT_SYSTEM_MESSAGE
         })
 
         # Send confirmation message with modern UI
