@@ -37,7 +37,7 @@ I can help you with:
 **Select a button below to get started!**
 """
 
-tip_text = "💡 **Pro Tip:** Type any message to start chatting with me, or use /help to see all commands!"
+tip_text = "💡 **Pro Tip:** Type any message to start chatting with me, or use /img with your prompt to generate images!\n\nFor more commands use /help."
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 

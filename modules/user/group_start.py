@@ -36,7 +36,7 @@ I'm now ready to assist everyone in this group with:
 Group admins can manage my permissions and settings using the buttons below.
 """
 
-group_tip_text = "💡 **Group Tip:** use /ai with your question or reply to my messages to interact with me!"
+group_tip_text = "💡 **Group Tip:** use /ai with your question or reply to my messages to interact with me. OR use /img with your prompt to generate images! For more commands use /help."
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
