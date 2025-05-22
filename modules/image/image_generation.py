@@ -171,7 +171,7 @@ user_states: Dict[int, UserGenerationState] = {}
 
 # ====== CORE IMAGE GENERATION ======
 
-async def generate_images(prompt: str, style: str, max_images: int = 3) -> Tuple[Optional[List[str]], Optional[str]]:
+async def generate_images(prompt: str, style: str, max_images: int = 1) -> Tuple[Optional[List[str]], Optional[str]]:
     """Generate images using available providers
     
     Args:
@@ -211,7 +211,7 @@ async def generate_images(prompt: str, style: str, max_images: int = 3) -> Tuple
             if provider == "PollinationsAI":
                 try:
                     provider_obj = PollinationsAI
-                    model_name = None  # PollinationsAI uses its own model
+                    model_name = "dall-e-3"  # PollinationsAI uses its own model
                     logger.info(f"Using PollinationsAI provider")
                 except Exception as e:
                     logger.error(f"Failed to use PollinationsAI provider: {str(e)}")

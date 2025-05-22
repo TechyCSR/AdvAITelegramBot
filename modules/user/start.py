@@ -32,12 +32,12 @@ I can help you with:
 
 ━━━━━━━━━━━━━━━━━━━━━
 
-👨‍💻 **Created by [Chandan Singh](https://techycsr.me)**(**@techycsr**)
+👨‍💻 **Developed by [Chandan Singh](https://techycsr.me)**(**@techycsr**)
 
 **Select a button below to get started!**
 """
 
-tip_text = "💡 **Pro Tip:** Type any message to start chatting with me, or use /img with your prompt to generate images!\n\nFor more commands use /help."
+tip_text = "💡 **Pro Tip:** Type any message to start chatting with me,OR\nuse /img with your prompt to generate images!\n**For more commands use /help.**"
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
