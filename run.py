@@ -61,8 +61,6 @@ logger = logging.getLogger(__name__)
 advAiBot = pyrogram.Client(
     "AdvChatGptBotV2", 
     bot_token=config.BOT_TOKEN, 
-    api_id=config.API_KEY, 
-    api_hash=config.API_HASH,
     workdir="sessions"
 )
 

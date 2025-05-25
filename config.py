@@ -12,8 +12,6 @@ START_TIME = time.time()
 
 #Preferences os >> env >> default
 
-API_KEY = os.environ.get('API_ID') or os.getenv('API_ID') or "API_KEY"
-API_HASH = os.environ.get('API_HASH') or os.getenv("API_HASH")   or "API_HASH"
 BOT_TOKEN = os.environ.get('BOT_TOKEN ') or os.getenv("BOT_TOKEN") or   "BOT_TOKEN"
 ADMINS=[]
 ADMINS = os.environ.get('ADMIN_IDS') or os.getenv("ADMIN_IDS") or "123456789"
