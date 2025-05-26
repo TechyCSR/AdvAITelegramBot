@@ -704,7 +704,8 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
             processing_message,  # Pass the new processing message
             state.prompt,
             style,
-            progress_task
+            progress_task,
+            callback_query.from_user  # Pass the user object
         )
         
     except Exception as e:
@@ -720,15 +721,17 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         if clicked_user_id in user_states:
             user_states[clicked_user_id].set_processing(False)
 
-async def generate_and_send_images(client: Client, message: Message, prompt: str, style: str, progress_task=None) -> None:
+async def generate_and_send_images(client: Client, message: Message, prompt: str, style: str, progress_task=None, user=None) -> None:
     """Generate images and send them to the user"""
-    # Get the user ID from the message
-    if hasattr(message, 'from_user') and message.from_user:
+    # Get the user ID from the user object if provided, else fallback
+    if user is not None:
+        user_id = user.id if hasattr(user, 'id') else user.get('id', None)
+    elif hasattr(message, 'from_user') and message.from_user:
         user_id = message.from_user.id
+        user = message.from_user
     else:
-        # Fallback to chat ID if from_user not available
         user_id = message.chat.id
-        
+        user = {'id': user_id}
     chat_id = message.chat.id
     generation_id = f"{user_id}_{int(time.time())}"
     generation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -750,13 +753,13 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             )
             
             # Get user info for mention
-            user_mention = f"[User {user_id}](tg://user?id={user_id})"
+            user_mention = get_user_mention(user)
             
             # Log the error
             try:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"#ImgLog #Rejected\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"\
+                    f"#ImgLog #Rejected\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"
                     f"**User**: {user_mention}\n**Time**: {generation_time}\n**Error**: {error}"
                 )
             except Exception as e:
@@ -826,7 +829,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             logger.error(f"Failed to store image metadata: {str(e)}")
         
         # Get user info for mention
-        user_mention = f"[User {user_id}](tg://user?id={user_id})"
+        user_mention = get_user_mention(user)
         
         # Log to channel
         try:
@@ -836,8 +839,8 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             # Send metadata
             await client.send_message(
                 LOG_CHANNEL,
-                f"#ImgLog #Generated\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"\
-                f"**User**: {user_mention}\n**Time**: {generation_time}\n"\
+                f"#ImgLog #Generated\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"
+                f"**User**: {user_mention}\n**Time**: {generation_time}\n"
                 f"**Images**: {len(urls)}\n**Generation ID**: `{generation_id}`"
             )
         except Exception as e:
@@ -894,6 +897,29 @@ def start_cleanup_scheduler():
             
     # Return the coroutine function so it can be scheduled by the bot
     return run_scheduled_cleanup
+
+# --- Add user mention helper ---
+def get_user_mention(user) -> str:
+    """Return a proper Telegram mention for a user object or dict."""
+    if hasattr(user, 'username') and user.username:
+        return f"@{user.username}"
+    elif hasattr(user, 'first_name'):
+        name = user.first_name
+        if hasattr(user, 'last_name') and user.last_name:
+            name += f" {user.last_name}"
+        return f"[{name}](tg://user?id={user.id})"
+    elif isinstance(user, dict):
+        if user.get('username'):
+            return f"@{user['username']}"
+        elif user.get('first_name'):
+            name = user['first_name']
+            if user.get('last_name'):
+                name += f" {user['last_name']}"
+            return f"[{name}](tg://user?id={user['id']})"
+        else:
+            return f"User {user.get('id', 'unknown')}"
+    else:
+        return f"User {getattr(user, 'id', 'unknown')}"
 
 
 
