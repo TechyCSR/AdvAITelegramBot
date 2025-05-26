@@ -122,7 +122,7 @@ async def command_inline(client, callback):
         keyboard_buttons.append([InlineKeyboardButton(admin_btn, callback_data="cmd_admin")])
     
     # Add back button
-    keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="back")])
+    keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="help_help")])
     
     keyboard = InlineKeyboardMarkup(keyboard_buttons)
 
@@ -212,6 +212,184 @@ async def handle_command_callbacks(client, callback):
             # User is not an admin, show unauthorized message
             await callback.answer("You don't have permission to view admin commands", show_alert=True)
     
+    await callback.answer()
+    return
+
+async def command_inline_start(client, callback):
+    user_id = callback.from_user.id
+    texts_to_translate = [command__text, "🧠 AI Response", "🖼️ Image Generation", "📋 Main Commands", "🔙 Back"]
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    translated_command = translated_texts[0]
+    ai_btn = translated_texts[1]
+    img_btn = translated_texts[2]
+    main_btn = translated_texts[3]
+    back_btn = translated_texts[4]
+    keyboard_buttons = [
+        [InlineKeyboardButton(ai_btn, callback_data="cmd_ai_start")],
+        [InlineKeyboardButton(img_btn, callback_data="cmd_img_start")],
+        [InlineKeyboardButton(main_btn, callback_data="cmd_main_start")],
+    ]
+    if user_id in ADMINS:
+        admin_btn = "⚙️ Admin Commands"
+        keyboard_buttons.append([InlineKeyboardButton(admin_btn, callback_data="cmd_admin_start")])
+    keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="back")])
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    await client.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        text=translated_command,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+    await callback.answer()
+    return
+
+async def command_inline_help(client, callback):
+    user_id = callback.from_user.id
+    texts_to_translate = [command__text, "🧠 AI Response", "🖼️ Image Generation", "📋 Main Commands", "🔙 Back"]
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    translated_command = translated_texts[0]
+    ai_btn = translated_texts[1]
+    img_btn = translated_texts[2]
+    main_btn = translated_texts[3]
+    back_btn = translated_texts[4]
+    keyboard_buttons = [
+        [InlineKeyboardButton(ai_btn, callback_data="cmd_ai_help")],
+        [InlineKeyboardButton(img_btn, callback_data="cmd_img_help")],
+        [InlineKeyboardButton(main_btn, callback_data="cmd_main_help")],
+    ]
+    if user_id in ADMINS:
+        admin_btn = "⚙️ Admin Commands"
+        keyboard_buttons.append([InlineKeyboardButton(admin_btn, callback_data="cmd_admin_help")])
+    keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="help_help")])
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    await client.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        text=translated_command,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+    await callback.answer()
+    return
+
+async def handle_command_callbacks_start(client, callback):
+    user_id = callback.from_user.id
+    callback_data = callback.data
+    if callback_data == "cmd_ai_start":
+        translated_text = await async_translate_to_lang(ai_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_start")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_img_start":
+        translated_text = await async_translate_to_lang(image_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_start")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_main_start":
+        translated_text = await async_translate_to_lang(main_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_start")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_admin_start":
+        if user_id in ADMINS:
+            back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(back_btn, callback_data="commands_start")]
+            ])
+            await client.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.id,
+                text=admin_commands_text,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        else:
+            await callback.answer("You don't have permission to view admin commands", show_alert=True)
+    await callback.answer()
+    return
+
+async def handle_command_callbacks_help(client, callback):
+    user_id = callback.from_user.id
+    callback_data = callback.data
+    if callback_data == "cmd_ai_help":
+        translated_text = await async_translate_to_lang(ai_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_help")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_img_help":
+        translated_text = await async_translate_to_lang(image_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_help")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_main_help":
+        translated_text = await async_translate_to_lang(main_commands_text, user_id)
+        back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(back_btn, callback_data="commands_help")]
+        ])
+        await client.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=translated_text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+    elif callback_data == "cmd_admin_help":
+        if user_id in ADMINS:
+            back_btn = await translate_ui_element("🔙 Back to Commands", user_id)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(back_btn, callback_data="commands_help")]
+            ])
+            await client.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.id,
+                text=admin_commands_text,
+                reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        else:
+            await callback.answer("You don't have permission to view admin commands", show_alert=True)
     await callback.answer()
     return
 

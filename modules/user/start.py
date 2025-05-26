@@ -37,7 +37,7 @@ I can help you with:
 **Select a button below to get started!**
 """
 
-tip_text = "💡 **Pro Tip:** Type any message to start chatting with me **OR**\nuse /img with your prompt to generate images!\n**For more commands use /help.**"
+tip_text = "💡 **Pro Tip:** Type any message to start chatting with me **OR**\nuse `/img` with your prompt to generate images!\n**For more commands use /help.**"
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
@@ -62,7 +62,7 @@ async def start(client, message):
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
+        [InlineKeyboardButton(translated_buttons[1], callback_data="commands_start"),
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
          InlineKeyboardButton(translated_buttons[4], callback_data="support")]
@@ -91,7 +91,7 @@ async def start_inline(bot, callback):
     # Create the inline keyboard buttons with translated text
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot.me.username}?startgroup=true")],
-        [InlineKeyboardButton(translated_buttons[1], callback_data="commands"),
+        [InlineKeyboardButton(translated_buttons[1], callback_data="commands_start"),
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
          InlineKeyboardButton(translated_buttons[4], callback_data="support")]

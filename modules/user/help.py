@@ -215,7 +215,7 @@ async def help_inline_start(bot, callback):
         [InlineKeyboardButton(voice_btn, callback_data="help_voice_start")],
         [InlineKeyboardButton(analysis_btn, callback_data="help_analysis_start")],
         [InlineKeyboardButton(quickstart_btn, callback_data="help_quickstart_start")],
-        [InlineKeyboardButton(cmd_btn, callback_data="commands")],
+        [InlineKeyboardButton(cmd_btn, callback_data="commands_start")],
         [InlineKeyboardButton(back_btn, callback_data="back")]
     ])
     await bot.edit_message_text(
@@ -248,7 +248,7 @@ async def help_inline_help(bot, callback):
         [InlineKeyboardButton(voice_btn, callback_data="help_voice_help")],
         [InlineKeyboardButton(analysis_btn, callback_data="help_analysis_help")],
         [InlineKeyboardButton(quickstart_btn, callback_data="help_quickstart_help")],
-        [InlineKeyboardButton(cmd_btn, callback_data="commands")]
+        [InlineKeyboardButton(cmd_btn, callback_data="commands_help")]
     ])
     await bot.edit_message_text(
         chat_id=callback.message.chat.id,

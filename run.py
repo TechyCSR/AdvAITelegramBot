@@ -274,8 +274,12 @@ async def callback_query(client, callback_query):
             await help_inline_help(client, callback_query)
         elif callback_query.data == "back":
             await start_inline(client, callback_query)
-        elif callback_query.data == "commands":
-            await command_inline(client, callback_query)
+        elif callback_query.data == "commands_start":
+            from modules.user.commands import command_inline_start
+            await command_inline_start(client, callback_query)
+        elif callback_query.data == "commands_help":
+            from modules.user.commands import command_inline_help
+            await command_inline_help(client, callback_query)
         elif callback_query.data == "settings":
             await settings_inline(client, callback_query)
         elif callback_query.data == "settings_v":
@@ -373,8 +377,15 @@ async def callback_query(client, callback_query):
             return
         # Command menu category callbacks
         elif callback_query.data.startswith("cmd_"):
-            from modules.user.commands import handle_command_callbacks
-            await handle_command_callbacks(client, callback_query)
+            if callback_query.data.endswith("_start"):
+                from modules.user.commands import handle_command_callbacks_start
+                await handle_command_callbacks_start(client, callback_query)
+            elif callback_query.data.endswith("_help"):
+                from modules.user.commands import handle_command_callbacks_help
+                await handle_command_callbacks_help(client, callback_query)
+            else:
+                from modules.user.commands import handle_command_callbacks
+                await handle_command_callbacks(client, callback_query)
             return
         # Image text back button handler
         elif callback_query.data.startswith("back_to_image_"):
@@ -404,6 +415,9 @@ async def callback_query(client, callback_query):
             from modules.maintenance import settings_others_refresh_callback
             await settings_others_refresh_callback(client, callback_query)
             return
+        elif callback_query.data == "commands":
+            from modules.user.commands import command_inline_help
+            await command_inline_help(client, callback_query)
         else:
             # Unknown callback, just acknowledge it
             await callback_query.answer("Unknown command")
