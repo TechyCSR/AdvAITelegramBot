@@ -9,12 +9,12 @@ from modules.chatlogs import channel_log
 
 
 help_text = """
-✨ **ADVANCED AI BOT - HELP CENTER** ✨
+✨ **ADVANCED ChatGPT BOT - HELP CENTER** ✨
 
 ━━━━━━━━━━━━━━━━━━━
 
 This intelligent bot was created by **Chandan Singh** (@techycsr) 
-to bring powerful AI features directly to your Telegram chats.
+to bring powerful ChatGPT features directly to your Telegram chats.
 
 **SELECT A CATEGORY BELOW:**
 """
@@ -194,23 +194,13 @@ async def help(client, message):
         disable_web_page_preview=True
     )
 
-async def help_inline(bot, callback):
+async def help_inline_start(bot, callback):
     user_id = callback.from_user.id
-    
-    # Translate help text and button labels
     texts_to_translate = [
-        help_text, 
-        "🧠 AI Chat", 
-        "🖼️ Image Generation", 
-        "🎙️ Voice Features",
-        "🔍 Image Analysis",
-        "🚀 Quick Start",
-        "📋 Commands",
-        "🔙 Back"
+        help_text, "🧠 AI Chat", "🖼️ Image Generation", "🎙️ Voice Features",
+        "🔍 Image Analysis", "🚀 Quick Start", "📋 Commands", "🔙 Back"
     ]
-    
     translated_texts = await batch_translate(texts_to_translate, user_id)
-    
     translated_help = translated_texts[0]
     ai_btn = translated_texts[1]
     img_btn = translated_texts[2]
@@ -219,18 +209,15 @@ async def help_inline(bot, callback):
     quickstart_btn = translated_texts[5]
     cmd_btn = translated_texts[6]
     back_btn = translated_texts[7]
-    
-    # Create interactive keyboard with feature categories
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(ai_btn, callback_data="help_ai")],
-        [InlineKeyboardButton(img_btn, callback_data="help_img")],
-        [InlineKeyboardButton(voice_btn, callback_data="help_voice")],
-        [InlineKeyboardButton(analysis_btn, callback_data="help_analysis")],
-        [InlineKeyboardButton(quickstart_btn, callback_data="help_quickstart")],
+        [InlineKeyboardButton(ai_btn, callback_data="help_ai_start")],
+        [InlineKeyboardButton(img_btn, callback_data="help_img_start")],
+        [InlineKeyboardButton(voice_btn, callback_data="help_voice_start")],
+        [InlineKeyboardButton(analysis_btn, callback_data="help_analysis_start")],
+        [InlineKeyboardButton(quickstart_btn, callback_data="help_quickstart_start")],
         [InlineKeyboardButton(cmd_btn, callback_data="commands")],
         [InlineKeyboardButton(back_btn, callback_data="back")]
     ])
-
     await bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
@@ -238,35 +225,64 @@ async def help_inline(bot, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-
     await callback.answer()
     return
-    
+
+async def help_inline_help(bot, callback):
+    user_id = callback.from_user.id
+    texts_to_translate = [
+        help_text, "🧠 AI Chat", "🖼️ Image Generation", "🎙️ Voice Features",
+        "🔍 Image Analysis", "🚀 Quick Start", "📋 Commands"
+    ]
+    translated_texts = await batch_translate(texts_to_translate, user_id)
+    translated_help = translated_texts[0]
+    ai_btn = translated_texts[1]
+    img_btn = translated_texts[2]
+    voice_btn = translated_texts[3]
+    analysis_btn = translated_texts[4]
+    quickstart_btn = translated_texts[5]
+    cmd_btn = translated_texts[6]
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(ai_btn, callback_data="help_ai_help")],
+        [InlineKeyboardButton(img_btn, callback_data="help_img_help")],
+        [InlineKeyboardButton(voice_btn, callback_data="help_voice_help")],
+        [InlineKeyboardButton(analysis_btn, callback_data="help_analysis_help")],
+        [InlineKeyboardButton(quickstart_btn, callback_data="help_quickstart_help")],
+        [InlineKeyboardButton(cmd_btn, callback_data="commands")]
+    ])
+    await bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        text=translated_help,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+    await callback.answer()
+    return
+
 async def handle_help_category(client, callback):
     user_id = callback.from_user.id
     callback_data = callback.data
-    
+    # Determine entry point
+    is_start = callback_data.endswith('_start')
     help_content = help_text  # Default
-    if callback_data == "help_ai":
+    if 'ai' in callback_data:
         help_content = ai_chat_help
-    elif callback_data == "help_img":
+    elif 'img' in callback_data:
         help_content = image_gen_help
-    elif callback_data == "help_voice":
+    elif 'voice' in callback_data:
         help_content = voice_features_help
-    elif callback_data == "help_analysis":
+    elif 'analysis' in callback_data:
         help_content = image_analysis_help
-    elif callback_data == "help_quickstart":
+    elif 'quickstart' in callback_data:
         help_content = quick_start_help
-    
-    # Translate the selected help content
     translated_text = await async_translate_to_lang(help_content, user_id)
     back_btn = await translate_ui_element("🔙 Back to Help Menu", user_id)
-    
-    # Use "help" as callback_data to return to main help menu
+    # Use correct callback_data for back button
+    back_callback = "help_start" if is_start else "help_help"
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(back_btn, callback_data="help")]
+        [InlineKeyboardButton(back_btn, callback_data=back_callback)]
     ])
-    
     await client.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
@@ -274,7 +290,6 @@ async def handle_help_category(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-    
     await callback.answer()
     return
     

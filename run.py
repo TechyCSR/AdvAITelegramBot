@@ -6,7 +6,7 @@ from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from pyrogram.enums import ChatAction, ChatType
 from modules.user.start import start, start_inline
-from modules.user.help import help, help_inline
+from modules.user.help import help
 from modules.user.commands import command_inline
 from modules.user.settings import settings_inline, settings_language_callback, change_voice_setting 
 from modules.user.settings import settings_voice_inlines
@@ -266,9 +266,12 @@ async def callback_query(client, callback_query):
             return
         
         # Standard menu callbacks
-        if callback_query.data == "help":
-            from modules.user.help import help_inline
-            await help_inline(client, callback_query)
+        if callback_query.data == "help_start":
+            from modules.user.help import help_inline_start
+            await help_inline_start(client, callback_query)
+        elif callback_query.data == "help_help" or callback_query.data == "help":
+            from modules.user.help import help_inline_help
+            await help_inline_help(client, callback_query)
         elif callback_query.data == "back":
             await start_inline(client, callback_query)
         elif callback_query.data == "commands":
@@ -364,7 +367,7 @@ async def callback_query(client, callback_query):
             await settings_support_callback(client, callback_query)
             return
         # Help menu category callbacks
-        elif callback_query.data.startswith("help_") and callback_query.data != "help":
+        elif (callback_query.data.startswith("help_") and callback_query.data != "help"):
             from modules.user.help import handle_help_category
             await handle_help_category(client, callback_query)
             return
