@@ -3,6 +3,8 @@ from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBu
 from modules.lang import async_translate_to_lang
 from modules.core.database import get_feature_settings_collection
 from config import ADMINS, OWNER_ID
+from modules.admin.statistics import get_bot_statistics
+from modules.ui.theme import Theme, Colors
 
 # Default feature states
 DEFAULT_FEATURE_STATES = {
@@ -143,8 +145,61 @@ For urgent inquiries, please contact:
     return await async_translate_to_lang(maintenance_text, user_id)
 
 async def settings_others_callback(client, callback: CallbackQuery):
-    """Handle settings_others callback - redirects to maintenance section now"""
-    await maintenance_settings(client, callback)
+    """Handle settings_others callback - show enhanced system status for users"""
+    await show_user_system_status(client, callback)
+
+async def show_user_system_status(client, callback: CallbackQuery):
+    """Show system status (uptime, CPU, memory, features) for regular users with refresh"""
+    user_id = callback.from_user.id
+    # Get translations
+    sysinfo_title = await async_translate_to_lang("⚙️ **System Information**", user_id)
+    sysinfo_desc = await async_translate_to_lang(
+        "This section shows the current status of the bot's features and system health.", user_id)
+    uptime_text = await async_translate_to_lang("Uptime", user_id)
+    cpu_text = await async_translate_to_lang("CPU", user_id)
+    mem_text = await async_translate_to_lang("Memory", user_id)
+    feature_status_text = await async_translate_to_lang("Current Feature Status", user_id)
+    enabled_text = await async_translate_to_lang("✅ Enabled", user_id)
+    disabled_text = await async_translate_to_lang("❌ Disabled", user_id)
+    back_text = await async_translate_to_lang("🔙 Back", user_id)
+    refresh_text = await async_translate_to_lang("🔄 Refresh", user_id)
+    # Feature names
+    ai_text = await async_translate_to_lang("AI Response", user_id)
+    img_text = await async_translate_to_lang("Image Generation", user_id)
+    voice_text = await async_translate_to_lang("Voice Features", user_id)
+
+    # Get system stats (reuse admin code, but only show system+feature status)
+    stats = await get_bot_statistics()
+    # Build system status message
+    sys_status = f"\n\n**{feature_status_text}:**\n\n"
+    sys_status += f"• {ai_text}: {enabled_text if stats.get('ai_response_enabled', True) else disabled_text}\n"
+    sys_status += f"• {img_text}: {enabled_text if stats.get('image_generation_enabled', True) else disabled_text}\n"
+    sys_status += f"• {voice_text}: {enabled_text if stats.get('voice_features_enabled', True) else disabled_text}\n"
+    # Maintenance mode
+    if stats.get('maintenance_mode', False):
+        sys_status += f"\n⚠️ <b>The bot is currently in maintenance mode.</b>\nSome features may be unavailable.\n"
+    # System metrics
+    sys_metrics = (
+        f"\n<b>{uptime_text}:</b> {stats.get('uptime','?')}\n"
+        f"<b>{cpu_text}:</b> {stats.get('cpu_usage','?')}%\n"
+        f"<b>{mem_text}:</b> {stats.get('memory_usage','?')}%\n"
+    )
+    # Compose message
+    message = f"{sysinfo_title}\n\n{sysinfo_desc}{sys_metrics}{sys_status}"
+    # Modern keyboard: Refresh + Back
+    keyboard = Theme.create_keyboard([
+        Theme.primary_button(refresh_text, "settings_others_refresh"),
+        Theme.back_button("support")
+    ], max_per_row=2)
+    await callback.message.edit(
+        text=message,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+
+# Add a refresh handler for the user system status
+async def settings_others_refresh_callback(client, callback: CallbackQuery):
+    await show_user_system_status(client, callback)
 
 async def maintenance_settings(client, callback: CallbackQuery):
     """Display maintenance settings page with admin options if applicable"""
@@ -234,9 +289,6 @@ async def show_admin_panel(client, callback: CallbackQuery):
     stats_text = await async_translate_to_lang("📊 Statistics", user_id)
     users_text = await async_translate_to_lang("👥 Users", user_id)
     donate_text = await async_translate_to_lang("💰 Donations", user_id)
-    
-    # Import the Theme module
-    from modules.ui.theme import Theme, Colors
     
     # Create modern control panel - flat list of rows
     keyboard = []

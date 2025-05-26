@@ -397,6 +397,10 @@ async def callback_query(client, callback_query):
             from modules.user.group_start import handle_group_callbacks
             await handle_group_callbacks(client, callback_query)
             return
+        elif callback_query.data == "settings_others_refresh":
+            from modules.maintenance import settings_others_refresh_callback
+            await settings_others_refresh_callback(client, callback_query)
+            return
         else:
             # Unknown callback, just acknowledge it
             await callback_query.answer("Unknown command")
