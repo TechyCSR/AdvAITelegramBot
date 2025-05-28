@@ -123,7 +123,7 @@ async def get_user_ids_message(bot, update, text: str) -> None:
     
     await update.reply_text(f"Message sent to {total} users.")
 
-async def get_usernames_message(bot, update, text: str) -> None:
+async def get_usernames_message(bot, update, text: str, parse_mode=None) -> None:
     """
     Send a message to all users with usernames
     
@@ -131,6 +131,7 @@ async def get_usernames_message(bot, update, text: str) -> None:
         bot: Telegram bot instance
         update: Message update
         text: Message text to send
+        parse_mode: Telegram parse mode (e.g., 'markdown', 'html')
     """
     users_collection = get_user_collection()
     users = users_collection.find({"username": {"$exists": True}})
@@ -140,7 +141,7 @@ async def get_usernames_message(bot, update, text: str) -> None:
     
     for user in users:
         try:
-            await bot.send_message(user["username"], text)
+            await bot.send_message(user["username"], text, parse_mode=parse_mode)
             await asyncio.sleep(0.05)
             total += 1
         except Exception as e:

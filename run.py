@@ -4,7 +4,7 @@ import pyrogram
 import time
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from pyrogram.enums import ChatAction, ChatType
+from pyrogram.enums import ChatAction, ChatType, ParseMode
 from modules.user.start import start, start_inline
 from modules.user.help import help
 from modules.user.commands import command_inline
@@ -688,19 +688,54 @@ async def announce_command(bot, update):
         try:
             text = update.text.split(" ", 1)[1]
             logger.info(f"Admin {update.from_user.id} broadcasting message: {text[:50]}...")
-            processing_msg = await update.reply_text("📣 Preparing to broadcast message...")
-            await user_db.get_usernames_message(bot, update, text)
-            await channel_log(bot, update, "/announce", f"Admin broadcast message to users", level="WARNING")
+            # Show preview and ask for confirmation
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Confirm Send", callback_data="announce_confirm"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="announce_cancel")
+                ]
+            ])
+            await update.reply_text(
+                f"**Broadcast Preview:**\n\n{text}",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            # Store the message in a temp dict for this admin (in-memory, simple)
+            if not hasattr(bot, "_announce_pending"): bot._announce_pending = {}
+            bot._announce_pending[update.from_user.id] = text
         except IndexError:
             logger.warning(f"Admin {update.from_user.id} attempted announce without message")
             await update.reply_text(
                 "⚠️ Please provide a message to broadcast.\n\n"
-                "Example: `/announce Hello everyone! We've added new features.`"
+                "Example: `/announce Hello everyone! We've added new features.`",
+                parse_mode=ParseMode.MARKDOWN
             )
     else:
         logger.warning(f"Unauthorized user {update.from_user.id} attempted to use announce command")
         await update.reply_text("⛔ You are not authorized to use this command.")
         await channel_log(bot, update, "/announce", f"Unauthorized access attempt", level="WARNING")
+
+@advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["announce_confirm", "announce_cancel"]))
+async def announce_callback_handler(bot, callback_query):
+    user_id = callback_query.from_user.id
+    if not hasattr(bot, "_announce_pending") or user_id not in bot._announce_pending:
+        await callback_query.answer("No pending announcement.", show_alert=True)
+        return
+    if callback_query.data == "announce_cancel":
+        del bot._announce_pending[user_id]
+        await callback_query.edit_message_text("❌ Broadcast cancelled.")
+        return
+    # Confirm send
+    text = bot._announce_pending[user_id]
+    await callback_query.edit_message_text(
+        f"📣 Sending broadcast to all users...\n\n{text}",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    # Send to users with Markdown
+    from modules.models import user_db
+    await user_db.get_usernames_message(bot, callback_query.message, text, parse_mode=ParseMode.MARKDOWN)
+    await channel_log(bot, callback_query.message, "/announce", f"Admin broadcast message to users", level="WARNING")
+    del bot._announce_pending[user_id]
 
 @advAiBot.on_message(filters.command("logs") & filters.user(config.ADMINS))
 async def logs_command(bot, update):

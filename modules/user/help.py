@@ -259,7 +259,7 @@ async def help_inline_help(bot, callback):
     )
     await callback.answer()
     return
-
+    
 async def handle_help_category(client, callback):
     user_id = callback.from_user.id
     callback_data = callback.data
