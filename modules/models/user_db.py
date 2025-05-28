@@ -125,7 +125,7 @@ async def get_user_ids_message(bot, update, text: str) -> None:
 
 async def get_usernames_message(bot, update, text: str, parse_mode=None) -> None:
     """
-    Send a message to all users with usernames
+    Send a message to all users with usernames and pin the message with notification
     
     Args:
         bot: Telegram bot instance
@@ -136,15 +136,16 @@ async def get_usernames_message(bot, update, text: str, parse_mode=None) -> None
     users_collection = get_user_collection()
     users = users_collection.find({"username": {"$exists": True}})
     total = 0
-    
     await update.reply_text(f"Sending message to users with usernames...")
-    
     for user in users:
         try:
-            await bot.send_message(user["username"], text, parse_mode=parse_mode)
+            sent_msg = await bot.send_message(user["username"], text, parse_mode=parse_mode)
             await asyncio.sleep(0.05)
+            try:
+                await bot.pin_chat_message(sent_msg.chat.id, sent_msg.id, disable_notification=False)
+            except Exception as e:
+                print(f"Could not pin message for user {user['user_id']}: {e}")
             total += 1
         except Exception as e:
             print(f"Error sending message to user ID {user['user_id']}: {e}")
-    
     await update.reply_text(f"Message sent to {total} users.") 
