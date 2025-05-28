@@ -167,6 +167,28 @@ async def inline_query_handler(client, inline_query):
     # Route to appropriate handler based on query content
     await handle_inline_query(client, inline_query)
 
+@advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["announce_confirm", "announce_cancel"]))
+async def announce_callback_handler(bot, callback_query):
+    user_id = callback_query.from_user.id
+    if not hasattr(bot, "_announce_pending") or user_id not in bot._announce_pending:
+        await callback_query.answer("No pending announcement.", show_alert=True)
+        return
+    if callback_query.data == "announce_cancel":
+        del bot._announce_pending[user_id]
+        await callback_query.edit_message_text("❌ Broadcast cancelled.")
+        return
+    # Confirm send
+    text = bot._announce_pending[user_id]
+    await callback_query.edit_message_text(
+        f"📣 Sending broadcast to all users...\n\n{text}",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    # Send to users with Markdown
+    from modules.models import user_db
+    await user_db.get_usernames_message(bot, callback_query.message, text, parse_mode=ParseMode.MARKDOWN)
+    await channel_log(bot, callback_query.message, "/announce", f"Admin broadcast message to users", level="WARNING")
+    del bot._announce_pending[user_id]
+
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
     try:
@@ -714,28 +736,6 @@ async def announce_command(bot, update):
         logger.warning(f"Unauthorized user {update.from_user.id} attempted to use announce command")
         await update.reply_text("⛔ You are not authorized to use this command.")
         await channel_log(bot, update, "/announce", f"Unauthorized access attempt", level="WARNING")
-
-@advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["announce_confirm", "announce_cancel"]))
-async def announce_callback_handler(bot, callback_query):
-    user_id = callback_query.from_user.id
-    if not hasattr(bot, "_announce_pending") or user_id not in bot._announce_pending:
-        await callback_query.answer("No pending announcement.", show_alert=True)
-        return
-    if callback_query.data == "announce_cancel":
-        del bot._announce_pending[user_id]
-        await callback_query.edit_message_text("❌ Broadcast cancelled.")
-        return
-    # Confirm send
-    text = bot._announce_pending[user_id]
-    await callback_query.edit_message_text(
-        f"📣 Sending broadcast to all users...\n\n{text}",
-        parse_mode=ParseMode.MARKDOWN
-    )
-    # Send to users with Markdown
-    from modules.models import user_db
-    await user_db.get_usernames_message(bot, callback_query.message, text, parse_mode=ParseMode.MARKDOWN)
-    await channel_log(bot, callback_query.message, "/announce", f"Admin broadcast message to users", level="WARNING")
-    del bot._announce_pending[user_id]
 
 @advAiBot.on_message(filters.command("logs") & filters.user(config.ADMINS))
 async def logs_command(bot, update):
