@@ -122,109 +122,29 @@ async def handle_voice_message(client, message):
             # Add the recognized text to history
             history.append({"role": "user", "content": recognized_text})
             
-            # Determine appropriate chat action based on response mode
-            chat_action = enums.ChatAction.RECORD_AUDIO if response_mode == "voice" else enums.ChatAction.TYPING
-            await client.send_chat_action(chat_id=message.chat.id, action=chat_action)
+            # Use non-streaming for reliability
+            ai_response = get_response(history)
             
-            # Use streaming for better user experience
-            streaming_response = get_streaming_response(history)
+            # Add response to history
+            history.append({"role": "assistant", "content": ai_response})
             
-            if streaming_response:
-                complete_response = ""
-                buffer = ""
-                last_update_time = asyncio.get_event_loop().time()
-                
-                for chunk in streaming_response:
-                    if hasattr(chunk, 'choices') and chunk.choices:
-                        choice = chunk.choices[0]
-                        if hasattr(choice, 'delta') and choice.delta:
-                            if hasattr(choice.delta, 'content') and choice.delta.content:
-                                buffer += choice.delta.content
-                                complete_response += choice.delta.content
-                                
-                                # Update periodically if response_mode is text
-                                if response_mode != "voice":
-                                    current_time = asyncio.get_event_loop().time()
-                                    if current_time - last_update_time >= 0.8 or len(buffer) >= 50:
-                                        try:
-                                            await processing_msg.edit_text(
-                                                f"🔊 **Voice Message**\n\n"
-                                                f"You said: *{recognized_text}*\n\n"
-                                                f"**Response:**\n{complete_response}"
-                                            )
-                                            buffer = ""
-                                            last_update_time = current_time
-                                            await client.send_chat_action(chat_id=message.chat.id, action=chat_action)
-                                        except Exception as e:
-                                            print(f"Edit error: {e}")
-                
-                # Add response to history
-                history.append({"role": "assistant", "content": complete_response})
-                
-                # Update MongoDB with new history
-                history_collection.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"history": history}},
-                    upsert=True
-                )
-                
-                # Handle different response modes
-                if response_mode == "voice":
-                    # Convert text response to voice
-                    await processing_msg.edit_text(
-                        f"🔊 **Voice Message**\n\n"
-                        f"You said: *{recognized_text}*\n\n"
-                        "Creating audio response..."
-                    )
-                    
-                    audio_path = await handle_text_message(client, message, complete_response)
-                    
-                    # Update final text message with transcript
-                    await processing_msg.edit_text(
-                        f"🔊 **Voice Conversation**\n\n"
-                        f"You said: *{recognized_text}*\n\n"
-                        f"**Response:** {complete_response}"
-                    )
-                else:
-                    # Final text response update
-                    await processing_msg.edit_text(
-                        f"🔊 **Voice Message**\n\n"
-                        f"You said: *{recognized_text}*\n\n"
-                        f"**Response:**\n{complete_response}"
-                    )
-            else:
-                # Fallback to non-streaming response
-                ai_response = get_response(history)
-                
-                # Add response to history
-                history.append({"role": "assistant", "content": ai_response})
-                
-                # Update MongoDB with new history
-                history_collection.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"history": history}},
-                    upsert=True
-                )
-                
-                if response_mode == "voice":
-                    # Convert text response to voice
-                    audio_path = await handle_text_message(client, message, ai_response)
-                    
-                    # Update final text message with transcript
-                    await processing_msg.edit_text(
-                        f"🔊 **Voice Conversation**\n\n"
-                        f"You said: *{recognized_text}*\n\n"
-                        f"**Response:** {ai_response}"
-                    )
-                else:
-                    # Text-only response
-                    await processing_msg.edit_text(
-                        f"🔊 **Voice Message**\n\n"
-                        f"You said: *{recognized_text}*\n\n"
-                        f"**Response:**\n{ai_response}"
-                    )
-                
-                complete_response = ai_response
+            # Update MongoDB with new history
+            history_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"history": history}},
+                upsert=True
+            )
+            
+            # Always send the text response
+            await processing_msg.edit_text(
+                f"🔊 **Voice Message**\n\n"
+                f"You said: *{recognized_text}*\n\n"
+                f"**Response:**\n{ai_response}"
+            )
+            
+            # If user wants voice, also send as audio
+            if response_mode == "voice":
+                await handle_text_message(client, message, ai_response)
             
             # Add response option buttons
             response_markup = InlineKeyboardMarkup([
@@ -246,7 +166,7 @@ async def handle_voice_message(client, message):
             
             # Log the voice interaction
             await client.send_audio(LOG_CHANNEL, f"{voice_path}.wav")
-            await user_log(client, message, f"\nVoice: {recognized_text}\n\nAI: {complete_response}")
+            await user_log(client, message, f"\nVoice: {recognized_text}\n\nAI: {ai_response}")
             
         except Exception as e:
             await message.reply_text(f"An error occurred: {e}")

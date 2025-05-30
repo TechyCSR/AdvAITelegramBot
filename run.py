@@ -77,6 +77,9 @@ bot_stats = {
 # Get the cleanup scheduler function to run later
 cleanup_scheduler = start_cleanup_scheduler()
 
+# Add a global in-memory dict to store pending group image contexts
+pending_group_images = {}
+
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
     # Start the cleanup scheduler on first command
@@ -598,92 +601,124 @@ async def handle_private_image(bot, update):
 @advAiBot.on_message(filters.photo & filters.group)
 async def handle_group_image(bot, update):
     """Handler for images in group chats"""
-    # Check for maintenance mode
     if await maintenance_check(update.from_user.id):
         maint_msg = await maintenance_message(update.from_user.id)
         await update.reply(maint_msg)
         return
-        
     bot_stats["active_users"].add(update.from_user.id)
     user_id = update.from_user.id
-    
     logger.info(f"Group image received - Chat ID: {update.chat.id}, Title: {update.chat.title}, Caption: {update.caption}")
-    
-    # Skip processing if no caption
     if not update.caption:
         logger.info(f"Image in group {update.chat.id} ignored - no caption")
         return
-        
-    # Check if caption contains "AI" or "/ai" trigger
     caption_lower = update.caption.lower()
     has_ai_trigger = "ai" in caption_lower or "/ai" in caption_lower
-    
     if not has_ai_trigger:
         logger.info(f"Image in group {update.chat.id} ignored - caption doesn't contain AI trigger: {update.caption}")
         return
-    
-    # Extract user question from caption (everything after the AI trigger)
-    user_question = ""
-    if "/ai" in caption_lower:
-        # Get text after /ai command
-        parts = update.caption.split("/ai", 1)
-        if len(parts) > 1:
-            user_question = parts[1].strip()
-    elif "ai" in caption_lower:
-        # Find the position of "ai" and extract text after it
-        ai_pos = caption_lower.find("ai")
-        if ai_pos >= 0:
-            user_question = update.caption[ai_pos + 2:].strip()
-    
-    # Send typing action
-    await bot.send_chat_action(chat_id=update.chat.id, action=ChatAction.TYPING)
-    
-    # Process the image with OCR and include the user's question
-    logger.info(f"Processing group image with AI trigger and question: '{user_question}'")
-    
-    # We'll modify how we call extract_text_res to include the user question
-    from modules.image.img_to_text import extract_text_from_image
-    
-    # First get the image file
-    photo_file = await bot.download_media(
-        message=update.photo.file_id,
-        file_name=f"temp_{user_id}_{int(time.time())}.jpg"
+    # Save the image context in memory (keyed by chat_id and message_id)
+    key = (update.chat.id, update.message_id)
+    pending_group_images[key] = {
+        "user_id": user_id,
+        "photo": update.photo,
+        "caption": update.caption
+    }
+    # Prompt user for AI response
+    markup = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Yes, analyze with AI", callback_data=f"group_img_ai_yes_{update.chat.id}_{update.message_id}"),
+            InlineKeyboardButton("❌ No", callback_data=f"group_img_ai_no_{update.chat.id}_{update.message_id}")
+        ]
+    ])
+    await update.reply_text(
+        "🤖 Do you want an AI response for this image and caption?",
+        reply_markup=markup
     )
-    
+    # Log usage
+    await channel_log(bot, update, "Group Image AI Prompt", "Prompted for AI response on group image")
+    logger.info(f"Prompted for AI response on group image in {update.chat.id} by user {user_id}")
+
+@advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("group_img_ai_yes_") or query.data.startswith("group_img_ai_no_")))
+async def handle_group_img_ai_callback(bot, callback_query):
+    data = callback_query.data
+    parts = data.split("_")
+    action = parts[3]  # 'yes' or 'no'
+    chat_id = int(parts[4])
+    message_id = int(parts[5])
+    key = (chat_id, message_id)
+    context = pending_group_images.get(key)
+    if not context:
+        await callback_query.answer("Image context expired or not found.", show_alert=True)
+        return
+    if action == "no":
+        await callback_query.message.edit_text("❌ AI analysis cancelled for this image.")
+        pending_group_images.pop(key, None)
+        await callback_query.answer("Cancelled.")
+        return
+    # If 'yes', process the image and generate AI response
+    await callback_query.message.edit_text("🔍 Processing image and generating AI response...")
+    from modules.image.img_to_text import extract_text_from_image
+    from modules.core.database import get_history_collection
+    from modules.models.ai_res import get_response, DEFAULT_SYSTEM_MESSAGE
+    user_id = context["user_id"]
+    photo = context["photo"]
+    caption = context["caption"]
+    # Download the image
     try:
-        # Extract text from image
-        extracted_text = await extract_text_from_image(photo_file)
-        
-        # Combine extracted text with user's question
-        if user_question:
-            message_text = f"Text from image:\n\n{extracted_text}\n\nUser's question: {user_question}"
+        if isinstance(photo, list):
+            photo_obj = photo[-1]
         else:
-            message_text = f"Text from image:\n\n{extracted_text}"
-        
-        # Create reply markup for showing extracted text
-        markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Analyze with AI", callback_data=f"followup_{user_id}")]
-        ])
-        
-        # Send response with the text and buttons
-        await update.reply_text(
-            message_text,
-            reply_markup=markup
+            photo_obj = photo
+        file_path = f"temp_{user_id}_{int(time.time())}.jpg"
+        file = await bot.download_media(photo_obj.file_id, file_name=file_path)
+        extracted_text, error = await extract_text_from_image(file)
+        if error:
+            await callback_query.message.edit_text(f"❌ Text Extraction Failed\n\n{error}")
+            pending_group_images.pop(key, None)
+            return
+        if not extracted_text or extracted_text.strip() == "":
+            await callback_query.message.edit_text("⚠️ No text detected in the image.")
+            pending_group_images.pop(key, None)
+            return
+        # Combine extracted text and caption
+        user_question = caption
+        combined_text = f"{extracted_text}\n\n[User's question: {user_question}]"
+        # Update user history (like in aires)
+        history_collection = get_history_collection()
+        user_history = history_collection.find_one({"user_id": user_id})
+        if user_history and 'history' in user_history:
+            history = user_history['history']
+            if not isinstance(history, list):
+                history = [history]
+        else:
+            history = DEFAULT_SYSTEM_MESSAGE.copy()
+        # Add the new user query to the history
+        prompt = f"The following text was extracted from an image:\n\n{combined_text}"
+        history.append({"role": "user", "content": prompt})
+        ai_response = get_response(history)
+        history.append({"role": "assistant", "content": ai_response})
+        history_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"history": history}},
+            upsert=True
         )
-    except Exception as e:
-        logger.error(f"Error processing group image: {e}")
-        await update.reply_text(f"Error processing the image: {str(e)}")
-    finally:
-        # Clean up downloaded file
+        await callback_query.message.edit_text(
+            f"📝 **Image Text Analysis**\n\n{ai_response}",
+            disable_web_page_preview=True
+        )
+        pending_group_images.pop(key, None)
+        # Clean up file
         try:
-            if os.path.exists(photo_file):
-                os.remove(photo_file)
+            if os.path.exists(file):
+                os.remove(file)
         except Exception as e:
             logger.error(f"Error removing temporary file: {e}")
-    
-    # Log usage
-    await channel_log(bot, update, "Group Image Analysis", "AI-triggered image text extraction in group")
-    logger.info(f"AI-triggered image analysis in group {update.chat.id} by user {user_id}")
+        await callback_query.answer("AI response generated.")
+    except Exception as e:
+        logger.error(f"Error processing group image AI: {e}")
+        await callback_query.message.edit_text(f"Error processing the image: {str(e)}")
+        pending_group_images.pop(key, None)
+        await callback_query.answer("Error.")
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
