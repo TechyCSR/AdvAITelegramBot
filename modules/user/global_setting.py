@@ -88,7 +88,7 @@ async def global_setting_command(client, message):
     await message.reply(
         summary + "\n<b>Select a setting to change:</b>",
         reply_markup=keyboard,
-        parse_mode="html",
+        parse_mode="markdown",
         disable_web_page_preview=True
     )
     await temp.delete()
