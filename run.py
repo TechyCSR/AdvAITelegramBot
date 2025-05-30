@@ -25,7 +25,7 @@ from modules.image.image_generation import generate_command, handle_image_feedba
 from modules.image.inline_image_generation import handle_inline_query, cleanup_ongoing_generations
 from modules.models.inline_ai_response import cleanup_ongoing_generations as ai_cleanup_ongoing_generations
 from modules.chatlogs import channel_log, user_log, error_log
-from modules.user.global_setting import global_setting_command
+from modules.user.user_settings_panel import user_settings_panel_command, handle_user_settings_callback
 from modules.speech.voice_to_text import handle_voice_toggle
 from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
 import modules.models.user_db as user_db
@@ -306,7 +306,7 @@ async def callback_query(client, callback_query):
             from modules.user.commands import command_inline_help
             await command_inline_help(client, callback_query)
         elif callback_query.data == "settings":
-            await settings_inline(client, callback_query)
+            await user_settings_panel_command(client, callback_query)
         elif callback_query.data == "settings_v":
             await settings_language_callback(client, callback_query)
         elif callback_query.data in ["settings_voice", "settings_text"]:
@@ -443,14 +443,17 @@ async def callback_query(client, callback_query):
         elif callback_query.data == "commands":
             from modules.user.commands import command_inline_help
             await command_inline_help(client, callback_query)
+        # User settings panel callbacks
+        elif callback_query.data.startswith("user_settings_"):
+            await handle_user_settings_callback(client, callback_query)
+            return
         else:
             # Unknown callback, just acknowledge it
             await callback_query.answer("Unknown command")
             
     except Exception as e:
         logger.error(f"Error in callback query handler: {e}")
-        await error_log(client, f"Callback Query Error: {e}")
-        # Acknowledge the callback query to prevent hanging UI
+        await error_log(client, "Callback Query Error", str(e))
         try:
             await callback_query.answer("An error occurred. Please try again later.")
         except:
@@ -723,7 +726,7 @@ async def handle_group_img_ai_callback(bot, callback_query):
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
     logger.info(f"User {update.from_user.id} accessed settings")
-    await global_setting_command(bot, update)
+    await user_settings_panel_command(bot, update)
     await channel_log(bot, update, "/settings")
 
 @advAiBot.on_message(filters.command("stats") & filters.user(config.ADMINS))
