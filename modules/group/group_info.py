@@ -1,6 +1,5 @@
 import logging
 from pyrogram import Client, filters
-from pyrogram.enums import ParseMode
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import ADMINS, OWNER_ID
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
@@ -61,10 +60,7 @@ async def info_command(client: Client, message: Message) -> None:
             user_info += f"<b>Is Bot:</b> {'Yes' if target_user.is_bot else 'No'}\n"
             user_info += f"<b>Is Premium:</b> {'Yes' if getattr(target_user, 'is_premium', False) else 'No'}\n"
             user_info += f"<b>Can be contacted:</b> {'Yes' if not target_user.is_bot and not getattr(target_user, 'is_deleted', False) else 'No'}\n"
-            # Add both direct contact and public profile links if available
-            user_info += f"\n<a href='tg://user?id={target_user_id}'>Direct Contact</a>"
-            if target_user.username:
-                user_info += f" | <a href='https://t.me/{target_user.username}'>Public Profile</a>"
+            user_info += f"\n<a href='tg://user?id={target_user_id}'>Direct Link to User</a>"
             # Interactive buttons
             buttons = []
             if not target_user.is_bot and not getattr(target_user, 'is_deleted', False):
@@ -75,8 +71,7 @@ async def info_command(client: Client, message: Message) -> None:
             await message.reply_text(
                 user_info,
                 reply_markup=InlineKeyboardMarkup(buttons) if buttons else None,
-                disable_web_page_preview=True,
-                parse_mode=ParseMode.HTML
+                disable_web_page_preview=True
             )
         except Exception as e:
             await message.reply_text(f"Error processing command: {e}")

@@ -192,6 +192,276 @@ async def announce_callback_handler(bot, callback_query):
     await channel_log(bot, callback_query.message, "/announce", f"Admin broadcast message to users", level="WARNING")
     del bot._announce_pending[user_id]
 
+@advAiBot.on_callback_query()
+async def callback_query(client, callback_query):
+    try:
+        # Handle restart callbacks
+        if callback_query.data == "confirm_restart" or callback_query.data == "cancel_restart":
+            await handle_restart_callback(client, callback_query)
+            return
+        
+        # Handle maintenance mode toggle and feature callbacks
+        if callback_query.data.startswith("toggle_") and callback_query.data.count("_") >= 2:
+            await handle_feature_toggle(client, callback_query)
+            return
+        elif callback_query.data.startswith("feature_info_"):
+            await handle_feature_info(client, callback_query)
+            return
+        elif callback_query.data == "admin_panel":
+            from modules.user.user_support import admin_panel_callback
+            await admin_panel_callback(client, callback_query)
+            return
+        elif callback_query.data == "support_donate":
+            from modules.maintenance import handle_donation
+            await handle_donation(client, callback_query)
+            return
+        # Advanced statistics panel
+        elif callback_query.data == "admin_view_stats":
+            from modules.admin import handle_stats_panel
+            await handle_stats_panel(client, callback_query)
+            return
+        elif callback_query.data == "admin_refresh_stats":
+            from modules.admin import handle_refresh_stats
+            await handle_refresh_stats(client, callback_query)
+            return
+        elif callback_query.data == "admin_export_stats":
+            from modules.admin import handle_export_stats
+            await handle_export_stats(client, callback_query)
+            return
+        # User management panel
+        elif callback_query.data == "admin_users":
+            from modules.admin import handle_user_management
+            await handle_user_management(client, callback_query)
+            return
+        elif callback_query.data.startswith("admin_users_filter_"):
+            from modules.admin import handle_user_management
+            # Extract filter type and page from callback data
+            try:
+                parts = callback_query.data.split("_")
+                if len(parts) >= 5:  # admin_users_filter_TYPE_PAGE
+                    filter_type = parts[3]
+                    page = int(parts[4])
+                    # Support all filter types
+                    valid_filters = ["all", "recent", "active", "new", "inactive", "groups"]
+                    if filter_type in valid_filters:
+                        await handle_user_management(client, callback_query, page, filter_type)
+                    else:
+                        # Default to recent if invalid filter
+                        await handle_user_management(client, callback_query, page, "recent")
+                else:
+                    # Default to first page, recent filter
+                    await handle_user_management(client, callback_query)
+            except Exception as e:
+                logger.error(f"Error in user filter handling: {str(e)}")
+                # Default to first page, recent filter
+                await handle_user_management(client, callback_query)
+            return
+        # Group permissions help callback
+        elif callback_query.data == "group_permissions_help":
+            from modules.group.group_permissions import handle_permissions_help
+            await handle_permissions_help(client, callback_query)
+            return
+        elif callback_query.data == "dismiss_permissions_help":
+            # Just acknowledge and close the message
+            await callback_query.answer("Permissions help dismissed")
+            # Try to delete the message if possible
+            try:
+                await client.delete_messages(
+                    chat_id=callback_query.message.chat.id,
+                    message_ids=callback_query.message.id
+                )
+            except Exception:
+                # If can't delete, just edit to a simple confirmation
+                await callback_query.edit_message_text("✅ Thanks for reviewing the permissions info!")
+            return
+        elif callback_query.data == "group_start":
+            # Import the group_start function from user directory
+            from modules.user.group_start import group_start
+            # Create a simulated message object for group_start
+            simulated_message = callback_query.message
+            simulated_message.from_user = callback_query.from_user
+            # Call group_start with the simulated message
+            await group_start(client, simulated_message)
+            # Answer the callback query
+            await callback_query.answer("Starting bot in this group")
+            return
+        elif callback_query.data == "admin_header" or callback_query.data == "features_header" or callback_query.data == "admin_tools_header":
+            # Just acknowledge the click for the headers
+            await callback_query.answer()
+            return
+        
+        # Standard menu callbacks
+        if callback_query.data == "help_start":
+            from modules.user.help import help_inline_start
+            await help_inline_start(client, callback_query)
+        elif callback_query.data == "help_help" or callback_query.data == "help":
+            from modules.user.help import help_inline_help
+            await help_inline_help(client, callback_query)
+        elif callback_query.data == "back":
+            await start_inline(client, callback_query)
+        elif callback_query.data == "commands_start":
+            from modules.user.commands import command_inline_start
+            await command_inline_start(client, callback_query)
+        elif callback_query.data == "commands_help":
+            from modules.user.commands import command_inline_help
+            await command_inline_help(client, callback_query)
+        elif callback_query.data == "settings":
+            from modules.user.settings import settings_inline
+            await settings_inline(client, callback_query)
+        elif callback_query.data == "settings_v":
+            await settings_language_callback(client, callback_query)
+        elif callback_query.data in ["settings_voice", "settings_text"]:
+            await change_voice_setting(client, callback_query)
+        elif callback_query.data == "settings_lans":
+            await settings_langs_callback(client, callback_query)
+        elif callback_query.data.startswith("language_"):
+            await change_language_setting(client, callback_query)
+        elif callback_query.data == "settings_voice_inlines":
+            await settings_voice_inlines(client, callback_query)
+        elif callback_query.data == "settings_back":
+            from modules.user.settings import settings_inline
+            await settings_inline(client, callback_query)
+        elif callback_query.data == "settings_assistant":
+            await settings_assistant_callback(client, callback_query)
+        elif callback_query.data == "settings_support":
+            await settings_support_callback(client, callback_query)
+        elif callback_query.data == "support_developers":
+            await support_developers_callback(client, callback_query)
+        elif callback_query.data == "support_admins":
+            await support_admins_callback(client, callback_query)
+        elif callback_query.data == "settings_others":
+            await settings_others_callback(client, callback_query)
+        elif callback_query.data.startswith("voice_toggle_"):
+            await handle_voice_toggle(client, callback_query)
+        elif callback_query.data.startswith("mode_"):
+            await change_mode_setting(client, callback_query)
+        elif callback_query.data.startswith("show_text_"):
+            await handle_show_text_callback(client, callback_query)
+        elif callback_query.data.startswith("followup_"):
+            await handle_followup_callback(client, callback_query)
+        elif callback_query.data.startswith("rate_"):
+            await handle_rate_callback(client, callback_query)
+        elif callback_query.data.startswith("feedback_") or \
+             callback_query.data.startswith("img_feedback_positive_") or \
+             callback_query.data.startswith("img_feedback_negative_") or \
+             callback_query.data.startswith("img_regenerate_") or \
+             callback_query.data.startswith("img_style_"):
+            await handle_image_feedback(client, callback_query)
+        elif callback_query.data == "group_commands":
+            # Handle group command menu
+            from modules.user.group_start import handle_group_command_inline
+            await handle_group_command_inline(client, callback_query)
+        elif callback_query.data.startswith("group_cmd_"):
+            # Handle specific group command sections
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
+        elif callback_query.data == "about_bot" or callback_query.data == "group_support":
+            # Handle other group menu buttons
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
+        elif callback_query.data == "admin_view_history":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data.startswith("history_user_"):
+            from modules.admin.user_history import handle_history_user_selection
+            user_id = int(callback_query.data.split("_")[2])
+            await handle_history_user_selection(client, callback_query, user_id)
+            return
+        elif callback_query.data.startswith("history_page_"):
+            from modules.admin.user_history import handle_history_pagination
+            parts = callback_query.data.split("_")
+            user_id = int(parts[2])
+            page = int(parts[3])
+            await handle_history_pagination(client, callback_query, user_id, page)
+            return
+        elif callback_query.data == "history_search":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data == "history_back":
+            from modules.admin.user_history import show_history_search_panel
+            await show_history_search_panel(client, callback_query)
+            return
+        elif callback_query.data.startswith("history_download_"):
+            from modules.admin.user_history import get_history_download
+            user_id = int(callback_query.data.split("_")[2])
+            await get_history_download(client, callback_query, user_id)
+            return
+        elif callback_query.data == "admin_search_user":
+            from modules.admin.user_history import show_user_search_form
+            await show_user_search_form(client, callback_query)
+            return
+        elif callback_query.data == "support":
+            # Handle the support callback
+            from modules.user.user_support import settings_support_callback
+            await settings_support_callback(client, callback_query)
+            return
+        # Help menu category callbacks
+        elif (callback_query.data.startswith("help_") and callback_query.data != "help"):
+            from modules.user.help import handle_help_category
+            await handle_help_category(client, callback_query)
+            return
+        # Command menu category callbacks
+        elif callback_query.data.startswith("cmd_"):
+            if callback_query.data.endswith("_start"):
+                from modules.user.commands import handle_command_callbacks_start
+                await handle_command_callbacks_start(client, callback_query)
+            elif callback_query.data.endswith("_help"):
+                from modules.user.commands import handle_command_callbacks_help
+                await handle_command_callbacks_help(client, callback_query)
+            else:
+                from modules.user.commands import handle_command_callbacks
+                await handle_command_callbacks(client, callback_query)
+            return
+        # Image text back button handler
+        elif callback_query.data.startswith("back_to_image_"):
+            # Get the user ID from the callback data
+            user_id = int(callback_query.data.split("_")[3])
+            # Create action buttons again
+            action_markup = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📋 Show Extracted Text", callback_data=f"show_text_{user_id}")
+                ],
+                [
+                    InlineKeyboardButton("❓ Ask Follow-up", callback_data=f"followup_{user_id}")
+                ]
+            ])
+            # Edit message back to original prompt
+            await callback_query.message.edit_text(
+                "**Need anything else with this image?**",
+                reply_markup=action_markup
+            )
+            return
+        # Group start back button handler
+        elif callback_query.data == "back_to_group_start":
+            from modules.user.group_start import handle_group_callbacks
+            await handle_group_callbacks(client, callback_query)
+            return
+        elif callback_query.data == "settings_others_refresh":
+            from modules.maintenance import settings_others_refresh_callback
+            await settings_others_refresh_callback(client, callback_query)
+            return
+        elif callback_query.data == "commands":
+            from modules.user.commands import command_inline_help
+            await command_inline_help(client, callback_query)
+        # User settings panel callbacks
+        elif callback_query.data.startswith("user_settings_"):
+            await handle_user_settings_callback(client, callback_query)
+            return
+        else:
+            # Unknown callback, just acknowledge it
+            await callback_query.answer("Unknown command")
+            
+    except Exception as e:
+        logger.error(f"Error in callback query handler: {e}")
+        await error_log(client, "Callback Query Error", str(e))
+        try:
+            await callback_query.answer("An error occurred. Please try again later.")
+        except:
+            pass
+
+
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
     # Check for maintenance mode and voice feature toggle
@@ -270,7 +540,7 @@ async def info_commands(bot, update):
         await update.reply_text("⛔ You are not authorized to use this command.")
         await channel_log(bot, update, "/uinfo", f"Unauthorized access attempt", level="WARNING")
 
-# Register uinfo panel callbacks (move these above the generic callback_query handler)
+# Register uinfo panel callbacks
 @advAiBot.on_callback_query(filters.create(lambda _, __, q: q.data.startswith("uinfo_settings_")))
 async def uinfo_settings_cb(client, callback_query):
     await uinfo_settings_callback(client, callback_query)
