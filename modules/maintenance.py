@@ -5,6 +5,7 @@ from modules.core.database import get_feature_settings_collection
 from config import ADMINS, OWNER_ID
 from modules.admin.statistics import get_bot_statistics
 from modules.ui.theme import Theme, Colors
+from modules.user.premium_management import is_user_premium
 
 # Default feature states
 DEFAULT_FEATURE_STATES = {
@@ -107,16 +108,26 @@ async def is_admin_user(user_id: int) -> bool:
 
 async def maintenance_check(user_id: int) -> bool:
     """
-    Check if the bot is in maintenance mode and the user is not an admin
+    Check if the bot is in maintenance mode.
+    Admins and Premium Users are exempt unless a specific 'super_admin_only_maintenance' is enabled (future enhancement).
     
     Args:
         user_id: User ID to check
         
     Returns:
-        True if bot is in maintenance AND user is not admin
+        True if bot is in maintenance AND user is not admin/premium, False otherwise.
     """
     if await is_admin_user(user_id):
-        return False
+        return False # Admins are always exempt
+
+    # Check if user is premium
+    is_premium, _, _ = await is_user_premium(user_id)
+    if is_premium:
+        # Potentially, in the future, add a check for a stricter maintenance mode
+        # that even premium users cannot bypass, e.g.:
+        # if await is_feature_enabled("super_admin_only_maintenance"):
+        #     return True 
+        return False # Premium users are exempt from standard maintenance
         
     return await is_feature_enabled("maintenance_mode")
 

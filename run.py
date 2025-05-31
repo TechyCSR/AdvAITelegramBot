@@ -37,6 +37,7 @@ import json
 import time
 from modules.models.image_service import ImageService
 from modules.user.user_bans_management import ban_user, unban_user, is_user_banned, get_banned_message, get_user_by_id_or_username
+from modules.user.premium_management import add_premium_status, remove_premium_status, is_user_premium, get_premium_status_message, daily_premium_check, get_premium_benefits_message
 
 
 # Create directories if they don't exist
@@ -81,6 +82,67 @@ cleanup_scheduler = start_cleanup_scheduler()
 # Add a global in-memory dict to store pending group image contexts
 pending_group_images = {}
 
+
+@advAiBot.on_message(filters.command("premium") & filters.user(config.ADMINS))
+async def premium_command_handler(client, message):
+    if len(message.command) < 3:
+        await message.reply_text("Usage: /premium <user_id_or_username> <days>")
+        return
+    identifier = message.command[1]
+    try:
+        days = int(message.command[2])
+        if days <= 0:
+            await message.reply_text("Number of days must be a positive integer.")
+            return
+    except ValueError:
+        await message.reply_text("Invalid number of days. Please provide an integer.")
+        return
+
+    target_user = await get_user_by_id_or_username(client, identifier)
+    if not target_user:
+        await message.reply_text(f"Could not find user: {identifier}")
+        return
+
+    success = await add_premium_status(target_user.id, message.from_user.id, days)
+    if success:
+        await message.reply_text(f"User {target_user.mention} (ID: {target_user.id}) has been granted Premium status for {days} days.")
+        await channel_log(client, message, "/premium", f"Admin {message.from_user.id} granted {days} days premium to user {target_user.id}")
+        try:
+            await client.send_message(target_user.id, f"🎉 Congratulations! You have been granted Premium User status for {days} days.")
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_user.id} about their premium grant: {e}")
+    else:
+        await message.reply_text(f"Failed to grant premium status to {target_user.mention}.")
+
+@advAiBot.on_message(filters.command("unpremium") & filters.user(config.ADMINS))
+async def unpremium_command_handler(client, message):
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /unpremium <user_id_or_username>")
+        return
+    identifier = message.command[1]
+    target_user = await get_user_by_id_or_username(client, identifier)
+    if not target_user:
+        await message.reply_text(f"Could not find user: {identifier}")
+        return
+
+    success = await remove_premium_status(target_user.id, revoked_by_admin=True)
+    if success:
+        await message.reply_text(f"Premium status for user {target_user.mention} (ID: {target_user.id}) has been revoked.")
+        await channel_log(client, message, "/unpremium", f"Admin {message.from_user.id} revoked premium from user {target_user.id}")
+        try:
+            await client.send_message(target_user.id, "ℹ️ Your Premium User status has been revoked by an administrator.")
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_user.id} about their premium revocation: {e}")
+    else:
+        await message.reply_text(f"User {target_user.mention} was not found with active premium status or could not be unpremiumed.")
+
+# Daily premium check scheduler
+async def premium_check_scheduler(client):
+    while True:
+        logger.info("Scheduler: Starting daily premium check...")
+        await daily_premium_check(client_for_notification=client)
+        logger.info("Scheduler: Daily premium check finished.")
+        await asyncio.sleep(24 * 60 * 60) # Sleep for 24 hours
 
 @advAiBot.on_message(filters.command("ban") & filters.user(config.ADMINS))
 async def ban_command_handler(client, message):
@@ -134,21 +196,22 @@ async def unban_command_handler(client, message):
 async def start_command(bot, update):
     if await check_if_banned_and_reply(bot, update): # BAN CHECK
         return
-    # Start the cleanup scheduler on first command
-    global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task
-    if not 'cleanup_scheduler_task' in globals() or cleanup_scheduler_task is None:
+
+    # Start schedulers on first command if not already running
+    global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task, premium_scheduler_task
+    if not globals().get('cleanup_scheduler_task') or cleanup_scheduler_task.done():
         cleanup_scheduler_task = asyncio.create_task(cleanup_scheduler())
         logger.info("Started image generation cleanup scheduler task")
-        
-    if not 'ongoing_generations_cleanup_task' in globals() or ongoing_generations_cleanup_task is None:
+    if not globals().get('ongoing_generations_cleanup_task') or ongoing_generations_cleanup_task.done():
         ongoing_generations_cleanup_task = asyncio.create_task(cleanup_ongoing_generations())
         logger.info("Started inline generations cleanup scheduler task")
-        
-    if not 'ai_ongoing_generations_cleanup_task' in globals() or ai_ongoing_generations_cleanup_task is None:
+    if not globals().get('ai_ongoing_generations_cleanup_task') or ai_ongoing_generations_cleanup_task.done():
         ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
         logger.info("Started inline AI generations cleanup scheduler task")
-    
-    # Check for restart marker file on first command
+    if not globals().get('premium_scheduler_task') or premium_scheduler_task.done():
+        premium_scheduler_task = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
+        logger.info("Started daily premium check scheduler task")
+
     if not hasattr(advAiBot, "_restart_checked"):
         logger.info("Checking for restart marker on first command")
         await check_restart_marker(bot)
@@ -156,17 +219,20 @@ async def start_command(bot, update):
         
     bot_stats["active_users"].add(update.from_user.id)
     
-    # Differentiate between private chats and group chats
+    # Original start logic
     if update.chat.type == ChatType.PRIVATE:
         logger.info(f"User {update.from_user.id} started the bot in private chat")
-        await start(bot, update)
+        await start(bot, update) # This is the function from modules.user.start
     else:
-        # This is a group chat
         logger.info(f"User {update.from_user.id} started the bot in group chat {update.chat.id} ({update.chat.title})")
-        # Import the group_start function from the newly created file
         from modules.user.group_start import group_start
         await group_start(bot, update)
     
+    # Append premium status message if user is premium
+    premium_message = await get_premium_status_message(update.from_user.id)
+    if premium_message:
+        await update.reply_text(premium_message, parse_mode=ParseMode.HTML) # Assuming HTML in premium message
+
     await channel_log(bot, update, "/start")
 
 @advAiBot.on_message(filters.command("help"))
@@ -1127,6 +1193,27 @@ async def handle_admin_text_input(bot, message):
     # If we reach here, it's not a special admin action, so proceed with normal message handling
     await handle_message(bot, message)
 
+@advAiBot.on_message(filters.command("benefits"))
+async def benefits_command_handler(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
+    
+    user_id = message.from_user.id
+    benefits_text = await get_premium_benefits_message(user_id)
+    
+    # Add a button to contact admin or view donation options
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💰 Donate / Upgrade to Premium", url="https://t.me/techycsr")]
+      
+    ])
+    
+    await message.reply_text(
+        benefits_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+    await channel_log(client, message, "/benefits")
 
 # IMPORTANT: Ensure this new ban check is added to all relevant message/command handlers
 async def check_if_banned_and_reply(client, update_obj): # Renamed to update_obj for clarity
@@ -1168,6 +1255,7 @@ if __name__ == "__main__":
     cleanup_scheduler_task = None
     ongoing_generations_cleanup_task = None
     ai_ongoing_generations_cleanup_task = None
+    premium_scheduler_task = None
     
     # Run the bot
     advAiBot.run()
