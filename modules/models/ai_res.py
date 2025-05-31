@@ -181,6 +181,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
             "• `/generate [prompt]` - Alternative image generation command\n"
             "• `/new` - Start a new conversation and update the bot to the latest version\n"
             "• `/settings` - Change your settings\n"
+            "• `/benefits` - Show the benefits of the premium subscription\n"
             "💡 **Tips**:\n"
             "• You can chat with me naturally\n"
             "• Ask me to generate images by describing what you want\n"
