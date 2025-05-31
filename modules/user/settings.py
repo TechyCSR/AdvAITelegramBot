@@ -112,7 +112,7 @@ async def settings_inline(client, callback):
                 InlineKeyboardButton(translated_labels[3], callback_data="settings_others")
             ],
             [
-                InlineKeyboardButton(translated_labels[4], callback_data="settings_back")
+                InlineKeyboardButton(translated_labels[4], callback_data="back")
             ]
         ]
     )

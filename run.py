@@ -26,7 +26,7 @@ from modules.image.inline_image_generation import handle_inline_query, cleanup_o
 from modules.models.inline_ai_response import cleanup_ongoing_generations as ai_cleanup_ongoing_generations
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.user_settings_panel import user_settings_panel_command, handle_user_settings_callback
-from modules.speech.voice_to_text import handle_voice_toggle
+from modules.speech.voice_to_text import handle_voice_message, handle_voice_toggle
 from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
 import modules.models.user_db as user_db
 import asyncio
@@ -470,10 +470,14 @@ async def voice(bot, message):
         maint_msg = await maintenance_message(message.from_user.id)
         await message.reply(maint_msg)
         return
-        
     bot_stats["voice_messages_processed"] += 1
     bot_stats["active_users"].add(message.from_user.id)
-    await voice_to_text.handle_voice_message(bot, message)
+    await handle_voice_message(bot, message)
+
+# Register the toggle callback for voice/text mode
+@advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("toggle_voice_")))
+async def voice_toggle_callback(client, callback_query):
+    await handle_voice_toggle(client, callback_query)
 
 # Add a new handler for replies to bot messages in groups
 @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())

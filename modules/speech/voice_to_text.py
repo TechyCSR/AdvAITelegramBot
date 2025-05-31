@@ -49,163 +49,51 @@ async def process_audio_file(input_path, output_path=None, language="en-US"):
         return None, f"Audio processing error: {str(e)}"
 
 async def handle_voice_message(client, message):
-    # Show processing message with modern UI
     processing_msg = await message.reply_text(
-        "🎙️ **Processing Voice Message**\n\n"
-        "Converting your audio to text...\n"
-        "Please wait a moment."
+        "🎙️ <b>Processing your voice message...</b>\nPlease wait...",
+        parse_mode="html"
     )
-    
-    # Determine the file type (voice or audio)
     try:
-        if message.voice:
-            file_id = message.voice.file_id
-        elif message.audio:
-            file_id = message.audio.file_id
-        else:
-            await processing_msg.edit_text("❌ Unsupported media type")
-            return
-    except Exception as e:
-        await processing_msg.edit_text(f"❌ Error processing media: {e}")
+        file_id = message.voice.file_id if message.voice else message.audio.file_id
+    except Exception:
+        await processing_msg.edit_text("❌ <b>Unsupported media type.</b>", parse_mode="html")
         return
-
-    # Create temporary directory for audio processing
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Download the voice message
         voice_path = await client.download_media(file_id, file_name=f"{temp_dir}/audio_file")
-        
-        # Process audio to extract text
         recognized_text, error = await process_audio_file(voice_path)
-        
-        # Handle recognition errors
         if error:
-            await processing_msg.edit_text(
-                f"❌ **Voice Recognition Failed**\n\n{error}\n\n"
-                "Please try recording again with clearer audio."
-            )
+            await processing_msg.edit_text(f"❌ <b>Voice Recognition Failed</b>\n{error}", parse_mode="html")
             return
-        
-        # Handle empty recognition
         if not recognized_text or recognized_text.strip() == "":
             await processing_msg.edit_text(
-                "⚠️ **No Speech Detected**\n\n"
-                "I couldn't detect any speech in your audio.\n"
-                "Please try recording again with clearer speech."
+                "⚠️ <b>No speech detected.</b>\nPlease try again.", parse_mode="html"
             )
             return
-        
-        # Update processing message
-        await processing_msg.edit_text(
-            "✅ **Voice Recognized**\n\n"
-            f"I heard: *{recognized_text}*\n\n"
-            "Generating response..."
-        )
-        
-        # Get user preferences for voice responses
         user_id = message.from_user.id
         user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
-        response_mode = user_settings.get("voice", "voice") if user_settings else "voice"
-        
-        try:
-            # Fetch user conversation history
-            user_history = history_collection.find_one({"user_id": user_id})
-            if user_history:
-                history = user_history['history']
-            else:
-                history = [{
-                    "role": "assistant",
-                    "content": (
-                        "I'm your advanced AI assistant. I can respond to your voice messages and help with various tasks."
-                    )
-                }]
-
-            # Add the recognized text to history
-            history.append({"role": "user", "content": recognized_text})
-            
-            # Use non-streaming for reliability
-            ai_response = get_response(history)
-            
-            # Add response to history
-            history.append({"role": "assistant", "content": ai_response})
-            
-            # Update MongoDB with new history
-            history_collection.update_one(
-                {"user_id": user_id},
-                {"$set": {"history": history}},
-                upsert=True
-            )
-            
-            # Always send the text response
+        response_mode = user_settings.get("voice", "text") if user_settings else "text"
+        user_history = history_collection.find_one({"user_id": user_id})
+        history = user_history['history'] if user_history else [{"role": "assistant", "content": "I'm your AI assistant."}]
+        history.append({"role": "user", "content": recognized_text})
+        ai_response = get_response(history)
+        history.append({"role": "assistant", "content": ai_response})
+        history_collection.update_one({"user_id": user_id}, {"$set": {"history": history}}, upsert=True)
+        clean_response = ai_response.replace("*", "").replace("_", "").replace("`", "").replace("\n", " ").strip()
+        if response_mode == "voice":
+            await processing_msg.delete()
+            await handle_text_message(client, message, clean_response)
+        else:
             await processing_msg.edit_text(
-                f"🔊 **Voice Message**\n\n"
-                f"You said: *{recognized_text}*\n\n"
-                f"**Response:**\n{ai_response}"
+                f"📝 <b>Recognized:</b> <i>{recognized_text}</i>\n\n<b>AI:</b> {ai_response}",
+                parse_mode="html"
             )
-            
-            # If user wants voice, also send as audio
-            if response_mode == "voice":
-                await handle_text_message(client, message, ai_response)
-            
-            # Add response option buttons
-            response_markup = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton(
-                        "🔊 Voice Responses" if response_mode != "voice" else "📝 Text Responses", 
-                        callback_data=f"toggle_voice_{user_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton("🎙️ New Voice Message", callback_data=f"new_voice_{user_id}")
-                ]
-            ])
-            
-            await message.reply_text(
-                "**Response Preferences**",
-                reply_markup=response_markup
-            )
-            
-            # Log the voice interaction
-            await client.send_audio(LOG_CHANNEL, f"{voice_path}.wav")
-            await user_log(client, message, f"\nVoice: {recognized_text}\n\nAI: {ai_response}")
-            
-        except Exception as e:
-            await message.reply_text(f"An error occurred: {e}")
-            print(f"Error in speech Voice2Text function: {e}")
 
 # Handle voice preference toggle callback
 async def handle_voice_toggle(client, callback_query):
-    user_id = int(callback_query.data.split("_")[2])
-    
-    # Get current setting
+    user_id = int(callback_query.data.split("_")[-1])
     user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
-    current_setting = user_settings.get("voice", "voice") if user_settings else "voice"
-    
-    # Toggle setting
-    new_setting = "text" if current_setting == "voice" else "voice"
-    
-    # Update database
-    user_voice_setting_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"voice": new_setting}},
-        upsert=True
-    )
-    
-    # Notify user
-    setting_text = "voice" if new_setting == "voice" else "text"
-    await callback_query.answer(f"Changed to {setting_text} responses")
-    
-    # Update button
-    button_text = "📝 Text Responses" if new_setting == "voice" else "🔊 Voice Responses"
-    
-    # Get existing keyboard
-    current_markup = callback_query.message.reply_markup
-    if current_markup and current_markup.inline_keyboard:
-        # Update first button text but keep the same callback data
-        current_markup.inline_keyboard[0][0] = InlineKeyboardButton(
-            button_text, 
-            callback_data=callback_query.data
-        )
-        
-        # Update message with new keyboard
-        await callback_query.message.edit_reply_markup(reply_markup=current_markup)
+    current_setting = user_settings.get("voice", "text") if user_settings else "text"
+    new_setting = "voice" if current_setting == "text" else "text"
+    user_voice_setting_collection.update_one({"user_id": user_id}, {"$set": {"voice": new_setting}}, upsert=True)
+    await callback_query.answer(f"Changed to {new_setting.title()} mode", show_alert=True)
 
