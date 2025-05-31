@@ -306,7 +306,8 @@ async def callback_query(client, callback_query):
             from modules.user.commands import command_inline_help
             await command_inline_help(client, callback_query)
         elif callback_query.data == "settings":
-            await user_settings_panel_command(client, callback_query)
+            from modules.user.settings import settings_inline
+            await settings_inline(client, callback_query)
         elif callback_query.data == "settings_v":
             await settings_language_callback(client, callback_query)
         elif callback_query.data in ["settings_voice", "settings_text"]:
@@ -318,6 +319,7 @@ async def callback_query(client, callback_query):
         elif callback_query.data == "settings_voice_inlines":
             await settings_voice_inlines(client, callback_query)
         elif callback_query.data == "settings_back":
+            from modules.user.settings import settings_inline
             await settings_inline(client, callback_query)
         elif callback_query.data == "settings_assistant":
             await settings_assistant_callback(client, callback_query)
