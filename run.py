@@ -108,7 +108,7 @@ async def premium_command_handler(client, message):
         await message.reply_text(f"User {target_user.mention} (ID: {target_user.id}) has been granted Premium status for {days} days.")
         await channel_log(client, message, "/premium", f"Admin {message.from_user.id} granted {days} days premium to user {target_user.id}")
         try:
-            await client.send_message(target_user.id, f"🎉 Congratulations! You have been granted Premium User status for {days} days.")
+            await client.send_message(target_user.id, f"🎉 Congratulations! You have been granted Premium User status for {days} days.\n\nUse /benefits to see the benefits of being a premium user.")
         except Exception as e:
             logger.warning(f"Could not notify user {target_user.id} about their premium grant: {e}")
     else:
