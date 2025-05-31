@@ -81,13 +81,18 @@ admin_commands_text = """
 
 These commands are restricted to bot administrators only.
 
+**/premium <user_id|username> <days>** - Grant premium access
+**/unpremium <user_id|username>** - Revoke premium access
+**/ban <user_id|username> [reason]** - Ban a user from the bot
+**/unban <user_id|username>** - Unban a user
+**/history <user_id>** - View a user's chat history
+**/uinfo <user_id|username>** - Get information about a user
+**/announce <message>** - Send a message to all users (alias: /broadcast)
+**/logs** - Get the most recent bot logs
+**/stats** - View bot statistics and usage data
 **/restart** - Restart the bot (requires confirmation)
-**/stats** - View bot statistics and usage data 
-**/logs** - Get the most recent log entries
-**/announce** - Send a message to all users
-**/gleave** - Leave a group chat
-**/invite** - Add the bot to a group
-**/uinfo** - Get information about users
+**/gleave** - Make the bot leave the current group
+**/invite** - Generate a bot invite link (for admins)
 
 **Note:** These commands are only available to authorized administrators listed in the configuration.
 

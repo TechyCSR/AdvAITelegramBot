@@ -6,7 +6,8 @@ from pyrogram.types import InlineQuery
 from pyrogram.types import CallbackQuery
 from modules.lang import async_translate_to_lang, translate_ui_element, batch_translate, format_with_mention
 from modules.chatlogs import channel_log
-from config import DATABASE_URL
+from config import DATABASE_URL, ADMINS
+from modules.user.premium_management import is_user_premium
 
 from pymongo import MongoClient
 
@@ -19,8 +20,8 @@ user_voice_collection = db["user_voice_setting"]
 
 # Access or create the database and collection
 user_lang_collection = db['user_lang']
-user_voice_collection = db["user_voice_setting"]
 ai_mode_collection = db['ai_mode']
+user_image_gen_settings_collection = db['user_image_gen_settings']
 
 modes = {
     "chatbot": "Chatbot",
@@ -42,10 +43,11 @@ languages = {
     "ru": "🇷🇺 Russian"
 }
 
-settings_text = """
+settings_text_template = """
 **Setting Menu for User {mention}**
 
 **User ID**: {user_id}
+**Account Status**: {premium_status}
 **User Language:** {language}
 **User Voice**: {voice_setting}
 **User Mode**: {mode}
@@ -55,75 +57,62 @@ You can change your settings from below options.
 **@AdvChatGptBot**
 """
 
-async def settings_inline(client, callback):
+async def settings_inline(client_obj, callback: CallbackQuery):
     user_id = callback.from_user.id
     user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
-    if user_lang_doc:
-        current_language = user_lang_doc['language']
-    else:
-        current_language = "en"
+    current_language = user_lang_doc['language'] if user_lang_doc else "en"
+    if not user_lang_doc:
         user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
     
     user_settings = user_voice_collection.find_one({"user_id": user_id})
-    if user_settings:
-        voice_setting = user_settings.get("voice", "voice")
-    else:
-        voice_setting = "voice"
-        user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
+    voice_setting = user_settings.get("voice", "voice") if user_settings else "voice"
+    if not user_settings:
+        user_voice_collection.insert_one({"user_id": user_id, "voice": voice_setting})
     
     user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
-    if user_mode_doc:
-        current_mode = user_mode_doc['mode']
-    else:
-        current_mode = "chatbot"
+    current_mode = user_mode_doc['mode'] if user_mode_doc else "chatbot"
+    if not user_mode_doc:
         ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
-    
-    current_mode_label = modes[current_mode]
-    current_language_label = languages[current_language]
 
-    # Get user mention
+    # Get premium status
+    is_premium, remaining_days, _ = await is_user_premium(user_id)
+    if is_premium:
+        premium_status_text_key = "✨ Premium User ({days} days left)"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key.format(days=remaining_days), current_language)
+    else:
+        premium_status_text_key = "👤 Standard User"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key, current_language)
+    
+    current_mode_label = await async_translate_to_lang(modes.get(current_mode, current_mode), current_language)
+    current_language_label = await async_translate_to_lang(languages.get(current_language, current_language), current_language)
     mention = callback.from_user.mention
     
-    # First safely translate the template with mention preservation
-    translated_text = await format_with_mention(settings_text, mention, user_id, current_language)
-    
-    # Now format with the other variables
-    formatted_text = translated_text.format(
+    translated_template = await async_translate_to_lang(settings_text_template, current_language)
+    formatted_text = translated_template.format(
         mention=mention,
-        user_id=callback.from_user.id,
+        user_id=user_id,
+        premium_status=premium_status_val,
         language=current_language_label,
-        voice_setting=voice_setting,
+        voice_setting=await async_translate_to_lang(voice_setting.capitalize(), current_language),
         mode=current_mode_label,
     )
 
-    # Efficiently translate all button labels at once using the optimized UI element translator
-    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🔧 Others", "🔙 Back"]
+    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🖼️ Image Count", "🔙 Back"]
     translated_labels = await batch_translate(button_labels, user_id)
     
-    # Use the translated button labels
-    keyboard = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
-                InlineKeyboardButton(translated_labels[1], callback_data="settings_v")
-            ],
-            [
-                InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
-                InlineKeyboardButton(translated_labels[3], callback_data="settings_others")
-            ],
-            [
-                InlineKeyboardButton(translated_labels[4], callback_data="back")
-            ]
-        ]
-    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
+         InlineKeyboardButton(translated_labels[1], callback_data="settings_v")],
+        [InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
+         InlineKeyboardButton(translated_labels[3], callback_data="settings_image_count")],
+        [InlineKeyboardButton(translated_labels[4], callback_data="back")]
+    ])
 
-    await callback.message.edit(
+    await callback.message.edit_text(
         text=formatted_text,
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-
-
 
 async def settings_language_callback(client, callback):
     user_id = callback.from_user.id
@@ -174,8 +163,6 @@ async def settings_language_callback(client, callback):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
-
-
 
 async def change_voice_setting(client, callback):
     user_id = callback.from_user.id
@@ -284,7 +271,7 @@ You can change your settings from below options.
     )
     
     # Efficiently translate all button labels at once
-    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🔧 Others", "🔙 Back"]
+    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🖼️ Image Count", "🔙 Back"]
     translated_labels = await batch_translate(button_labels, user_id)
 
     keyboard = InlineKeyboardMarkup(
@@ -295,7 +282,7 @@ You can change your settings from below options.
             ],
             [
                 InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
-                InlineKeyboardButton(translated_labels[3], callback_data="settings_others")
+                InlineKeyboardButton(translated_labels[3], callback_data="settings_image_count")
             ],
             [
                 InlineKeyboardButton(translated_labels[4], callback_data="back")
@@ -308,6 +295,79 @@ You can change your settings from below options.
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+
+async def settings_image_count_callback(client, callback: CallbackQuery):
+    user_id = callback.from_user.id
+    current_lang = user_lang_collection.find_one({"user_id": user_id}).get("language", "en")
+
+    user_gen_settings = user_image_gen_settings_collection.find_one({"user_id": user_id})
+    current_count = user_gen_settings.get("generation_count", 1) if user_gen_settings else 1
+
+    is_premium_user, _, _ = await is_user_premium(user_id)
+    is_admin_user = user_id in ADMINS
+
+    title_text = await async_translate_to_lang("🖼️ Image Generation Count", current_lang)
+    desc_text_template = await async_translate_to_lang("Select how many images you want to generate at once. Current: {count}", current_lang)
+    desc_text = desc_text_template.format(count=current_count)
+    premium_needed_alert = await async_translate_to_lang("Standard users can only generate 1 image. Upgrade to Premium for more!", current_lang)
+    back_button_text = await async_translate_to_lang("🔙 Back", current_lang)
+    time_warning_text = await async_translate_to_lang("⚠️ Generating 3 or 4 images will take significantly longer.", current_lang)
+
+    buttons = []
+    for i in range(1, 5): # 1, 2, 3, 4
+        text = f"{i} ✅" if i == current_count else str(i)
+        buttons.append(InlineKeyboardButton(text, callback_data=f"img_count_{i}"))
+    
+    keyboard_layout = [buttons, [InlineKeyboardButton(back_button_text, callback_data="settings")]]
+    keyboard = InlineKeyboardMarkup(keyboard_layout)
+
+    final_text = f"<b>{title_text}</b>\n\n{desc_text}"
+    if not is_premium_user and not is_admin_user and current_count > 1:
+        # This case should ideally not be reached if logic is correct, but as a safeguard:
+        final_text += f"\n\n<small><i>{premium_needed_alert}</i></small>"
+    
+    # Add time warning if user is premium/admin and considering 3 or 4 images
+    if is_premium_user or is_admin_user:
+        final_text += f"\n\n<small><i>{time_warning_text}</i></small>"
+
+    await callback.message.edit_text(
+        text=final_text,
+        reply_markup=keyboard,
+        parse_mode=pyrogram.enums.ParseMode.HTML # For bold and small tags
+    )
+    await callback.answer()
+
+async def change_image_count_callback(client, callback: CallbackQuery):
+    user_id = callback.from_user.id
+    current_lang = user_lang_collection.find_one({"user_id": user_id}).get("language", "en")
+    
+    try:
+        chosen_count = int(callback.data.split("_")[-1])
+    except (IndexError, ValueError):
+        await callback.answer("Invalid selection.", show_alert=True)
+        return
+
+    is_premium_user, _, _ = await is_user_premium(user_id)
+    is_admin_user = user_id in ADMINS
+
+    if not is_premium_user and not is_admin_user and chosen_count > 1:
+        premium_needed_alert = await async_translate_to_lang("Standard users can only generate 1 image. Upgrade to Premium for more!", current_lang)
+        await callback.answer(premium_needed_alert, show_alert=True)
+        # Don't change setting, just re-display the panel (or do nothing to keep them on the same panel)
+        # Calling settings_image_count_callback again will refresh it.
+        await settings_image_count_callback(client, callback) 
+        return
+
+    user_image_gen_settings_collection.update_one(
+        {"user_id": user_id},
+        {"$set": {"generation_count": chosen_count}},
+        upsert=True
+    )
+    
+    update_success_alert_template = await async_translate_to_lang("Image count set to {count}!", current_lang)
+    await callback.answer(update_success_alert_template.format(count=chosen_count), show_alert=False)
+    # Refresh the panel to show the new selection
+    await settings_image_count_callback(client, callback)
 
 
 

@@ -8,11 +8,13 @@ from modules.user.assistant import settings_assistant_callback
 from modules.user.user_support import settings_support_callback
 from modules.maintenance import get_feature_states
 from modules.admin.statistics import get_bot_statistics
+from modules.user.premium_management import is_user_premium
 
 settings_text = """
 **Setting Menu for User {mention}**
 
 **User ID**: {user_id}
+**Account Status**: {premium_status}
 **User Language:** {language}
 **User Voice**: {voice_setting}
 **User Mode**: {mode}
@@ -22,99 +24,98 @@ You can manage your settings from the start panel below.
 **@AdvChatGptBot**
 """
 
-async def user_settings_panel_command(client, message, edit=False):
-    user_id = message.from_user.id
+async def user_settings_panel_command(client, message, edit=False, callback_query=None):
+    actual_message = callback_query.message if callback_query else message
+    user = callback_query.from_user if callback_query else message.from_user
+    user_id = user.id
+
     user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
-    if user_lang_doc:
-        current_language = user_lang_doc['language']
-    else:
-        current_language = "en"
+    current_language = user_lang_doc['language'] if user_lang_doc else "en"
+    if not user_lang_doc:
         user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
-    user_settings = user_voice_collection.find_one({"user_id": user_id})
-    if user_settings:
-        voice_setting = user_settings.get("voice", "voice")
-    else:
-        voice_setting = "voice"
-        user_voice_collection.insert_one({"user_id": user_id, "voice": "voice"})
+
+    user_settings_doc = user_voice_collection.find_one({"user_id": user_id})
+    voice_setting = user_settings_doc.get("voice", "voice") if user_settings_doc else "voice"
+    if not user_settings_doc:
+        user_voice_collection.insert_one({"user_id": user_id, "voice": voice_setting})
+
     user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
-    if user_mode_doc:
-        current_mode = user_mode_doc['mode']
-    else:
-        current_mode = "chatbot"
+    current_mode = user_mode_doc['mode'] if user_mode_doc else "chatbot"
+    if not user_mode_doc:
         ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
-    current_mode_label = modes[current_mode]
-    current_language_label = languages[current_language]
-    mention = message.from_user.mention if hasattr(message.from_user, 'mention') else f"<a href='tg://user?id={user_id}'>User</a>"
-    formatted_text = await format_with_mention(settings_text, mention, user_id, current_language)
-    formatted_text = formatted_text.format(
+
+    is_premium, remaining_days, _ = await is_user_premium(user_id)
+    if is_premium:
+        premium_status_text_key = "✨ Premium User ({days} days left)"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key.format(days=remaining_days), current_language)
+    else:
+        premium_status_text_key = "👤 Standard User"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key, current_language)
+
+    current_mode_label = await async_translate_to_lang(modes.get(current_mode, current_mode), current_language)
+    current_language_label = await async_translate_to_lang(languages.get(current_language, current_language), current_language)
+    
+    mention = user.mention if hasattr(user, 'mention') else f"<a href='tg://user?id={user_id}'>User {user_id}</a>"
+    
+    translated_settings_template = await async_translate_to_lang(settings_text, current_language)
+
+    formatted_text = translated_settings_template.format(
         mention=mention,
         user_id=user_id,
+        premium_status=premium_status_val,
         language=current_language_label,
-        voice_setting=voice_setting,
+        voice_setting=await async_translate_to_lang(voice_setting.capitalize(), current_language),
         mode=current_mode_label,
     )
+
     bot_username = (await client.get_me()).username
     button_labels = ["⚙️ Open Start Panel", "🔄 Reset Conversation", "📊 System Status", "❌ Close"]
     translated_labels = await batch_translate(button_labels, user_id)
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(translated_labels[0], url=f"https://t.me/{bot_username}?start=settings")
-        ],
-        [
-            InlineKeyboardButton(translated_labels[1], callback_data="user_settings_reset")
-        ],
-        [
-            InlineKeyboardButton(translated_labels[2], callback_data="user_settings_status")
-        ],
-        [
-            InlineKeyboardButton(translated_labels[3], callback_data="user_settings_close")
-        ]
+        [InlineKeyboardButton(translated_labels[0], url=f"https://t.me/{bot_username}?start=settings")],
+        [InlineKeyboardButton(translated_labels[1], callback_data="user_settings_reset")],
+        [InlineKeyboardButton(translated_labels[2], callback_data="user_settings_status")],
+        [InlineKeyboardButton(translated_labels[3], callback_data="user_settings_close")]
     ])
-    if edit:
-        await message.edit_text(
+
+    if edit or callback_query:
+        await actual_message.edit_text(
             formatted_text,
             reply_markup=keyboard,
             disable_web_page_preview=True
         )
     else:
-        temp = await message.reply_text("**Loading your settings...**")
         await message.reply(
             formatted_text,
             reply_markup=keyboard,
             disable_web_page_preview=True
         )
-        await temp.delete()
 
 async def handle_user_settings_callback(client, callback_query):
     data = callback_query.data
     user_id = callback_query.from_user.id
+    current_language = user_lang_collection.find_one({"user_id": user_id}).get('language', 'en')
+
     if data == "user_settings_reset":
-        # Reset conversation logic (like /new), only show alert
         history_collection = get_history_collection()
         history_collection.delete_one({"user_id": user_id})
-        history_collection.insert_one({
-            "user_id": user_id,
-            "history": DEFAULT_SYSTEM_MESSAGE
-        })
-        await callback_query.answer("🔄 Conversation reset! Your chat history has been cleared.", show_alert=True)
+        history_collection.insert_one({"user_id": user_id, "history": DEFAULT_SYSTEM_MESSAGE})
+        reset_msg = await async_translate_to_lang("🔄 Conversation reset! Your chat history has been cleared.", current_language)
+        await callback_query.answer(reset_msg, show_alert=True)
         return
     elif data == "user_settings_status":
-        # Show a modern system status page using full stats and translations
-        user_id = callback_query.from_user.id
         stats = await get_bot_statistics()
-        # Translate headers
-        sysinfo_title = await async_translate_to_lang("⚙️ System Information", user_id)
-        uptime_text = await async_translate_to_lang("Uptime", user_id)
-        cpu_text = await async_translate_to_lang("CPU", user_id)
-        mem_text = await async_translate_to_lang("Memory", user_id)
-        feature_status_text = await async_translate_to_lang("Current Feature Status", user_id)
-        enabled_text = await async_translate_to_lang("✅ Enabled", user_id)
-        disabled_text = await async_translate_to_lang("❌ Disabled", user_id)
-        back_text = await async_translate_to_lang("🔙 Back", user_id)
-        ai_text = await async_translate_to_lang("AI Response", user_id)
-        img_text = await async_translate_to_lang("Image Generation", user_id)
-        voice_text = await async_translate_to_lang("Voice Features", user_id)
-        # Build status message
+        sysinfo_title = await async_translate_to_lang("⚙️ System Information", current_language)
+        uptime_text = await async_translate_to_lang("Uptime", current_language)
+        cpu_text = await async_translate_to_lang("CPU", current_language)
+        mem_text = await async_translate_to_lang("Memory", current_language)
+        feature_status_text = await async_translate_to_lang("Current Feature Status", current_language)
+        enabled_text = await async_translate_to_lang("✅ Enabled", current_language)
+        disabled_text = await async_translate_to_lang("❌ Disabled", current_language)
+        back_text = await async_translate_to_lang("🔙 Back", current_language)
+        ai_text = await async_translate_to_lang("AI Response", current_language)
+        img_text = await async_translate_to_lang("Image Generation", current_language)
+        voice_text = await async_translate_to_lang("Voice Features", current_language)
         status_message = f"<b>{sysinfo_title}</b>\n\n"
         status_message += f"• {uptime_text}: <b>{stats.get('uptime','-')}</b>\n"
         status_message += f"• {cpu_text}: <b>{stats.get('cpu_usage','-')}%</b>\n"
@@ -126,23 +127,23 @@ async def handle_user_settings_callback(client, callback_query):
         if stats.get('maintenance_mode', False):
             maintenance_info = await async_translate_to_lang(
                 "\n⚠️ <b>The bot is currently in maintenance mode.</b>\nSome features may be unavailable.",
-                user_id
+                current_language
             )
             status_message += maintenance_info
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(back_text, callback_data="user_settings_back")]
         ])
-        await callback_query.message.edit_text(
-            status_message,
-            reply_markup=keyboard,
-        )
+        await callback_query.message.edit_text(status_message, reply_markup=keyboard)
         await callback_query.answer()
         return
     elif data == "user_settings_back":
-        await user_settings_panel_command(client, callback_query.message, edit=True)
+        await user_settings_panel_command(client, None, edit=True, callback_query=callback_query)
         await callback_query.answer()
         return
     elif data == "user_settings_close":
         await callback_query.message.delete()
+        await callback_query.answer()
         return
-    await callback_query.answer("Feature coming soon!", show_alert=True) 
+    
+    default_answer = await async_translate_to_lang("Feature coming soon!", current_language)
+    await callback_query.answer(default_answer, show_alert=True) 

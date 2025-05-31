@@ -153,12 +153,12 @@ async def get_premium_benefits_message(user_id: int) -> str:
     benefits = [
         {"feature": "🖼️ Image Generation Model", "regular": "Standard (DALL-E 2)", "premium": "🎨 Advanced (DALL-E 3 - Higher Quality & Accuracy)"},
         {"feature": "⚡ Image Generation Speed", "regular": "Standard Queue", "premium": "Priority Queue (Faster Results)"},
+        {"feature": "🖼️ Number of Images", "regular": "1 Image", "premium": "Up to 4 Images at a time"},
         {"feature": "🚀 AI Response Time", "regular": "Standard", "premium": "Enhanced (Quicker Bot Replies)"},
         {"feature": "🚧 Maintenance Mode Access", "regular": "⛔ Restricted Access", "premium": "✅ Uninterrupted Bot Usage"},
         {"feature": "👥 Group Chat Features", "regular": "Limited (Basic Commands)", "premium": "Full Access (All AI Features)"},
         {"feature": "📈 Daily Usage Limits", "regular": "Standard Limits", "premium": "Higher Limits / No Limits (Varies)"},
         {"feature": "🥇 New Feature Access", "regular": "Standard Rollout", "premium": "Early Access to Beta Features"},
-        {"feature": "🆘 Support Priority", "regular": "Standard Support", "premium": "Priority Support Channel"}
     ]
 
     for item in benefits:

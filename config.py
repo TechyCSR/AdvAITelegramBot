@@ -40,4 +40,5 @@ if not OWNER_ID.isdigit():
 ADMINS = list(map(int, ADMINS))
 OWNER_ID = int(OWNER_ID)
 BOT_NAME = os.environ.get('BOT_NAME') or os.getenv("BOT_NAME") or "Adance AI ChatBot"
+ADMIN_CONTACT_MENTION = os.environ.get('ADMIN_CONTACT_MENTION') or os.getenv("ADMIN_CONTACT_MENTION") or "@techycsr"
 

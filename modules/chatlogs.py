@@ -14,10 +14,18 @@ async def channel_log(bot, message, action_type, additional_info=None, level="IN
     Send a standardized log message to the log channel
     """
     try:
-        user_id = message.from_user.id if message.from_user else None
-        username = message.from_user.username if message.from_user else None
-        chat_id = message.chat.id if message.chat else None
-        chat_type = message.chat.type if message.chat else None
+        # Handle both Message and CallbackQuery objects
+        is_callback = hasattr(message, 'message') and message.message is not None
+        
+        actual_message = message.message if is_callback else message
+        user = message.from_user
+
+        user_id = user.id if user else None
+        username = user.username if user else None
+        user_mention = user.mention if user else "Unknown"
+        
+        chat_id = actual_message.chat.id if actual_message and actual_message.chat else None
+        chat_type = actual_message.chat.type if actual_message and actual_message.chat else None
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Format for channel logging
@@ -32,7 +40,7 @@ async def channel_log(bot, message, action_type, additional_info=None, level="IN
         
         log_message = (
             f"{tags}\n"
-            f"**User**: {message.from_user.mention if message.from_user else 'Unknown'}\n"
+            f"**User**: {user_mention}\n"
             f"**User ID**: `{user_id}`\n"
             f"**Action**: `{action_type}`\n"
             f"**Chat**: `{chat_id} ({chat_type})`\n"
@@ -138,4 +146,3 @@ async def error_log(bot, error_type, error_message, context=None, user_id=None):
         
     except Exception as e:
         logger.error(f"Failed to log error: {str(e)}")
-

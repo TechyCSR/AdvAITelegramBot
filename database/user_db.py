@@ -9,7 +9,6 @@ users_collection = db['users']
 user_lang_collection = db['user_lang']
 
 
-#make it async
 
 async def check_and_add_username(user_id, username):
     """Check if a username exists in the users collection, and add it if it doesn't."""
