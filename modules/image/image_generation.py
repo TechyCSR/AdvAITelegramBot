@@ -786,7 +786,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         media_group = []
         for i, url in enumerate(urls):
             caption = f"🖼️ **AI Generated Image**\n\nPrompt: `{prompt}`\nStyle: `{style_info['name']}`" if i == 0 else ""
-            media_group.append(InputMediaPhoto(url, caption=caption))
+            media_group.append(InputMediaPhoto(url, caption=caption[:1024]))
         
         # Send generated images
         sent_message = await client.send_media_group(

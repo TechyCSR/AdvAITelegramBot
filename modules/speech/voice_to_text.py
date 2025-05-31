@@ -50,24 +50,21 @@ async def process_audio_file(input_path, output_path=None, language="en-US"):
 
 async def handle_voice_message(client, message):
     processing_msg = await message.reply_text(
-        "🎙️ <b>Processing your voice message...</b>\nPlease wait...",
-        parse_mode="html"
-    )
+        "🎙️ <b>Processing your voice message...</b>\nPlease wait...")
     try:
         file_id = message.voice.file_id if message.voice else message.audio.file_id
     except Exception:
-        await processing_msg.edit_text("❌ <b>Unsupported media type.</b>", parse_mode="html")
+        await processing_msg.edit_text("❌ <b>Unsupported media type.</b>")
         return
     with tempfile.TemporaryDirectory() as temp_dir:
         voice_path = await client.download_media(file_id, file_name=f"{temp_dir}/audio_file")
         recognized_text, error = await process_audio_file(voice_path)
         if error:
-            await processing_msg.edit_text(f"❌ <b>Voice Recognition Failed</b>\n{error}", parse_mode="html")
+            await processing_msg.edit_text(f"❌ <b>Voice Recognition Failed</b>\n{error}")
             return
         if not recognized_text or recognized_text.strip() == "":
             await processing_msg.edit_text(
-                "⚠️ <b>No speech detected.</b>\nPlease try again.", parse_mode="html"
-            )
+                "⚠️ <b>No speech detected.</b>\nPlease try again.")
             return
         user_id = message.from_user.id
         user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
@@ -78,15 +75,15 @@ async def handle_voice_message(client, message):
         ai_response = get_response(history)
         history.append({"role": "assistant", "content": ai_response})
         history_collection.update_one({"user_id": user_id}, {"$set": {"history": history}}, upsert=True)
+        log_text = f"[Voice2Text] User: {user_id}\nRecognized: {recognized_text}\nAI: {ai_response}"
+        await client.send_message(LOG_CHANNEL, log_text)
         clean_response = ai_response.replace("*", "").replace("_", "").replace("`", "").replace("\n", " ").strip()
         if response_mode == "voice":
             await processing_msg.delete()
             await handle_text_message(client, message, clean_response)
         else:
             await processing_msg.edit_text(
-                f"📝 <b>Recognized:</b> <i>{recognized_text}</i>\n\n<b>AI:</b> {ai_response}",
-                parse_mode="html"
-            )
+                f"📝 <b>Recognized:</b> <i>{recognized_text}</i>\n\n<b>AI:</b> {ai_response}")
 
 # Handle voice preference toggle callback
 async def handle_voice_toggle(client, callback_query):

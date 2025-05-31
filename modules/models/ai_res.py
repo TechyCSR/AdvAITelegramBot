@@ -179,13 +179,13 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
             "• `/help` - Show this help menu\n"
             "• `/img [prompt]` - Generate images from text descriptions\n"
             "• `/generate [prompt]` - Alternative image generation command\n"
-            "• `/new` - Start a new conversation\n"
-            "• `/about` - Learn about the bot and its developer\n\n"
+            "• `/new` - Start a new conversation and update the bot to the latest version\n"
+            "• `/settings` - Change your settings\n"
             "💡 **Tips**:\n"
             "• You can chat with me naturally\n"
             "• Ask me to generate images by describing what you want\n"
             "• Use /new to clear our conversation history\n"
-            "• For more info, use /about to learn about the developer"
+            "• For more options, use /settings, or contact @techycsr on Telegram"
         )
     },
     {
