@@ -36,6 +36,7 @@ from logging.handlers import RotatingFileHandler
 import json
 import time
 from modules.models.image_service import ImageService
+from modules.user.user_bans_management import ban_user, unban_user, is_user_banned, get_banned_message, get_user_by_id_or_username
 
 
 # Create directories if they don't exist
@@ -80,8 +81,59 @@ cleanup_scheduler = start_cleanup_scheduler()
 # Add a global in-memory dict to store pending group image contexts
 pending_group_images = {}
 
+
+@advAiBot.on_message(filters.command("ban") & filters.user(config.ADMINS))
+async def ban_command_handler(client, message):
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /ban <user_id_or_username> [reason]")
+        return
+    identifier = message.command[1]
+    reason = " ".join(message.command[2:]) if len(message.command) > 2 else "No reason provided."
+    target_user = await get_user_by_id_or_username(client, identifier)
+    if not target_user:
+        await message.reply_text(f"Could not find user: {identifier}")
+        return
+    if target_user.id in config.ADMINS:
+        await message.reply_text("Admins cannot be banned.")
+        return
+    success = await ban_user(target_user.id, message.from_user.id, reason)
+    if success:
+        await message.reply_text(f"User {target_user.mention} (ID: {target_user.id}) has been banned. Reason: {reason}")
+        await channel_log(client, message, "/ban", f"Admin {message.from_user.id} banned user {target_user.id}. Reason: {reason}")
+        try: # Notify user if possible
+            banned_msg_for_user = await get_banned_message(reason)
+            await client.send_message(target_user.id, banned_msg_for_user)
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_user.id} about their ban: {e}")
+    else:
+        await message.reply_text(f"Failed to ban user {target_user.mention}.")
+
+@advAiBot.on_message(filters.command("unban") & filters.user(config.ADMINS))
+async def unban_command_handler(client, message):
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /unban <user_id_or_username>")
+        return
+    identifier = message.command[1]
+    target_user = await get_user_by_id_or_username(client, identifier)
+    if not target_user:
+        await message.reply_text(f"Could not find user: {identifier}")
+        return
+    success = await unban_user(target_user.id)
+    if success:
+        await message.reply_text(f"User {target_user.mention} (ID: {target_user.id}) has been unbanned.")
+        await channel_log(client, message, "/unban", f"Admin {message.from_user.id} unbanned user {target_user.id}")
+        try: # Notify user if possible
+            await client.send_message(target_user.id, "🎉 You have been unbanned and can now use the bot again!")
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_user.id} about their unban: {e}")
+    else:
+        await message.reply_text(f"User {target_user.mention} was not found in the ban list or could not be unbanned.")
+
+
 @advAiBot.on_message(filters.command("start"))
 async def start_command(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     # Start the cleanup scheduler on first command
     global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task
     if not 'cleanup_scheduler_task' in globals() or cleanup_scheduler_task is None:
@@ -119,6 +171,8 @@ async def start_command(bot, update):
 
 @advAiBot.on_message(filters.command("help"))
 async def help_command(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     logger.info(f"User {update.from_user.id} requested help")
     await help(bot, update)
     await channel_log(bot, update, "/help")
@@ -143,13 +197,14 @@ def is_not_command_filter():
 def is_reply_to_bot_filter():
     async def func(_, __, message):
         if message.reply_to_message and message.reply_to_message.from_user:
-            # Check if the message is replying to the bot
             return message.reply_to_message.from_user.id == advAiBot.me.id
         return False
     return filters.create(func)
 
 @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
 async def handle_message(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
     # Check for maintenance mode
     if await maintenance_check(message.from_user.id):
         maint_msg = await maintenance_message(message.from_user.id)
@@ -163,7 +218,14 @@ async def handle_message(client, message):
 
 @advAiBot.on_inline_query()
 async def inline_query_handler(client, inline_query):
-    """Handler for inline queries, for both image generation and AI responses"""
+    # For inline queries, we can't directly reply with a ban message.
+    # We'll log it and prevent further processing.
+    user_id = inline_query.from_user.id
+    is_banned, reason = await is_user_banned(user_id)
+    if is_banned:
+        logger.warning(f"Banned user {user_id} attempted to use inline query. Reason: {reason}")
+        await inline_query.answer([], switch_pm_text="You are banned from using this bot.", switch_pm_parameter="banned")
+        return
     bot_stats["active_users"].add(inline_query.from_user.id)
     logger.info(f"Processing inline query from user {inline_query.from_user.id}: '{inline_query.query}'")
     
@@ -194,6 +256,16 @@ async def announce_callback_handler(bot, callback_query):
 
 @advAiBot.on_callback_query()
 async def callback_query(client, callback_query):
+    if await check_if_banned_and_reply(client, callback_query): # BAN CHECK (for the user who pressed the button)
+        # Note: check_if_banned_and_reply expects a message-like object for reply_text
+        # We might need to adjust it or handle banned callback queries differently,
+        # e.g., by just answering the callback with an alert.
+        try:
+            banned_msg_text = await get_banned_message((await is_user_banned(callback_query.from_user.id))[1])
+            await callback_query.answer(banned_msg_text, show_alert=True)
+        except: # Catch any exception during answer to prevent crash
+             await callback_query.answer("You are banned from using this bot.", show_alert=True)
+        return
     try:
         # Handle restart callbacks
         if callback_query.data == "confirm_restart" or callback_query.data == "cancel_restart":
@@ -449,6 +521,12 @@ async def callback_query(client, callback_query):
         elif callback_query.data.startswith("user_settings_"):
             await handle_user_settings_callback(client, callback_query)
             return
+        elif callback_query.data.startswith("uinfo_settings_"):
+            await uinfo_settings_callback(client, callback_query)
+            return
+        elif callback_query.data.startswith("uinfo_history_"):
+            await uinfo_history_callback(client, callback_query)
+            return
         else:
             # Unknown callback, just acknowledge it
             await callback_query.answer("Unknown command")
@@ -464,6 +542,8 @@ async def callback_query(client, callback_query):
 
 @advAiBot.on_message(filters.voice)
 async def voice(bot, message):
+    if await check_if_banned_and_reply(bot, message): # BAN CHECK
+        return
     # Check for maintenance mode and voice feature toggle
     from modules.maintenance import is_feature_enabled
     if await maintenance_check(message.from_user.id) or not await is_feature_enabled("voice_features"):
@@ -482,6 +562,8 @@ async def voice_toggle_callback(client, callback_query):
 # Add a new handler for replies to bot messages in groups
 @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
 async def handle_reply_to_bot(bot, message):
+    if await check_if_banned_and_reply(bot, message): # BAN CHECK
+        return
     # Check for maintenance mode and AI response toggle
     from modules.maintenance import is_feature_enabled
     if await maintenance_check(message.from_user.id) or not await is_feature_enabled("ai_response"):
@@ -516,6 +598,8 @@ async def leave_group_command(bot, update):
 
 @advAiBot.on_message(filters.command("rate") & filters.private)
 async def rate_commands(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     await rate_command(bot, update)
 
 @advAiBot.on_message(filters.command("invite"))
@@ -551,6 +635,8 @@ async def uinfo_history_cb(client, callback_query):
 
 @advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
 async def handle_group_message(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     # Check for maintenance mode and AI response feature
     from modules.maintenance import is_feature_enabled
     if await maintenance_check(update.from_user.id) or not await is_feature_enabled("ai_response"):
@@ -576,6 +662,8 @@ async def handle_group_message(bot, update):
 
 @advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
 async def handle_new_chat(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
     bot_stats["active_users"].add(message.from_user.id)
     await new_chat(client, message)
     await channel_log(client, message, "/newchat")
@@ -583,6 +671,8 @@ async def handle_new_chat(client, message):
 
 @advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
 async def handle_generate(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
     # Check for maintenance mode and image generation toggle
     from modules.maintenance import is_feature_enabled
     if await maintenance_check(message.from_user.id) or not await is_feature_enabled("image_generation"):
@@ -597,6 +687,8 @@ async def handle_generate(client, message):
 
 @advAiBot.on_message(filters.photo & filters.private)
 async def handle_private_image(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     """Handler for images in private chats"""
     # Check for maintenance mode
     if await maintenance_check(update.from_user.id):
@@ -618,6 +710,8 @@ async def handle_private_image(bot, update):
 
 @advAiBot.on_message(filters.photo & filters.group)
 async def handle_group_image(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     """Handler for images in group chats"""
     if await maintenance_check(update.from_user.id):
         maint_msg = await maintenance_message(update.from_user.id)
@@ -740,6 +834,8 @@ async def handle_group_img_ai_callback(bot, callback_query):
 
 @advAiBot.on_message(filters.command("settings"))
 async def settings_command(bot, update):
+    if await check_if_banned_and_reply(bot, update): # BAN CHECK
+        return
     logger.info(f"User {update.from_user.id} accessed settings")
     await user_settings_panel_command(bot, update)
     await channel_log(bot, update, "/settings")
@@ -848,6 +944,8 @@ async def logs_command(bot, update):
 
 @advAiBot.on_message(filters.command(["clear_cache", "clearcache", "clear_images"]))
 async def clear_user_cache(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
     """Handle request to clear user's image cache"""
     user_id = message.from_user.id
     logger.info(f"User {user_id} requested to clear their image cache")
@@ -1028,6 +1126,37 @@ async def handle_admin_text_input(bot, message):
     
     # If we reach here, it's not a special admin action, so proceed with normal message handling
     await handle_message(bot, message)
+
+
+# IMPORTANT: Ensure this new ban check is added to all relevant message/command handlers
+async def check_if_banned_and_reply(client, update_obj): # Renamed to update_obj for clarity
+    user_id = update_obj.from_user.id
+    # Admins cannot be banned by the bot, so skip check for them.
+    if user_id in config.ADMINS:
+        return False
+
+    is_banned, reason = await is_user_banned(user_id)
+    if is_banned:
+        banned_msg_text = await get_banned_message(reason)
+        if hasattr(update_obj, 'message') and update_obj.message: # It's a CallbackQuery
+            try:
+                await update_obj.answer(banned_msg_text, show_alert=True)
+            except Exception as e: # Catch any exception during answer to prevent crash
+                 logger.error(f"Error answering banned callback: {e}")
+                 await update_obj.answer("You are banned from using this bot.", show_alert=True)
+        elif hasattr(update_obj, 'reply_text'): # It's a Message
+            await update_obj.reply_text(banned_msg_text, parse_mode=ParseMode.HTML)
+        elif hasattr(update_obj, 'answer') and hasattr(update_obj, 'query'): # It's an InlineQuery
+             await update_obj.answer([], switch_pm_text="You are banned from using this bot.", switch_pm_parameter="banned_user")
+        return True
+    return False
+
+# Example of integrating the ban check into an existing handler:
+# @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
+# async def handle_message(client, message):
+#     if await check_if_banned_and_reply(client, message):
+#         return 
+#     # ... rest of the handler ...
 
 if __name__ == "__main__":
     # Print startup message
