@@ -4,19 +4,22 @@ from g4f.cookies import set_cookies
 
 # Initialize the GPT-4 client
 
+str="""
+Qwen/Qwen3-235B-A22B Done
 
+"""
 
-gpt_client = GPTClient(provider="PollinationsAI")
+gpt_client = GPTClient(provider="LegacyLMArena")
 
 history = []
-history.append({"role": "system", "content": "Hello! I am GPT-4, a chatbot."})
+history.append({"role": "system", "content": "Hello! I a  chatbot."})
 
 
 def get_response(ask):
         
         response = gpt_client.chat.completions.create(
-                model="gpt-4o",
-            messages=history + [{"role": "user", "content": ask}],
+        model="gemini-2.5-flash",
+        messages=history + [{"role": "user", "content": ask}],
         )
         history.append({"role": "system", "content": response.choices[0].message.content})
         return response.choices[0].message.content
