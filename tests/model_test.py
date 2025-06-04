@@ -9,7 +9,7 @@ Qwen/Qwen3-235B-A22B Done
 
 """
 
-gpt_client = GPTClient(provider="LegacyLMArena")
+gpt_client = GPTClient(provider="DeepInfraChat")    
 
 history = []
 history.append({"role": "system", "content": "Hello! I a  chatbot."})
@@ -18,7 +18,7 @@ history.append({"role": "system", "content": "Hello! I a  chatbot."})
 def get_response(ask):
         
         response = gpt_client.chat.completions.create(
-        model="gemini-2.5-flash",
+        model="deepseek-r1",
         messages=history + [{"role": "user", "content": ask}],
         )
         history.append({"role": "system", "content": response.choices[0].message.content})

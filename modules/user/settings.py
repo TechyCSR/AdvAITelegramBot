@@ -52,6 +52,7 @@ settings_text_template = """
 **User Voice**: {voice_setting}
 **User Mode**: {mode}
 
+
 You can change your settings from below options.
 
 **@AdvChatGptBot**
@@ -100,7 +101,11 @@ async def settings_inline(client_obj, callback: CallbackQuery):
     button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🖼️ Image Count", "🔙 Back"]
     translated_labels = await batch_translate(button_labels, user_id)
     
+    # Add the new AI Models button
+    ai_models_button_label = await async_translate_to_lang("🧠 AI Models", current_language)
+
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(ai_models_button_label, callback_data="settings_ai_models")],  # New button
         [InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
          InlineKeyboardButton(translated_labels[1], callback_data="settings_v")],
         [InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),

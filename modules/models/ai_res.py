@@ -2,6 +2,7 @@ import os
 import asyncio
 import time
 import re
+
 from typing import List, Dict, Any, Optional, Generator, Union
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
@@ -9,43 +10,72 @@ from g4f.client import Client as GPTClient
 from modules.core.database import get_history_collection
 from modules.chatlogs import user_log
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
+from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL
 
+# --- Provider mapping ---
+PROVIDER_MAP = {
+    "gpt-4o": "PollinationsAI",
+    "gpt-4.1": "PollinationsAI",
+    "qwen3": "DeepInfraChat",
+    "deepseek-r1": "DeepInfraChat"
+}
+
+# --- Model mapping for DeepInfraChat ---
+DEEPINFRA_MODEL_MAP = {
+    "qwen3": "Qwen/Qwen3-235B-A22B",
+    "deepseek-r1": "deepseek-r1"
+}
 
 # Initialize the GPT client with a more efficient provider
 gpt_client = GPTClient(provider="PollinationsAI")
 
-def get_response(history: List[Dict[str, str]]) -> str:  
+def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider: str = "PollinationsAI") -> str:
     """
     Get a non-streaming response from the AI model
     
     Args:
         history: Conversation history in the format expected by the AI model
+        model: The model to use for generating the response
+        provider: The provider to use for generating the response
         
     Returns:
         String response from the AI model
     """
     try:
-        # Ensure history is a list
         if not isinstance(history, list):
             history = [history]
-            
-        # If history is empty, use the default system message
         if not history:
-            history = DEFAULT_SYSTEM_MESSAGE.copy()  # Create a copy to avoid modifying the original
-            
-        # Ensure each message in history is a dictionary
+            history = DEFAULT_SYSTEM_MESSAGE.copy()
         for i, msg in enumerate(history):
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
-                
-        response = gpt_client.chat.completions.create(
-            model="gpt-4o",  # Using more capable model for higher quality responses
-            messages=history
-        )
-        return response.choices[0].message.content
+        gpt_client = GPTClient()
+        if provider == "PollinationsAI":
+            response = gpt_client.chat.completions.create(
+                model=model,
+                messages=history,
+                provider="PollinationsAI"
+            )
+            return response.choices[0].message.content
+        elif provider == "DeepInfraChat":
+            deep_model = DEEPINFRA_MODEL_MAP.get(model, model)
+            response = gpt_client.chat.completions.create(
+                model=deep_model,
+                messages=history,
+                provider="DeepInfraChat"
+            )
+            return response.choices[0].message.content
+        else:
+            # fallback to default
+            response = gpt_client.chat.completions.create(
+                model="gpt-4o",
+                messages=history,
+                provider="PollinationsAI"
+            )
+            return response.choices[0].message.content
     except Exception as e:
         print(f"Error generating response: {e}")
-        return "I'm experiencing technical difficulties. Please try again in a moment."
+        raise
 
 def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]:
     """
@@ -121,7 +151,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     {
         "role": "system",
         "content": (
-            "I'm your advanced AI assistant (**@AdvChatGptBot**), designed to provide helpful, accurate, and thoughtful responses. "
+            "I'm your advanced AI assistant (**@AdvChatGptBot**), Multi-Model AI Chatbot, designed to provide helpful, accurate, and thoughtful responses. "
             "I can assist with a wide range of tasks including answering questions, creating content, "
             "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
             "and improving to better serve your needs. This bot was developed by Chandan Singh (@techycsr)."
@@ -221,7 +251,6 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     }
 ]
 
-
 async def aires(client: Client, message: Message) -> None:
     """
     Handle user messages and generate AI responses
@@ -230,7 +259,6 @@ async def aires(client: Client, message: Message) -> None:
         client: Pyrogram client instance
         message: Message from the user
     """
-    # Check maintenance mode and AI response feature
     if await maintenance_check(message.from_user.id) or not await is_feature_enabled("ai_response"):
         maint_msg = await maintenance_message(message.from_user.id)
         await message.reply(maint_msg)
@@ -262,8 +290,17 @@ async def aires(client: Client, message: Message) -> None:
         # Use non-streaming approach for all chats to avoid flood control
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         
-        # Use non-streaming approach
-        ai_response = get_response(history)
+        # --- Get user model ---
+        user_model, _ = await get_user_ai_models(user_id)
+        provider = PROVIDER_MAP.get(user_model, "PollinationsAI")
+        model_to_use = user_model
+        fallback_used = False
+        try:
+            ai_response = get_response(history, model=model_to_use, provider=provider)
+        except Exception as e:
+            # fallback to gpt-4o
+            fallback_used = True
+            ai_response = get_response(history, model="gpt-4o", provider="PollinationsAI")
         
         # Add the AI response to the history
         history.append({"role": "assistant", "content": ai_response})
@@ -275,8 +312,11 @@ async def aires(client: Client, message: Message) -> None:
             upsert=True
         )
         
-        # Edit the temporary message with the AI response
-        await temp.edit_text(ai_response, disable_web_page_preview=True)
+        if fallback_used:
+            fallback_msg = f"⚠️ The selected model <b>{user_model}</b> is currently unavailable. Using <b>gpt-4o</b> as fallback."
+            await temp.edit_text(fallback_msg + "\n\n" + ai_response, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
+        else:
+            await temp.edit_text(ai_response, disable_web_page_preview=True)
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:

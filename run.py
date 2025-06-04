@@ -13,6 +13,7 @@ from modules.user.assistant import settings_assistant_callback, change_mode_sett
 from modules.user.lang_settings import settings_langs_callback, change_language_setting
 from modules.user.user_support import settings_support_callback, support_admins_callback, admin_panel_callback
 from modules.user.dev_support import support_developers_callback
+from modules.user.ai_model import ai_model_settings_panel, handle_set_text_model, handle_set_image_model, handle_ai_model_heading_click
 from modules.speech import text_to_voice, voice_to_text
 from modules.image.img_to_text import extract_text_res, handle_show_text_callback, handle_followup_callback
 from modules.maintenance import settings_others_callback, handle_feature_toggle, handle_feature_info, maintenance_check, maintenance_message, handle_donation
@@ -445,6 +446,8 @@ async def callback_query(client, callback_query):
         elif callback_query.data == "settings":
             from modules.user.settings import settings_inline
             await settings_inline(client, callback_query)
+        elif callback_query.data == "settings_ai_models":
+            await ai_model_settings_panel(client, callback_query)
         elif callback_query.data == "settings_v":
             await settings_language_callback(client, callback_query)
         elif callback_query.data in ["settings_voice", "settings_text"]:
@@ -608,6 +611,16 @@ async def callback_query(client, callback_query):
             return
         elif callback_query.data.startswith("img_count_"):
             await change_image_count_callback(client, callback_query)
+            return
+        # AI Model Panel Callbacks
+        elif callback_query.data.startswith("set_text_model_"):
+            await handle_set_text_model(client, callback_query)
+            return
+        elif callback_query.data.startswith("set_image_model_"):
+            await handle_set_image_model(client, callback_query)
+            return
+        elif callback_query.data.startswith("ai_model_heading_"):
+            await handle_ai_model_heading_click(client, callback_query)
             return
         else:
             # Unknown callback, just acknowledge it
