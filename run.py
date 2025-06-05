@@ -37,7 +37,7 @@ import json
 import time
 from modules.models.image_service import ImageService
 from modules.user.user_bans_management import ban_user, unban_user, is_user_banned, get_banned_message, get_user_by_id_or_username
-from modules.user.premium_management import add_premium_status, remove_premium_status, is_user_premium, get_premium_status_message, daily_premium_check, get_premium_benefits_message
+from modules.user.premium_management import add_premium_status, remove_premium_status, is_user_premium, get_premium_status_message, daily_premium_check, get_premium_benefits_message, get_all_premium_users, format_premium_users_list
 
 
 # Create directories if they don't exist
@@ -961,14 +961,15 @@ async def announce_command(bot, update):
                     InlineKeyboardButton("❌ Cancel", callback_data="announce_cancel")
                 ]
             ])
+            bold_text = f"**{text}**" if not text.strip().startswith("**") else text
             await update.reply_text(
-                f"**Broadcast Preview:**\n\n{text}",
+                f"**Broadcast Preview:**\n\n{bold_text}",
                 reply_markup=keyboard,
                 parse_mode=ParseMode.MARKDOWN
             )
             # Store the message in a temp dict for this admin (in-memory, simple)
             if not hasattr(bot, "_announce_pending"): bot._announce_pending = {}
-            bot._announce_pending[update.from_user.id] = text
+            bot._announce_pending[update.from_user.id] = bold_text
         except IndexError:
             logger.warning(f"Admin {update.from_user.id} attempted announce without message")
             await update.reply_text(
@@ -1158,6 +1159,59 @@ async def history_command(bot, update):
         await update.reply_text(f"❌ **Error retrieving chat history**: {str(e)}")
         await error_log(bot, "HISTORY_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
 
+
+@advAiBot.on_message(filters.command("benefits"))
+async def benefits_command_handler(client, message):
+    if await check_if_banned_and_reply(client, message): # BAN CHECK
+        return
+    
+    user_id = message.from_user.id
+    benefits_text = await get_premium_benefits_message(user_id)
+    
+    # Add a button to contact admin or view donation options
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💰 Donate / Upgrade to Premium", url="https://t.me/techycsr")]
+      
+    ])
+    
+    await message.reply_text(
+        benefits_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+    await channel_log(client, message, "/benefits")
+
+@advAiBot.on_message(filters.command("upremium") & filters.user(config.ADMINS))
+async def upremium_command(bot, message):
+    users = await get_all_premium_users()
+    formatted = await format_premium_users_list(users)
+    await message.reply_text(formatted, parse_mode=ParseMode.HTML)
+
+# IMPORTANT: Ensure this new ban check is added to all relevant message/command handlers
+async def check_if_banned_and_reply(client, update_obj): # Renamed to update_obj for clarity
+    user_id = update_obj.from_user.id
+    # Admins cannot be banned by the bot, so skip check for them.
+    if user_id in config.ADMINS:
+        return False
+
+    is_banned, reason = await is_user_banned(user_id)
+    if is_banned:
+        banned_msg_text = await get_banned_message(reason)
+        if hasattr(update_obj, 'message') and update_obj.message: # It's a CallbackQuery
+            try:
+                await update_obj.answer(banned_msg_text, show_alert=True)
+            except Exception as e: # Catch any exception during answer to prevent crash
+                 logger.error(f"Error answering banned callback: {e}")
+                 await update_obj.answer("You are banned from using this bot.", show_alert=True)
+        elif hasattr(update_obj, 'reply_text'): # It's a Message
+            await update_obj.reply_text(banned_msg_text, parse_mode=ParseMode.HTML)
+        elif hasattr(update_obj, 'answer') and hasattr(update_obj, 'query'): # It's an InlineQuery
+             await update_obj.answer([], switch_pm_text="You are banned from using this bot.", switch_pm_parameter="banned_user")
+        return True
+    return False
+
+
 @advAiBot.on_message(filters.text & filters.private & filters.user(config.ADMINS))
 async def handle_admin_text_input(bot, message):
     """Handler for admin text input, including user ID for history search"""
@@ -1222,50 +1276,6 @@ async def handle_admin_text_input(bot, message):
     # If we reach here, it's not a special admin action, so proceed with normal message handling
     await handle_message(bot, message)
 
-@advAiBot.on_message(filters.command("benefits"))
-async def benefits_command_handler(client, message):
-    if await check_if_banned_and_reply(client, message): # BAN CHECK
-        return
-    
-    user_id = message.from_user.id
-    benefits_text = await get_premium_benefits_message(user_id)
-    
-    # Add a button to contact admin or view donation options
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💰 Donate / Upgrade to Premium", url="https://t.me/techycsr")]
-      
-    ])
-    
-    await message.reply_text(
-        benefits_text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-        disable_web_page_preview=True
-    )
-    await channel_log(client, message, "/benefits")
-
-# IMPORTANT: Ensure this new ban check is added to all relevant message/command handlers
-async def check_if_banned_and_reply(client, update_obj): # Renamed to update_obj for clarity
-    user_id = update_obj.from_user.id
-    # Admins cannot be banned by the bot, so skip check for them.
-    if user_id in config.ADMINS:
-        return False
-
-    is_banned, reason = await is_user_banned(user_id)
-    if is_banned:
-        banned_msg_text = await get_banned_message(reason)
-        if hasattr(update_obj, 'message') and update_obj.message: # It's a CallbackQuery
-            try:
-                await update_obj.answer(banned_msg_text, show_alert=True)
-            except Exception as e: # Catch any exception during answer to prevent crash
-                 logger.error(f"Error answering banned callback: {e}")
-                 await update_obj.answer("You are banned from using this bot.", show_alert=True)
-        elif hasattr(update_obj, 'reply_text'): # It's a Message
-            await update_obj.reply_text(banned_msg_text, parse_mode=ParseMode.HTML)
-        elif hasattr(update_obj, 'answer') and hasattr(update_obj, 'query'): # It's an InlineQuery
-             await update_obj.answer([], switch_pm_text="You are banned from using this bot.", switch_pm_parameter="banned_user")
-        return True
-    return False
 
 # Example of integrating the ban check into an existing handler:
 # @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)

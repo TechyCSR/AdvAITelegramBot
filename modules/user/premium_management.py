@@ -4,6 +4,7 @@ from config import DATABASE_URL
 from typing import Tuple, Optional
 import asyncio
 from modules.lang import async_translate_to_lang # Import for localization
+from modules.user.ai_model import revert_restricted_models_if_needed, TEXT_MODELS, IMAGE_MODELS
 
 # Initialize MongoDB client and collection
 mongo_client = MongoClient(DATABASE_URL)
@@ -49,6 +50,8 @@ async def remove_premium_status(user_id: int, revoked_by_admin: bool = False) ->
         {"user_id": user_id, "is_premium": True},
         {"$set": update_fields}
     )
+    # Revert restricted models if needed
+    await revert_restricted_models_if_needed(user_id)
     return result.modified_count > 0
 
 async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.datetime]]:
@@ -125,6 +128,8 @@ async def daily_premium_check(client_for_notification=None):
                     print(f"Failed to send premium expiry notification to {user_id}: {e}")
         else:
             print(f"Failed to remove premium status for user_id: {user_id}, or already marked as not premium.")
+        # Always revert restricted models for expired users (safety)
+        await revert_restricted_models_if_needed(user_id)
             
     if count > 0:
         print(f"Daily premium check: {count} users had their premium status expired and updated.")
@@ -133,38 +138,73 @@ async def daily_premium_check(client_for_notification=None):
     return count 
 
 async def get_premium_benefits_message(user_id: int) -> str:
-    """Generates a visually appealing HTML message comparing premium and regular user benefits."""
-    
-    header_text = "🌟 <b>Unlock Superpowers with Premium!</b> 🌟"
-    # For potential future localization:
-    # header_text = await async_translate_to_lang("🌟 <b>Unlock Superpowers with Premium!</b> 🌟", user_id)
-    # sub_header_text = await async_translate_to_lang("Here's a glimpse of what you get:", user_id)
-    # regular_user_title = await async_translate_to_lang("👤 Regular User", user_id)
-    # premium_user_title = await async_translate_to_lang("✨ Premium User", user_id)
-    # upgrade_prompt = await async_translate_to_lang("Ready to upgrade? Contact admin @techycsr", user_id)
+    """
+    Returns a clean, modern, and visually appealing HTML message comparing Standard and Premium benefits in a single, unified card.
+    """
+    from modules.user.ai_model import TEXT_MODELS, IMAGE_MODELS
 
-    sub_header_text = "Here's a glimpse of what you get:"
-    regular_user_title = "👤 Regular User"
-    premium_user_title = "✨ Premium User"
-    upgrade_prompt = "Ready to upgrade? Contact admin @techycsr"
+    # --- Header ---
+    header = (
+        "<b>💎 Unlock Premium AI Power!</b>\n"
+        "<i>Upgrade for the best AI experience, exclusive models, and more control.</i>\n"
+    )
 
-    message = f"{header_text}\n{sub_header_text}\n\n"
-
-    benefits = [
-        {"feature": "🖼️ Image Generation Model", "regular": "Standard (DALL-E 2)", "premium": "🎨 Advanced (DALL-E 3 - Higher Quality & Accuracy)"},
-        {"feature": "⚡ Image Generation Speed", "regular": "Standard Queue", "premium": "Priority Queue (Faster Results)"},
-        {"feature": "🖼️ Number of Images", "regular": "1 Image", "premium": "Up to 4 Images at a time"},
-        {"feature": "🚀 AI Response Time", "regular": "Standard", "premium": "Enhanced (Quicker Bot Replies)"},
-        {"feature": "🚧 Maintenance Mode Access", "regular": "⛔ Restricted Access", "premium": "✅ Uninterrupted Bot Usage"},
-        {"feature": "👥 Group Chat Features", "regular": "Limited (Basic Commands)", "premium": "Full Access (All AI Features)"},
-        {"feature": "📈 Daily Usage Limits", "regular": "Standard Limits", "premium": "Higher Limits / No Limits (Varies)"},
-        {"feature": "🥇 New Feature Access", "regular": "Standard Rollout", "premium": "Early Access to Beta Features"},
+    # --- Feature Comparison (Compact, Card Style) ---
+    features = [
+        ("🧠 AI Text Models", "GPT-4o", "GPT-4o, GPT-4.1, Qwen3, DeepSeek-R1"),
+        ("🖼️ Image Models", "DALL-E 3, Flux", "DALL-E 3, Flux, Flux Pro"),
+        ("🖼️ Images per Request", "1", "Up to 4"),
+        ("⚡ Image Speed", "Standard", "Priority (Faster)"),
+        ("🚀 AI Response Time", "Standard", "Enhanced"),
+        ("📈 Daily Usage", "Standard Limits", "Higher/No Limits"),
+        ("🥇 New Features", "Standard Rollout", "Early Access"),
+        ("🔒 Maintenance Access", "Restricted", "Uninterrupted"),
     ]
+    feature_rows = "\n".join([
+        f"<b>{icon}</b> <code>\nStandard:</code> {std}   <code>\nPremium:</code> {prem}\n" for icon, std, prem in features
+    ])
 
-    for item in benefits:
-        message += f"<b>{item['feature']}</b>\n"
-        message += f"  <code>{regular_user_title}:</code> {item['regular']}\n"
-        message += f"  <code>{premium_user_title}:</code> {item['premium']}\n\n"
-    
-    message += f"\n{upgrade_prompt}"
+    # --- Premium-Only Models ---
+    premium_models = [TEXT_MODELS['gpt-4.1'], TEXT_MODELS['qwen3'], IMAGE_MODELS['flux-pro']]
+    premium_models_section = (
+        "\n<b>✨ Premium-Only Models:</b> <code>" + ", ".join(premium_models) + "</code>\n"
+        "<i>\nAccess the most advanced AI and image models, only for Premium users.</i>"
+    )
+    # --- Call to Action ---
+    upgrade_cta = (
+        "\n\n<a href='https://t.me/techycsr'><b>🚀 Upgrade to Premium Now</b></a>"
+    )
+
+    # --- Compose Message ---
+    message = (
+        f"{header}"
+        "<pre>─────────────────────────────</pre>\n"
+        f"{feature_rows}\n"
+        "<pre>─────────────────────────────</pre>\n"
+        f"{premium_models_section}"
+        f"{upgrade_cta}"
+    )
     return message 
+
+async def get_all_premium_users():
+    """Returns a list of all users with active premium status, including user_id, premium_since, and premium_expires_at."""
+    users = list(premium_users_collection.find({"is_premium": True}))
+    result = []
+    for user in users:
+        result.append({
+            "user_id": user["user_id"],
+            "premium_since": user.get("premium_since"),
+            "premium_expires_at": user.get("premium_expires_at")
+        })
+    return result
+
+async def format_premium_users_list(users):
+    """Formats the premium users list for admin display."""
+    if not users:
+        return "<b>No active premium users found.</b>"
+    lines = ["<b>💎 Premium Users List</b>\n"]
+    for u in users:
+        since = u["premium_since"].strftime("%Y-%m-%d") if u["premium_since"] else "-"
+        until = u["premium_expires_at"].strftime("%Y-%m-%d") if u["premium_expires_at"] else "-"
+        lines.append(f"<b>User:</b> <code>{u['user_id']}</code> | <b>Start:</b> {since} | <b>Expires:</b> {until}")
+    return "\n".join(lines) 

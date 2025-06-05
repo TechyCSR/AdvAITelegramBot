@@ -8,15 +8,17 @@ import json
 from typing import Dict, List, Optional, Tuple, Union
 import re
 import hashlib
+import urllib.parse
 
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
 from pyrogram import Client, filters
 from pymongo import MongoClient
-from ImgGenModel.g4f.client import Client as ImageClient
-from ImgGenModel.g4f.Provider import PollinationsAI
 from config import DATABASE_URL, LOG_CHANNEL, ADMINS
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 from modules.user.premium_management import is_user_premium
+from modules.user.ai_model import get_user_ai_models, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, RESTRICTED_IMAGE_MODELS
+from g4f.client import AsyncClient
+from g4f.Provider import PollinationsImage
 
 # Get the logger
 logger = logging.getLogger(__name__)
@@ -173,145 +175,84 @@ user_states: Dict[int, UserGenerationState] = {}
 
 # ====== CORE IMAGE GENERATION ======
 
-async def generate_images(prompt: str, style: str, max_images: int = 1) -> Tuple[Optional[List[str]], Optional[str]]:
+async def generate_images(prompt: str, style: str, max_images: int = 1, user_id: int = None) -> Tuple[Optional[List[str]], Optional[str]]:
     logger.info(f"Starting generate_images. Prompt: '{prompt[:50]}...', Style: '{style}', Max images requested: {max_images}")
-    
     style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
     enhanced_prompt = f"{prompt}, {style_info['prompt_additions']}"
     logger.info(f"Enhanced prompt for generation: '{enhanced_prompt[:50]}...'")
-    
-    generated_images_count = 0
+
+    # Get user-selected model (default if not set)
+    if user_id is not None:
+        _, user_image_model = await get_user_ai_models(user_id)
+        is_premium, _, _ = await is_user_premium(user_id)
+        is_admin = user_id in ADMINS
+        if not is_premium and not is_admin and user_image_model in RESTRICTED_IMAGE_MODELS:
+            user_image_model = DEFAULT_IMAGE_MODEL
+    else:
+        user_image_model = DEFAULT_IMAGE_MODEL
+
     image_urls_list = []
-    
-    providers_to_try = ["PollinationsAI", None] 
-
-    for provider_name_spec in providers_to_try:
-        current_provider_name_for_log = provider_name_spec if provider_name_spec else 'Default'
-        logger.info(f"Outer Loop: Considering Provider '{current_provider_name_for_log}'. Images collected: {generated_images_count}/{max_images}.")
-
-        if generated_images_count >= max_images:
-            logger.info("Target image count reached. Skipping further providers.")
-            break
-        
-        consecutive_zero_yield_calls = 0
-        # Max times this provider can return 0 images (or fail init) consecutively before we give up on it for this session
-        max_consecutive_zero_yield_threshold = 2 
-
-        # Inner loop: try to get more images from THIS provider
-        while generated_images_count < max_images:
-            if consecutive_zero_yield_calls >= max_consecutive_zero_yield_threshold:
-                logger.warning(f"Provider '{current_provider_name_for_log}' was unproductive for {max_consecutive_zero_yield_threshold} calls. Moving to next provider.")
-                break # Break from this inner provider loop
-
-            images_needed_for_total = max_images - generated_images_count
-            num_to_request_in_this_api_call = images_needed_for_total # Request all remaining
-
-            logger.info(f"Inner Loop (Provider '{current_provider_name_for_log}'): Requesting {num_to_request_in_this_api_call} images. (Total collected: {generated_images_count}/{max_images})")
-
-            image_api_client = ImageClient()
-            provider_instance_for_api = None
-            actual_model_name_for_api = "dall-e-3"
-
-            if provider_name_spec == "PollinationsAI":
-                try:
-                    provider_instance_for_api = PollinationsAI
-                    logger.info("Using PollinationsAI instance for this call.")
-                except Exception as e_provider_init:
-                    logger.error(f"Failed to initialize PollinationsAI: {str(e_provider_init)}. Marking as unproductive for this call.")
-                    consecutive_zero_yield_calls +=1 # Count init failure as unproductive
-                    continue # Restart inner loop to check consecutive_zero_yield_calls
+    try:
+        client = AsyncClient(image_provider=PollinationsImage)
+        response = await client.images.generate(
+            prompt=enhanced_prompt,
+            model=user_image_model,
+            n=max_images,
+            response_format="url",
+            width=1024,
+            height=1024,
+            quality="standard"
+        )
+        if not response or not response.data:
+            logger.warning(f"g4f returned no image data (empty/None response.data).")
+            return None, "Failed to generate images. No images were returned by the provider. Please try a different prompt or try again later."
+        for i, image_object in enumerate(response.data):
+            if hasattr(image_object, 'url') and image_object.url and image_object.url.startswith("https://"):
+                image_urls_list.append(image_object.url)
             else:
-                logger.info("Using Default provider instance for this call.")
-            
-            generation_parameters = {
-                "prompt": enhanced_prompt, "n": num_to_request_in_this_api_call,
-                "provider": provider_instance_for_api, "width": 1024, "height": 1024,
-                "quality": "standard", "model": actual_model_name_for_api
-            }
-            logger.debug(f"API Gen Params for '{current_provider_name_for_log}': {generation_parameters}")
-            
-            try:
-                api_response = await asyncio.wait_for(
-                    image_api_client.images.async_generate(**generation_parameters),
-                    timeout=75 
-                )
+                logger.warning(f"Image object {i} from g4f has no valid HTTPS URL. Skipping.")
+    except Exception as e_generate:
+        logger.error(f"Exception with g4f image generation: {str(e_generate)}.")
+        # Log the error to the log channel
+        try:
+            await client.send_message(
+                LOG_CHANNEL,
+                f"#ImgGenError\nPrompt: `{enhanced_prompt}`\nUser ID: {user_id}\nError: {str(e_generate)}"
+            )
+        except Exception as log_err:
+            logger.error(f"Failed to log image gen error to channel: {str(log_err)}")
+        # Return a generic error for the user
+        return None, "There's some issue, please try in a moment or change your prompt."
 
-                if not api_response or not api_response.data:
-                    logger.warning(f"Provider '{current_provider_name_for_log}' returned no image data (empty/None response.data).")
-                    consecutive_zero_yield_calls += 1
-                    continue 
-
-                num_returned_this_call = len(api_response.data)
-                logger.info(f"Provider '{current_provider_name_for_log}' returned {num_returned_this_call} image(s) (requested {num_to_request_in_this_api_call}).")
-
-                if num_returned_this_call == 0:
-                    consecutive_zero_yield_calls += 1
-                    continue 
-
-                consecutive_zero_yield_calls = 0 # Reset if images were returned
-                
-                for i, image_object in enumerate(api_response.data):
-                    if not hasattr(image_object, 'url') or not image_object.url:
-                        logger.warning(f"Image object {i} from '{current_provider_name_for_log}' has no URL. Skipping.")
-                        continue
-                    
-                    image_urls_list.append(image_object.url)
-                    generated_images_count += 1
-                    logger.info(f"Added image. Total generated: {generated_images_count}/{max_images}.")
-                    if generated_images_count >= max_images:
-                        break 
-                
-                if generated_images_count >= max_images:
-                    break 
-
-            except asyncio.TimeoutError:
-                logger.warning(f"Timeout with provider '{current_provider_name_for_log}'. Breaking from this provider for now.")
-                break 
-            except Exception as e_generate:
-                logger.error(f"Exception with provider '{current_provider_name_for_log}': {str(e_generate)}. Breaking from this provider for now.")
-                break 
-        # End of inner while loop (current provider)
-        
-        if generated_images_count >= max_images:
-            logger.info(f"Target of {max_images} images collected. Last provider used: '{current_provider_name_for_log}'.")
-            break # Break from outer for loop (providers_to_try)
-
-    logger.info(f"Finished all provider attempts. Total images generated: {generated_images_count}. URLs collected: {len(image_urls_list)}.")
-    
     if not image_urls_list:
         logger.warning("No image URLs were collected after all attempts.")
-        return None, "Failed to generate images. No images were returned by providers after multiple attempts. Please try a different prompt or try again later."
-    
-    processed_image_paths = []
-    for u_idx, u_url in enumerate(image_urls_list):
-        path_to_use = u_url 
-        if "/images/" in u_url: 
-            path_to_use = u_url.replace("/images/", "./generated_images/")
-            # Ensure the directory exists if we are creating local paths like this
-            # os.makedirs(os.path.dirname(path_to_use), exist_ok=True) 
-            logger.debug(f"Processed URL {u_idx}: '{u_url}' to path '{path_to_use}'")
-        else:
-            logger.debug(f"URL {u_idx}: '{u_url}' used as is (assumed direct path or remote URL).")
-        processed_image_paths.append(path_to_use)
+        return None, "Failed to generate images. No images were returned by the provider. Please try a different prompt or try again later."
 
-    return processed_image_paths, None
+    return image_urls_list, None
 
 # ====== UI COMPONENTS ======
 
-async def update_generation_progress(client: Client, chat_id: int, message_id: int, prompt: str, style: str, num_images: int = 1) -> None:
-    """Show a dynamic progress indicator while generating images"""
+async def update_generation_progress(client: Client, chat_id: int, message_id: int, prompt: str, style: str, num_images: int = 1, user_id: int = None) -> None:
+    """Show a dynamic progress indicator while generating images, including the user's selected model."""
     progress_stages = [
         "⏳ Analyzing your prompt...",
         "🤔 Brainstorming creative concepts...",
         "🎨 Sketching out initial designs...",
         "🖌️ Applying artistic layers & textures...",
         "✨ Refining details & adding highlights...",
-        "Finalizing your masterpiece(s)...",
         "📷 Rendering final image(s)..."
     ]
     
     style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
     num_images_note = f" (for {num_images} images)" if num_images > 1 else ""
+    
+    # Fetch the user's selected model
+    user_model = None
+    if user_id is not None:
+        _, user_model = await get_user_ai_models(user_id)
+    else:
+        user_model = DEFAULT_IMAGE_MODEL
+    model_note = f"\nModel: `{user_model}`"
     
     try:
         for i, stage in enumerate(progress_stages):
@@ -324,7 +265,7 @@ async def update_generation_progress(client: Client, chat_id: int, message_id: i
                 message_id=message_id,
                 text=f"🎭 **Generating Images**\n\n"
                 f"Your prompt: `{prompt}`\n\n"
-                f"Style: `{style_info['name']}`{num_images_note}\n\n"
+                f"Style: `{style_info['name']}`{num_images_note}{model_note}\n\n"
                 f"{stage}"
             )
     except asyncio.CancelledError:
@@ -704,6 +645,12 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         # Get style info
         style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
         
+        # Get the user's selected image model (key and display name)
+        _, user_image_model = await get_user_ai_models(clicked_user_id)
+        model_display_name = IMAGE_MODELS.get(user_image_model, user_image_model)
+        model_note = f"\nModel: {model_display_name}"
+        settings_note = "\n_You can change the model in Settings → AI Model Panel_"
+
         # Determine number of images to generate
         num_images_to_generate = 1 # Default for standard users
         is_premium, _, _ = await is_user_premium(clicked_user_id)
@@ -738,7 +685,8 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
                 processing_message.id, 
                 state.prompt, 
                 style,
-                num_images_to_generate # Pass num_images here
+                num_images_to_generate, # Pass num_images here
+                clicked_user_id # Pass user_id for model display
             )
         )
         
@@ -766,6 +714,19 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         if clicked_user_id in user_states:
             user_states[clicked_user_id].set_processing(False)
 
+def extract_valid_image_url(url: str) -> str:
+    """Extract a valid HTTP/HTTPS image URL from a possibly encoded or indirect URL."""
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    # Try to extract ?url=... from the string
+    parsed = urllib.parse.urlparse(url)
+    query = urllib.parse.parse_qs(parsed.query)
+    if 'url' in query:
+        candidate = query['url'][0]
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            return candidate
+    return None
+
 async def generate_and_send_images(client: Client, message: Message, prompt: str, style: str, progress_task=None, user=None, num_images: int = 1) -> None:
     """Generate images and send them to the user"""
     # Get the user ID from the user object if provided, else fallback
@@ -783,7 +744,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
     
     try:
         # Generate the images
-        urls, error = await generate_images(prompt, style, max_images=num_images)
+        urls, error = await generate_images(prompt, style, max_images=num_images, user_id=user_id)
         
         # Cancel progress updater if it exists
         if progress_task and not progress_task.done():
@@ -794,7 +755,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
             await client.send_message(
                 chat_id=chat_id,
-                text=f"❌ **Image Generation Failed**\n\n{error}\n\nPlease try a different prompt or style."
+                text=f"❌ **Image Generation Failed**\n\nThere's some issue, please try in a moment or change your prompt.\n\nPlease try a different prompt or style."
             )
             
             # Get user info for mention
@@ -804,8 +765,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             try:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"#ImgLog #Rejected\n**Prompt**: `{prompt}`\n**Style**: `{style_info['name']}`\n"
-                    f"**User**: {user_mention}\n**Time**: {generation_time}\n**Error**: {error}"
+                    f"#ImgGenError\nPrompt: `{prompt}`\nUser ID: {user_id}\nError: {error}"
                 )
             except Exception as e:
                 logger.error(f"Failed to log error to channel: {str(e)}")
@@ -827,11 +787,30 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         # Get style info
         style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
         
+        # Get the user's selected image model (key and display name)
+        _, user_image_model = await get_user_ai_models(user_id)
+        model_display_name = IMAGE_MODELS.get(user_image_model, user_image_model)
+        model_note = f"\nModel: {model_display_name}"
+        settings_note = "\nYou can change the model in Settings → AI Model Panel"
+
         # Prepare media group with generated images
         media_group = []
         for i, url in enumerate(urls):
-            caption = f"🖼️ **AI Generated Image**\n\nPrompt: `{prompt}`\nStyle: `{style_info['name']}`" if i == 0 else ""
-            media_group.append(InputMediaPhoto(url, caption=caption[:1024]))
+            valid_url = extract_valid_image_url(url)
+            if not valid_url:
+                logger.warning(f"Skipping invalid image URL: {url}")
+                continue
+            if i == 0:
+                caption = (
+                    f"🖼️ **AI Generated Image**\n\nPrompt: `{prompt}`\nStyle: `{style_info['name']}`"
+                    f"{model_note}\n\n{settings_note}"
+                )
+            else:
+                caption = ""
+            media_group.append(InputMediaPhoto(valid_url, caption=caption[:1024]))
+        if not media_group:
+            await client.send_message(chat_id=chat_id, text="❌ **Image Generation Failed**\n\nNo valid images were returned by the provider.")
+            return
         
         # Send generated images
         sent_message = await client.send_media_group(
@@ -854,7 +833,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         # Send feedback message
         feedback_msg = await client.send_message(
             chat_id=chat_id,
-            text="**How do you like these images?**\n\nYour feedback helps improve our AI.",
+            text=f"**How do you like these images?**\n\n_Model used: {model_display_name}_\n_You can change the model in Settings → AI Model Panel._\n\nYour feedback helps improve our AI.",
             reply_markup=feedback_markup,
             reply_to_message_id=sent_message[0].id if sent_message else None
         )
@@ -900,9 +879,17 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
                 
     except Exception as e:
         logger.error(f"Error in image generation: {str(e)}")
+        # Log the error to the log channel
+        try:
+            await client.send_message(
+                LOG_CHANNEL,
+                f"#ImgGenError\nPrompt: `{prompt}`\nUser ID: {user_id}\nError: {str(e)}"
+            )
+        except Exception as log_err:
+            logger.error(f"Failed to log image gen error to channel: {str(log_err)}")
         await client.send_message(
             chat_id=chat_id,
-            text=f"❌ **Error**\n\nFailed to generate images: {str(e)}"
+            text="❌ **Image Generation Failed**\n\nThere's some issue, please try in a moment or change your prompt."
         )
     finally:
         # ALWAYS reset ALL user states for this user, no matter what

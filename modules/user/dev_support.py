@@ -52,7 +52,7 @@ Consider donating to help maintain and improve this bot.
         [
             [
                 InlineKeyboardButton(portfolio_btn, url="https://techycsr.me"),
-                InlineKeyboardButton(github_btn, url="https://github.com/TechyCSR/AdvAITelegramBot")
+                InlineKeyboardButton(github_btn, url="https://github.com/TechyCSR/")
             ],
             [
                 InlineKeyboardButton(contact_btn, url="https://t.me/techycsr"),

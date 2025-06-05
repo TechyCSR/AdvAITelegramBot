@@ -83,6 +83,7 @@ These commands are restricted to bot administrators only.
 
 **/premium <user_id|username> <days>** - Grant premium access
 **/unpremium <user_id|username>** - Revoke premium access
+**/upremium** - Get premium list
 **/ban <user_id|username> [reason]** - Ban a user from the bot
 **/unban <user_id|username>** - Unban a user
 **/history <user_id>** - View a user's chat history

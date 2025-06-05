@@ -10,7 +10,9 @@ from g4f.client import Client as GPTClient
 from modules.core.database import get_history_collection
 from modules.chatlogs import user_log
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
-from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL
+from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL, RESTRICTED_TEXT_MODELS
+from modules.user.premium_management import is_user_premium
+from config import ADMINS
 
 # --- Provider mapping ---
 PROVIDER_MAP = {
@@ -151,7 +153,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     {
         "role": "system",
         "content": (
-            "I'm your advanced AI assistant (**@AdvChatGptBot**), Multi-Model AI Chatbot, designed to provide helpful, accurate, and thoughtful responses. "
+            "I'm your advanced AI assistant (**@AdvChatGptBot**), Multi-Model AI Chatbot(Gpt4.1,Qwen3,DeepSeek R1,Img Gen : Dall-e3,Flux & Flux-Pro), designed to provide helpful, accurate, and thoughtful responses. "
             "I can assist with a wide range of tasks including answering questions, creating content, "
             "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
             "and improving to better serve your needs. This bot was developed by Chandan Singh (@techycsr)."
@@ -218,6 +220,16 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
             "• Use /new to clear our conversation history\n"
             "• For more options, use /settings, or contact @techycsr on Telegram"
         )
+    },
+    {
+        "role": "user",
+        "content": "How to change AI model for image generation or text responses?"
+    },
+    {
+        "role": "assistant",
+        "content":"/start --> settings --> AI Model Panel to change the  AI model for image generation or text responses."
+
+
     },
     {
         "role": "user",
@@ -292,6 +304,10 @@ async def aires(client: Client, message: Message) -> None:
         
         # --- Get user model ---
         user_model, _ = await get_user_ai_models(user_id)
+        is_premium, _, _ = await is_user_premium(user_id)
+        is_admin = user_id in ADMINS
+        if not is_premium and not is_admin and user_model in RESTRICTED_TEXT_MODELS:
+            user_model = DEFAULT_TEXT_MODEL
         provider = PROVIDER_MAP.get(user_model, "PollinationsAI")
         model_to_use = user_model
         fallback_used = False

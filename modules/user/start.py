@@ -9,6 +9,7 @@ import database.user_db as user_db
 from pyrogram.enums import ParseMode
 from config import ADMIN_CONTACT_MENTION, OWNER_ID
 from modules.user.premium_management import get_premium_benefits_message, get_premium_status_message
+from modules.user.ai_model import TEXT_MODELS, IMAGE_MODELS
 
 # Import for benefits display
 # Define button texts with emojis - NO premium button here
@@ -24,17 +25,25 @@ button_list = [
 welcome_text = """
 ✨ **Welcome {user_mention}!** ✨
 
-🤖 **Advanced AI Bot **
+🤖 **Advanced AI Bot**
 
 I can help you with:
 
-🧠 **Smart Chat** - Intelligent conversations with GPT-4o
+🧠 **Smart Chat** - Intelligent conversations with Multi-Model
 🗣️ **Voice & Text** - Convert voice to text and back
 🖼️ **Image Creation** - Generate stunning visuals from text
 📝 **Text Extraction** - Analyze text from any image
 🌐 **Multilingual** - Communicate in your language
 
 ━━━━━━━━━━━━━━━━━━━━━
+
+<b>🧠 AI Text Models Supported:</b>
+""" + ", ".join(TEXT_MODELS.values()) + """
+
+<b>🖼️ Image Generation Models Supported:</b>
+""" + ", ".join(IMAGE_MODELS.values()) + """
+
+<b>✨ Multi-Model Support:</b> You can choose your preferred AI and image models in Settings → AI Model Panel.
 
 👨‍💻 **Developed by [Chandan Singh](https://techycsr.me)**(**@techycsr**)
 

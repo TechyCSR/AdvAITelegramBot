@@ -8,6 +8,7 @@ from modules.lang import async_translate_to_lang, translate_ui_element, batch_tr
 from modules.chatlogs import channel_log
 from config import DATABASE_URL, ADMINS
 from modules.user.premium_management import is_user_premium
+from modules.user.ai_model import get_user_ai_models
 
 from pymongo import MongoClient
 
@@ -51,7 +52,8 @@ settings_text_template = """
 **User Language:** {language}
 **User Voice**: {voice_setting}
 **User Mode**: {mode}
-
+**AI Text Model**: {ai_text_model}
+**AI Image Model**: {ai_image_model}
 
 You can change your settings from below options.
 
@@ -88,6 +90,9 @@ async def settings_inline(client_obj, callback: CallbackQuery):
     current_language_label = await async_translate_to_lang(languages.get(current_language, current_language), current_language)
     mention = callback.from_user.mention
     
+    # Fetch user AI models
+    ai_text_model, ai_image_model = await get_user_ai_models(user_id)
+
     translated_template = await async_translate_to_lang(settings_text_template, current_language)
     formatted_text = translated_template.format(
         mention=mention,
@@ -96,6 +101,8 @@ async def settings_inline(client_obj, callback: CallbackQuery):
         language=current_language_label,
         voice_setting=await async_translate_to_lang(voice_setting.capitalize(), current_language),
         mode=current_mode_label,
+        ai_text_model=ai_text_model,
+        ai_image_model=ai_image_model,
     )
 
     button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🖼️ Image Count", "🔙 Back"]

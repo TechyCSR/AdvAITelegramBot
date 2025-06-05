@@ -2,7 +2,7 @@ import pyrogram
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from pymongo import MongoClient
-from config import DATABASE_URL
+from config import DATABASE_URL, ADMINS
 from modules.lang import async_translate_to_lang, batch_translate
 from typing import Tuple
 import asyncio
@@ -27,6 +27,10 @@ IMAGE_MODELS = {
 DEFAULT_TEXT_MODEL = "gpt-4o"
 DEFAULT_IMAGE_MODEL = "dall-e3"
 
+# --- Restricted Models ---
+RESTRICTED_TEXT_MODELS = {"gpt-4.1", "qwen3"}
+RESTRICTED_IMAGE_MODELS = {"flux-pro"}
+
 # --- Database Setup ---
 client = MongoClient(DATABASE_URL)
 db = client["aibotdb"]
@@ -35,11 +39,21 @@ user_lang_collection = db['user_lang'] # Assuming this is used for language pref
 
 # --- Helper Functions ---
 async def get_user_ai_models(user_id: int) -> Tuple[str, str]:
-    """Fetches the user's selected AI models, returning defaults if not set."""
+    """Fetches the user's selected AI models, returning defaults if not set. Enforces fallback for restricted models if user is not premium/admin."""
     settings = user_ai_model_settings_collection.find_one({"user_id": user_id})
-    if settings:
-        return settings.get("text_model", DEFAULT_TEXT_MODEL), settings.get("image_model", DEFAULT_IMAGE_MODEL)
-    return DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL
+    text_model = settings.get("text_model", DEFAULT_TEXT_MODEL) if settings else DEFAULT_TEXT_MODEL
+    image_model = settings.get("image_model", DEFAULT_IMAGE_MODEL) if settings else DEFAULT_IMAGE_MODEL
+
+    # Enforce fallback for restricted models at runtime
+    from modules.user.premium_management import is_user_premium
+    is_premium, _, _ = await is_user_premium(user_id)
+    is_admin = user_id in ADMINS
+    if not is_premium and not is_admin:
+        if text_model in RESTRICTED_TEXT_MODELS:
+            text_model = DEFAULT_TEXT_MODEL
+        if image_model in RESTRICTED_IMAGE_MODELS:
+            image_model = DEFAULT_IMAGE_MODEL
+    return text_model, image_model
 
 async def set_user_ai_model(user_id: int, model_type: str, model_name: str):
     """Sets the user's selected AI model for a given type (text or image)."""
@@ -53,6 +67,21 @@ async def get_current_lang(user_id: int) -> str:
     """Gets the user's current language preference."""
     lang_doc = user_lang_collection.find_one({"user_id": user_id})
     return lang_doc["language"] if lang_doc else "en"
+
+async def revert_restricted_models_if_needed(user_id: int):
+    from modules.user.premium_management import is_user_premium
+    is_premium, _, _ = await is_user_premium(user_id)
+    is_admin = user_id in ADMINS
+    text_model, image_model = await get_user_ai_models(user_id)
+    changed = False
+    if (not is_premium and not is_admin):
+        if text_model in RESTRICTED_TEXT_MODELS:
+            await set_user_ai_model(user_id, "text", DEFAULT_TEXT_MODEL)
+            changed = True
+        if image_model in RESTRICTED_IMAGE_MODELS:
+            await set_user_ai_model(user_id, "image", DEFAULT_IMAGE_MODEL)
+            changed = True
+    return changed
 
 # --- Main Panel Function ---
 async def ai_model_settings_panel(client_obj, callback: CallbackQuery):
@@ -128,36 +157,42 @@ async def ai_model_settings_panel(client_obj, callback: CallbackQuery):
 
 # --- Callback Handlers for Model Changes ---
 async def handle_set_text_model(client_obj, callback: CallbackQuery):
+    from modules.user.premium_management import is_user_premium
     user_id = callback.from_user.id
     current_lang = await get_current_lang(user_id)
     model_key = callback.data.split("_")[-1]
-    
     current_text_model, _ = await get_user_ai_models(user_id)
-
+    is_premium, _, _ = await is_user_premium(user_id)
+    is_admin = user_id in ADMINS
     if model_key == current_text_model:
         alert_text = await async_translate_to_lang("This is already your selected text model.", current_lang)
         await callback.answer(alert_text, show_alert=True)
+    elif (model_key in RESTRICTED_TEXT_MODELS) and (not is_premium and not is_admin):
+        alert_text = await async_translate_to_lang("You need to upgrade to Premium to use this model.", current_lang)
+        await callback.answer(alert_text, show_alert=True)
     else:
         await set_user_ai_model(user_id, "text", model_key)
-        # Refresh the panel first for instant UI feedback
         await ai_model_settings_panel(client_obj, callback)
         alert_text_template = await async_translate_to_lang("Text model set to: {model_name}", current_lang)
         model_display_name = await async_translate_to_lang(TEXT_MODELS.get(model_key, model_key), current_lang)
         await callback.answer(alert_text_template.format(model_name=model_display_name), show_alert=False)
 
 async def handle_set_image_model(client_obj, callback: CallbackQuery):
+    from modules.user.premium_management import is_user_premium
     user_id = callback.from_user.id
     current_lang = await get_current_lang(user_id)
     model_key = callback.data.split("_")[-1]
-
     _, current_image_model = await get_user_ai_models(user_id)
-
+    is_premium, _, _ = await is_user_premium(user_id)
+    is_admin = user_id in ADMINS
     if model_key == current_image_model:
         alert_text = await async_translate_to_lang("This is already your selected image model.", current_lang)
         await callback.answer(alert_text, show_alert=True)
+    elif (model_key in RESTRICTED_IMAGE_MODELS) and (not is_premium and not is_admin):
+        alert_text = await async_translate_to_lang("You need to upgrade to Premium to use this model.", current_lang)
+        await callback.answer(alert_text, show_alert=True)
     else:
         await set_user_ai_model(user_id, "image", model_key)
-        # Refresh the panel first for instant UI feedback
         await ai_model_settings_panel(client_obj, callback)
         alert_text_template = await async_translate_to_lang("Image model set to: {model_name}", current_lang)
         model_display_name = await async_translate_to_lang(IMAGE_MODELS.get(model_key, model_key), current_lang)
@@ -177,4 +212,10 @@ async def handle_ai_model_heading_click(client_obj, callback: CallbackQuery):
     else:
         alert_text = await async_translate_to_lang("Invalid selection.", current_lang) # Should not happen
         
-    await callback.answer(alert_text, show_alert=True) 
+    await callback.answer(alert_text, show_alert=True)
+
+"""
+Supported AI Text Models: """ + ", ".join(TEXT_MODELS.values()) + """
+Supported Image Generation Models: """ + ", ".join(IMAGE_MODELS.values()) + """
+Multi-Model Support: Users can choose their preferred models in the AI Model Panel (Settings).
+""" 

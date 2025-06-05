@@ -10,18 +10,20 @@ support_text="""
 
 This versatile AI assistant supports a wide range of capabilities:
 
-• 🖼️ Image Generation (DALL-E-3)
+• 🖼️ Image Generation 
 • 🎙️ Voice Interactions
 • 📝 Image-to-Text Analysis
 • 💬 Advanced Conversational AI
 • 🌐 Multi-language Support
 
 **Developed by:** [Chandan Singh](https://techycsr.me)
-**Technology:** GPT-4o and GPT-4o-mini
-**Version:** 2.0
+**Technology:** Gpt-4, Qwen-3, DeepSeek-R1, Dall-E3, Flux, Flux-Pro
+**Version:** 2.1
 
 **Need assistance?** Choose an option below.
 """
+
+
 
 # Function to handle settings support callback
 async def settings_support_callback(client, callback_query):
