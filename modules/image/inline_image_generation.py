@@ -22,8 +22,8 @@ from pyrogram.types import (
 )
 from pyrogram.errors import QueryIdInvalid, MessageNotModified
 
-from ImgGenModel.g4f.client import Client as ImageClient
-from ImgGenModel.g4f.Provider import PollinationsAI
+from g4f.client import AsyncClient 
+from g4f.Provider import PollinationsAI
 from config import LOG_CHANNEL
 
 # Get the logger
@@ -68,7 +68,7 @@ async def generate_inline_image(prompt: str) -> List[str]:
     providers = ["PollinationsAI", None]
     
     for provider in providers:
-        client = ImageClient()
+        client = AsyncClient()
         try:
             # Prepare provider configuration
             provider_obj = None
