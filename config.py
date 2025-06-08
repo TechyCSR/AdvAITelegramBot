@@ -26,7 +26,9 @@ BING_COOKIE = os.environ.get('BING_COOKIE') or os.getenv("BING_COOKIE") or "BING
 OCR_KEY = os.environ.get('OCR_KEY') or os.getenv("OCR_KEY") or "OCR_KEY"
 
 MULTIPLE_BOTS = os.environ.get('MULTIPLE_BOTS') or os.getenv("MULTIPLE_BOTS") or "false"
+MULTIPLE_BOTS = MULTIPLE_BOTS.lower() in ["true", "1", "yes", "y"]
 NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS')) or int(os.getenv("NUM_OF_BOTS")) or 1
+
 
 # Function to get all bot tokens
 
@@ -41,7 +43,6 @@ def get_bot_tokens():
         return tokens
     else:
         return [BOT_TOKEN]
-
 #check if all ids are int or not
 for x in ADMINS:
     x = str(x)
