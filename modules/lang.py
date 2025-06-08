@@ -13,6 +13,7 @@ from modules.lang_resources.translation_cache import (
     preload_all_caches,
     batch_cache_translations
 )
+from modules.core.database import get_user_lang_collection, db_service
 
 # Initialize MongoDB client
 mongo_client = MongoClient(DATABASE_URL)
@@ -51,6 +52,7 @@ except Exception as e:
 
 def get_user_language(user_id):
     """Get user's preferred language from database"""
+    user_lang_collection = get_user_lang_collection()
     user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
     if user_lang_doc:
         return user_lang_doc['language']
@@ -189,7 +191,7 @@ async def async_translate_to_lang(text, user_id=None, lang=None) -> str:
             return result
             
         # Then check database cache (for backward compatibility)
-        cached = translation_cache.find_one({"key": cache_key})
+        cached = get_translation_cache().find_one({"key": cache_key})
         if cached:
             _translation_cache[cache_key] = cached["translation"]
             result = cached["translation"]
@@ -223,7 +225,7 @@ async def async_translate_to_lang(text, user_id=None, lang=None) -> str:
             _translation_cache[cache_key] = translated_text
             
             # Add to MongoDB cache (will be phased out)
-            translation_cache.update_one(
+            get_translation_cache().update_one(
                 {"key": cache_key},
                 {"$set": {"translation": translated_text, "timestamp": time.time()}},
                 upsert=True
@@ -324,7 +326,7 @@ def translate_to_lang(text, user_id=None, lang=None):
             return result
             
         # Then check database cache (for backward compatibility)
-        cached = translation_cache.find_one({"key": cache_key})
+        cached = get_translation_cache().find_one({"key": cache_key})
         if cached:
             _translation_cache[cache_key] = cached["translation"]
             result = cached["translation"]
@@ -350,7 +352,7 @@ def translate_to_lang(text, user_id=None, lang=None):
             _translation_cache[cache_key] = translated_text
             
             # Add to MongoDB cache (will be phased out)
-            translation_cache.update_one(
+            get_translation_cache().update_one(
                 {"key": cache_key},
                 {"$set": {"translation": translated_text, "timestamp": time.time()}},
                 upsert=True
@@ -506,3 +508,6 @@ async def format_with_mention(text, mention, user_id=None, lang=None):
 # Create a translation object for testing
 if __name__ == "__main__":
     pass
+
+def get_translation_cache():
+    return db_service.get_collection('translation_cache')

@@ -381,5 +381,57 @@ async def change_image_count_callback(client, callback: CallbackQuery):
     # Refresh the panel to show the new selection
     await settings_image_count_callback(client, callback)
 
+async def send_settings_menu_as_message(client_obj, message):
+    user_id = message.from_user.id
+    user_lang_doc = user_lang_collection.find_one({"user_id": user_id})
+    current_language = user_lang_doc['language'] if user_lang_doc else "en"
+    if not user_lang_doc:
+        user_lang_collection.insert_one({"user_id": user_id, "language": current_language})
+    user_settings = user_voice_collection.find_one({"user_id": user_id})
+    voice_setting = user_settings.get("voice", "voice") if user_settings else "voice"
+    if not user_settings:
+        user_voice_collection.insert_one({"user_id": user_id, "voice": voice_setting})
+    user_mode_doc = ai_mode_collection.find_one({"user_id": user_id})
+    current_mode = user_mode_doc['mode'] if user_mode_doc else "chatbot"
+    if not user_mode_doc:
+        ai_mode_collection.insert_one({"user_id": user_id, "mode": current_mode})
+    is_premium, remaining_days, _ = await is_user_premium(user_id)
+    if is_premium:
+        premium_status_text_key = "✨ Premium User ({days} days left)"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key.format(days=remaining_days), current_language)
+    else:
+        premium_status_text_key = "👤 Standard User"
+        premium_status_val = await async_translate_to_lang(premium_status_text_key, current_language)
+    current_mode_label = await async_translate_to_lang(modes.get(current_mode, current_mode), current_language)
+    current_language_label = await async_translate_to_lang(languages.get(current_language, current_language), current_language)
+    mention = message.from_user.mention
+    ai_text_model, ai_image_model = await get_user_ai_models(user_id)
+    translated_template = await async_translate_to_lang(settings_text_template, current_language)
+    formatted_text = translated_template.format(
+        mention=mention,
+        user_id=user_id,
+        premium_status=premium_status_val,
+        language=current_language_label,
+        voice_setting=await async_translate_to_lang(voice_setting.capitalize(), current_language),
+        mode=current_mode_label,
+        ai_text_model=ai_text_model,
+        ai_image_model=ai_image_model,
+    )
+    button_labels = ["🌐 Language", "🎙️ Voice", "🤖 Assistant", "🖼️ Image Count", "🔙 Back"]
+    translated_labels = await batch_translate(button_labels, user_id)
+    ai_models_button_label = await async_translate_to_lang("🧠 AI Models", current_language)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(ai_models_button_label, callback_data="settings_ai_models")],
+        [InlineKeyboardButton(translated_labels[0], callback_data="settings_lans"),
+         InlineKeyboardButton(translated_labels[1], callback_data="settings_v")],
+        [InlineKeyboardButton(translated_labels[2], callback_data="settings_assistant"),
+         InlineKeyboardButton(translated_labels[3], callback_data="settings_image_count")],
+    ])
+    await message.reply(
+        text=formatted_text,
+        reply_markup=keyboard,
+        disable_web_page_preview=True
+    )
+
 
 

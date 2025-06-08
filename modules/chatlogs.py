@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 from config import LOG_CHANNEL, DATABASE_URL
-from pymongo import MongoClient
+from modules.core.database import db_service
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -98,9 +98,7 @@ async def user_log(bot, message, query, response=None):
         logger.info(log_entry)
         
         # Save to database - ensure user_id is consistently stored as integer
-        client = MongoClient(DATABASE_URL)
-        db = client['aibotdb']
-        logs_collection = db.user_logs
+        logs_collection = db_service.get_collection('user_logs')
         
         # Store the log with user_id as integer and chat_type as string
         log_data = {

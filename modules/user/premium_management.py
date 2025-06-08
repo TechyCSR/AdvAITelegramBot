@@ -5,11 +5,14 @@ from typing import Tuple, Optional
 import asyncio
 from modules.lang import async_translate_to_lang # Import for localization
 from modules.user.ai_model import revert_restricted_models_if_needed, TEXT_MODELS, IMAGE_MODELS
+from modules.core.database import db_service
 
 # Initialize MongoDB client and collection
 mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
-premium_users_collection = db['premium_users']
+
+def get_premium_users_collection():
+    return db_service.get_collection('premium_users')
 
 async def add_premium_status(user_id: int, admin_id: int, days: int) -> bool:
     """Adds or updates a user's premium status."""
@@ -31,7 +34,7 @@ async def add_premium_status(user_id: int, admin_id: int, days: int) -> bool:
         "last_updated": now
     }
     
-    premium_users_collection.update_one({"user_id": user_id}, {"$set": premium_record}, upsert=True)
+    get_premium_users_collection().update_one({"user_id": user_id}, {"$set": premium_record}, upsert=True)
     return True
 
 async def remove_premium_status(user_id: int, revoked_by_admin: bool = False) -> bool:
@@ -46,7 +49,7 @@ async def remove_premium_status(user_id: int, revoked_by_admin: bool = False) ->
     if revoked_by_admin:
         update_fields["reason_for_removal"] = "Revoked by admin"
 
-    result = premium_users_collection.update_one(
+    result = get_premium_users_collection().update_one(
         {"user_id": user_id, "is_premium": True},
         {"$set": update_fields}
     )
@@ -59,7 +62,7 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
     if not isinstance(user_id, int):
         return False, 0, None
         
-    user_record = premium_users_collection.find_one({"user_id": user_id, "is_premium": True})
+    user_record = get_premium_users_collection().find_one({"user_id": user_id, "is_premium": True})
     if not user_record:
         return False, 0, None
 
@@ -101,7 +104,7 @@ async def daily_premium_check(client_for_notification=None):
     now = datetime.datetime.utcnow()
     
     # Find users whose premium has expired but are still marked as premium
-    expired_users_docs = list(premium_users_collection.find({
+    expired_users_docs = list(get_premium_users_collection().find({
         "is_premium": True,
         "premium_expires_at": {"$lte": now}
     }))
@@ -188,7 +191,7 @@ async def get_premium_benefits_message(user_id: int) -> str:
 
 async def get_all_premium_users():
     """Returns a list of all users with active premium status, including user_id, premium_since, and premium_expires_at."""
-    users = list(premium_users_collection.find({"is_premium": True}))
+    users = list(get_premium_users_collection().find({"is_premium": True}))
     result = []
     for user in users:
         result.append({

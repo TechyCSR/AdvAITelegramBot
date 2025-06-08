@@ -25,6 +25,22 @@ DATABASE_URL=os.environ.get('DATABASE_URL') or os.getenv("DATABASE_URL") or "DAT
 BING_COOKIE = os.environ.get('BING_COOKIE') or os.getenv("BING_COOKIE") or "BING_COOKIE"
 OCR_KEY = os.environ.get('OCR_KEY') or os.getenv("OCR_KEY") or "OCR_KEY"
 
+MULTIPLE_BOTS = os.environ.get('MULTIPLE_BOTS') or os.getenv("MULTIPLE_BOTS") or "false"
+NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS')) or int(os.getenv("NUM_OF_BOTS")) or 1
+
+# Function to get all bot tokens
+
+def get_bot_tokens():
+    if MULTIPLE_BOTS:
+        tokens = []
+        for i in range(1, NUM_OF_BOTS + 1):
+            token = os.environ.get(f'BOT_TOKEN{i}') or os.getenv(f'BOT_TOKEN{i}')
+            if not token:
+                sys.exit(f"BOT_TOKEN{i} is required when MULTIPLE_BOTS is true.")
+            tokens.append(token)
+        return tokens
+    else:
+        return [BOT_TOKEN]
 
 #check if all ids are int or not
 for x in ADMINS:

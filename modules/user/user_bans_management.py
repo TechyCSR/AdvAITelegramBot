@@ -2,6 +2,7 @@ import datetime
 from pymongo import MongoClient
 from config import DATABASE_URL
 from typing import Optional, Tuple
+from modules.core.database import db_service
 
 
 
@@ -14,7 +15,7 @@ async def ban_user(user_id: int, admin_id: int, reason: str = "No reason provide
     """Bans a user, storing their ID, reason, and ban timestamp."""
     if not isinstance(user_id, int) or not isinstance(admin_id, int):
         return False
-        
+    user_bans_collection = db_service.get_collection('user_bans')
     ban_record = {
         "user_id": user_id,
         "is_banned": True,
@@ -29,7 +30,7 @@ async def unban_user(user_id: int) -> bool:
     """Unbans a user by removing their record or marking as not banned."""
     if not isinstance(user_id, int):
         return False
-        
+    user_bans_collection = db_service.get_collection('user_bans')
     result = user_bans_collection.update_one({"user_id": user_id}, {"$set": {"is_banned": False, "unbanned_at": datetime.datetime.utcnow()}})
     return result.modified_count > 0
 
@@ -37,7 +38,7 @@ async def is_user_banned(user_id: int) -> Tuple[bool, Optional[str]]:
     """Checks if a user is banned. Returns (True, reason) if banned, else (False, None)."""
     if not isinstance(user_id, int):
         return False, None # Or raise an error
-        
+    user_bans_collection = db_service.get_collection('user_bans')
     ban_record = user_bans_collection.find_one({"user_id": user_id, "is_banned": True})
     if ban_record:
         return True, ban_record.get("reason", "No reason provided.")

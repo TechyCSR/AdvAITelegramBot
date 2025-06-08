@@ -19,6 +19,8 @@ from modules.user.premium_management import is_user_premium
 from modules.user.ai_model import get_user_ai_models, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, RESTRICTED_IMAGE_MODELS
 from g4f.client import AsyncClient
 from g4f.Provider import PollinationsImage
+from modules.core.database import db_service
+from pyrogram.enums import ParseMode
 
 # Get the logger
 logger = logging.getLogger(__name__)
@@ -26,10 +28,15 @@ logger = logging.getLogger(__name__)
 # MongoDB setup
 mongo_client = MongoClient(DATABASE_URL)
 db = mongo_client['aibotdb']
-user_images_collection = db['user_images']
-image_feedback_collection = db['image_feedback']
-prompt_storage_collection = db['prompt_storage']  # New collection for storing prompts
-user_image_gen_settings_collection = db['user_image_gen_settings'] # Added for image count settings
+
+def get_user_images_collection():
+    return db_service.get_collection('user_images')
+def get_image_feedback_collection():
+    return db_service.get_collection('image_feedback')
+def get_prompt_storage_collection():
+    return db_service.get_collection('prompt_storage')
+def get_user_image_gen_settings_collection():
+    return db_service.get_collection('user_image_gen_settings')
 
 # In-memory prompt storage as fallback (will be cached to DB)
 prompt_storage = {}
@@ -89,7 +96,7 @@ def store_prompt(user_id: int, prompt: str) -> str:
     
     # Also store in database for persistence
     try:
-        prompt_storage_collection.update_one(
+        get_prompt_storage_collection().update_one(
             {"prompt_id": prompt_id},
             {"$set": {
                 "user_id": user_id,
@@ -118,7 +125,7 @@ def get_prompt(prompt_id: str) -> Optional[str]:
     
     # Fall back to database
     try:
-        result = prompt_storage_collection.find_one({"prompt_id": prompt_id})
+        result = get_prompt_storage_collection().find_one({"prompt_id": prompt_id})
         if result and "prompt" in result:
             # Update memory cache
             prompt_storage[prompt_id] = result["prompt"]
@@ -389,7 +396,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 )
                 
                 # Store in database
-                image_feedback_collection.insert_one({
+                get_image_feedback_collection().insert_one({
                     "generation_id": generation_id,
                     "user_id": user_id,
                     "feedback_type": "positive",
@@ -424,7 +431,7 @@ async def handle_feedback(client: Client, callback_query: CallbackQuery) -> None
                 )
                 
                 # Store in database
-                image_feedback_collection.insert_one({
+                get_image_feedback_collection().insert_one({
                     "generation_id": generation_id,
                     "user_id": user_id,
                     "feedback_type": "negative",
@@ -655,7 +662,7 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         num_images_to_generate = 1 # Default for standard users
         is_premium, _, _ = await is_user_premium(clicked_user_id)
         if is_premium or clicked_user_id in ADMINS:
-            user_gen_settings = user_image_gen_settings_collection.find_one({"user_id": clicked_user_id})
+            user_gen_settings = get_user_image_gen_settings_collection().find_one({"user_id": clicked_user_id})
             if user_gen_settings and "generation_count" in user_gen_settings:
                 num_images_to_generate = user_gen_settings["generation_count"]
             else:
@@ -833,14 +840,16 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         # Send feedback message
         feedback_msg = await client.send_message(
             chat_id=chat_id,
-            text=f"**How do you like these images?**\n\n_Model used: {model_display_name}_\n_You can change the model in Settings → AI Model Panel._\n\nYour feedback helps improve our AI.",
+            text=f"**How do you like these images?**\n\n**<i>Model used:</i> <i>{model_display_name}</i>**\n**<i>You can change the model in settings → AI Model Panel.</i>**\n\nYour feedback helps improve our AI.",
             reply_markup=feedback_markup,
-            reply_to_message_id=sent_message[0].id if sent_message else None
+            reply_to_message_id=sent_message[0].id if sent_message else None,
+            parse_mode=ParseMode.DEFAULT,
+            disable_web_page_preview=True
         )
         
         # Store metadata in database
         try:
-            user_images_collection.insert_one({
+            get_user_images_collection().insert_one({
                 "generation_id": generation_id,
                 "user_id": user_id,
                 "prompt": prompt,

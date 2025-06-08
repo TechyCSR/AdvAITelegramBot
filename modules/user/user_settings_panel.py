@@ -9,6 +9,7 @@ from modules.user.user_support import settings_support_callback
 from modules.maintenance import get_feature_states
 from modules.admin.statistics import get_bot_statistics
 from modules.user.premium_management import is_user_premium
+from modules.user.ai_model import get_user_ai_models, TEXT_MODELS, IMAGE_MODELS
 
 settings_text = """
 **Setting Menu for User {mention}**
@@ -18,6 +19,8 @@ settings_text = """
 **User Language:** {language}
 **User Voice**: {voice_setting}
 **User Mode**: {mode}
+**AI Text Model**: {ai_text_model}
+**AI Image Model**: {ai_image_model}
 
 You can manage your settings from the start panel below.
 
@@ -57,6 +60,12 @@ async def user_settings_panel_command(client, message, edit=False, callback_quer
     
     mention = user.mention if hasattr(user, 'mention') else f"<a href='tg://user?id={user_id}'>User {user_id}</a>"
     
+    # Get user AI models (already restricted for standard users)
+    ai_text_model_key, ai_image_model_key = await get_user_ai_models(user_id)
+    # Translate model display names
+    ai_text_model_name = await async_translate_to_lang(TEXT_MODELS.get(ai_text_model_key, ai_text_model_key), current_language)
+    ai_image_model_name = await async_translate_to_lang(IMAGE_MODELS.get(ai_image_model_key, ai_image_model_key), current_language)
+
     translated_settings_template = await async_translate_to_lang(settings_text, current_language)
 
     formatted_text = translated_settings_template.format(
@@ -66,6 +75,8 @@ async def user_settings_panel_command(client, message, edit=False, callback_quer
         language=current_language_label,
         voice_setting=await async_translate_to_lang(voice_setting.capitalize(), current_language),
         mode=current_mode_label,
+        ai_text_model=ai_text_model_name,
+        ai_image_model=ai_image_model_name,
     )
 
     bot_username = (await client.get_me()).username
