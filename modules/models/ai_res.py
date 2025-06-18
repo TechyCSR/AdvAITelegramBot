@@ -235,7 +235,11 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     },
     {
         "role": "user",
-        "content": "Who created this bot?"
+        "content": "what's there in that image?"
+    },
+    {
+        "role": "assistant",
+        "content":"Looks like image context is not set. Please send the image again with your question."
     },
     {
         "role": "assistant",
