@@ -22,7 +22,7 @@ settings_text = """
 **AI Text Model**: {ai_text_model}
 **AI Image Model**: {ai_image_model}
 
-You can manage your settings from the start panel below.
+You can manage your settings from the settings panel below.
 
 **@AdvChatGptBot**
 """
@@ -65,7 +65,7 @@ async def user_settings_panel_command(client, message, edit=False, callback_quer
     # Translate model display names
     ai_text_model_name = await async_translate_to_lang(TEXT_MODELS.get(ai_text_model_key, ai_text_model_key), current_language)
     ai_image_model_name = await async_translate_to_lang(IMAGE_MODELS.get(ai_image_model_key, ai_image_model_key), current_language)
-
+    
     translated_settings_template = await async_translate_to_lang(settings_text, current_language)
 
     formatted_text = translated_settings_template.format(
@@ -80,7 +80,7 @@ async def user_settings_panel_command(client, message, edit=False, callback_quer
     )
 
     bot_username = (await client.get_me()).username
-    button_labels = ["⚙️ Open Start Panel", "🔄 Reset Conversation", "📊 System Status", "❌ Close"]
+    button_labels = ["⚙️ Open Settings Panel", "🔄 Reset Conversation", "📊 System Status", "❌ Close"]
     translated_labels = await batch_translate(button_labels, user_id)
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(translated_labels[0], url=f"https://t.me/{bot_username}?start=settings")],

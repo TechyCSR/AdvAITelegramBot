@@ -798,7 +798,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
         _, user_image_model = await get_user_ai_models(user_id)
         model_display_name = IMAGE_MODELS.get(user_image_model, user_image_model)
         model_note = f"\nModel: {model_display_name}"
-        settings_note = "\nYou can change the model in Settings → AI Model Panel"
+        settings_note = "\n__You can change the model in Settings → AI Model Panel__"
 
         # Prepare media group with generated images
         media_group = []

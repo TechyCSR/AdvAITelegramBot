@@ -15,7 +15,7 @@ from modules.user.user_support import settings_support_callback, support_admins_
 from modules.user.dev_support import support_developers_callback
 from modules.user.ai_model import ai_model_settings_panel, handle_set_text_model, handle_set_image_model, handle_ai_model_heading_click
 from modules.speech import text_to_voice, voice_to_text
-from modules.image.img_to_text import extract_text_res, handle_show_text_callback, handle_followup_callback
+from modules.image.img_to_text import extract_text_res, handle_vision_followup  
 from modules.maintenance import settings_others_callback, handle_feature_toggle, handle_feature_info, maintenance_check, maintenance_message, handle_donation
 from modules.group.group_settings import leave_group, invite_command
 from modules.feedback_nd_rating import rate_command, handle_rate_callback
@@ -39,6 +39,7 @@ from modules.models.image_service import ImageService
 from modules.user.user_bans_management import ban_user, unban_user, is_user_banned, get_banned_message, get_user_by_id_or_username
 from modules.user.premium_management import add_premium_status, remove_premium_status, is_user_premium, get_premium_status_message, daily_premium_check, get_premium_benefits_message, get_all_premium_users, format_premium_users_list
 import multiprocessing
+from modules.user.file_to_text import handle_file_upload, handle_file_question
 
 
 # Create directories if they don't exist
@@ -286,7 +287,8 @@ def create_bot_instance(bot_token, bot_index=1):
             return False
         return filters.create(func)
 
-    @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
+  
+    @advAiBot.on_message(is_chat_text_filter() & filters.text & (filters.private | filters.group))
     async def handle_message(client, message):
         if await check_if_banned_and_reply(client, message): # BAN CHECK
             return
@@ -294,6 +296,9 @@ def create_bot_instance(bot_token, bot_index=1):
         if await maintenance_check(message.from_user.id):
             maint_msg = await maintenance_message(message.from_user.id)
             await message.reply(maint_msg)
+            return
+        handled = await handle_vision_followup(client, message)
+        if handled:
             return
         
         bot_stats["messages_processed"] += 1
@@ -341,15 +346,12 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_callback_query()
     async def callback_query(client, callback_query):
-        if await check_if_banned_and_reply(client, callback_query): # BAN CHECK (for the user who pressed the button)
-            # Note: check_if_banned_and_reply expects a message-like object for reply_text
-            # We might need to adjust it or handle banned callback queries differently,
-            # e.g., by just answering the callback with an alert.
+        if await check_if_banned_and_reply(client, callback_query):
             try:
                 banned_msg_text = await get_banned_message((await is_user_banned(callback_query.from_user.id))[1])
                 await callback_query.answer(banned_msg_text, show_alert=True)
-            except: # Catch any exception during answer to prevent crash
-                 await callback_query.answer("You are banned from using this bot.", show_alert=True)
+            except:
+                await callback_query.answer("You are banned from using this bot.", show_alert=True)
             return
         try:
             # Handle restart callbacks
@@ -494,10 +496,10 @@ def create_bot_instance(bot_token, bot_index=1):
                 await handle_voice_toggle(client, callback_query)
             elif callback_query.data.startswith("mode_"):
                 await change_mode_setting(client, callback_query)
-            elif callback_query.data.startswith("show_text_"):
-                await handle_show_text_callback(client, callback_query)
-            elif callback_query.data.startswith("followup_"):
-                await handle_followup_callback(client, callback_query)
+            # elif callback_query.data.startswith("show_text_"):
+            #     await handle_show_text_callback(client, callback_query)
+            # elif callback_query.data.startswith("followup_"):
+            #     await handle_followup_callback(client, callback_query)
             elif callback_query.data.startswith("rate_"):
                 await handle_rate_callback(client, callback_query)
             elif callback_query.data.startswith("feedback_") or \
@@ -801,150 +803,11 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.photo & filters.private)
     async def handle_private_image(bot, update):
-        if await check_if_banned_and_reply(bot, update): # BAN CHECK
-            return
-        """Handler for images in private chats"""
-        # Check for maintenance mode
-        if await maintenance_check(update.from_user.id):
-            maint_msg = await maintenance_message(update.from_user.id)
-            await update.reply(maint_msg)
-            return
-        
-        bot_stats["active_users"].add(update.from_user.id)
-        user_id = update.from_user.id
-        
-        logger.info(f"Processing private chat image for user {user_id}")
-        
-        # For private chats, process all images
         await extract_text_res(bot, update)
-        
-        # Log usage
-        await channel_log(bot, update, "Private Image Analysis")
-        logger.info(f"Image analysis for user {user_id} in private chat")
 
     @advAiBot.on_message(filters.photo & filters.group)
     async def handle_group_image(bot, update):
-        if await check_if_banned_and_reply(bot, update): # BAN CHECK
-            return
-        """Handler for images in group chats"""
-        if await maintenance_check(update.from_user.id):
-            maint_msg = await maintenance_message(update.from_user.id)
-            await update.reply(maint_msg)
-            return
-        bot_stats["active_users"].add(update.from_user.id)
-        user_id = update.from_user.id
-        logger.info(f"Group image received - Chat ID: {update.chat.id}, Title: {update.chat.title}, Caption: {update.caption}")
-        if not update.caption:
-            logger.info(f"Image in group {update.chat.id} ignored - no caption")
-            return
-        caption_lower = update.caption.lower()
-        has_ai_trigger = "ai" in caption_lower or "/ai" in caption_lower
-        if not has_ai_trigger:
-            logger.info(f"Image in group {update.chat.id} ignored - caption doesn't contain AI trigger: {update.caption}")
-            return
-        # Save the image context in memory (keyed by chat_id and message_id)
-        key = (update.chat.id, update.message_id)
-        pending_group_images[key] = {
-            "user_id": user_id,
-            "photo": update.photo,
-            "caption": update.caption
-        }
-        # Prompt user for AI response
-        markup = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ Yes, analyze with AI", callback_data=f"group_img_ai_yes_{update.chat.id}_{update.message_id}"),
-                InlineKeyboardButton("❌ No", callback_data=f"group_img_ai_no_{update.chat.id}_{update.message_id}")
-            ]
-        ])
-        await update.reply_text(
-            "🤖 Do you want an AI response for this image and caption?",
-            reply_markup=markup
-        )
-        # Log usage
-        await channel_log(bot, update, "Group Image AI Prompt", "Prompted for AI response on group image")
-        logger.info(f"Prompted for AI response on group image in {update.chat.id} by user {user_id}")
-
-    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("group_img_ai_yes_") or query.data.startswith("group_img_ai_no_")))
-    async def handle_group_img_ai_callback(bot, callback_query):
-        data = callback_query.data
-        parts = data.split("_")
-        action = parts[3]  # 'yes' or 'no'
-        chat_id = int(parts[4])
-        message_id = int(parts[5])
-        key = (chat_id, message_id)
-        context = pending_group_images.get(key)
-        if not context:
-            await callback_query.answer("Image context expired or not found.", show_alert=True)
-            return
-        if action == "no":
-            await callback_query.message.edit_text("❌ AI analysis cancelled for this image.")
-            pending_group_images.pop(key, None)
-            await callback_query.answer("Cancelled.")
-            return
-        # If 'yes', process the image and generate AI response
-        await callback_query.message.edit_text("🔍 Processing image and generating AI response...")
-        from modules.image.img_to_text import extract_text_from_image
-        from modules.core.database import get_history_collection
-        from modules.models.ai_res import get_response, DEFAULT_SYSTEM_MESSAGE
-        user_id = context["user_id"]
-        photo = context["photo"]
-        caption = context["caption"]
-        # Download the image
-        try:
-            if isinstance(photo, list):
-                photo_obj = photo[-1]
-            else:
-                photo_obj = photo
-            file_path = f"temp_{user_id}_{int(time.time())}.jpg"
-            file = await bot.download_media(photo_obj.file_id, file_name=file_path)
-            extracted_text, error = await extract_text_from_image(file)
-            if error:
-                await callback_query.message.edit_text(f"❌ Text Extraction Failed\n\n{error}")
-                pending_group_images.pop(key, None)
-                return
-            if not extracted_text or extracted_text.strip() == "":
-                await callback_query.message.edit_text("⚠️ No text detected in the image.")
-                pending_group_images.pop(key, None)
-                return
-            # Combine extracted text and caption
-            user_question = caption
-            combined_text = f"{extracted_text}\n\n[User's question: {user_question}]"
-            # Update user history (like in aires)
-            history_collection = get_history_collection()
-            user_history = history_collection.find_one({"user_id": user_id})
-            if user_history and 'history' in user_history:
-                history = user_history['history']
-                if not isinstance(history, list):
-                    history = [history]
-            else:
-                history = DEFAULT_SYSTEM_MESSAGE.copy()
-            # Add the new user query to the history
-            prompt = f"The following text was extracted from an image:\n\n{combined_text}"
-            history.append({"role": "user", "content": prompt})
-            ai_response = get_response(history)
-            history.append({"role": "assistant", "content": ai_response})
-            history_collection.update_one(
-                {"user_id": user_id},
-                {"$set": {"history": history}},
-                upsert=True
-            )
-            await callback_query.message.edit_text(
-                f"📝 **Image Text Analysis**\n\n{ai_response}",
-                disable_web_page_preview=True
-            )
-            pending_group_images.pop(key, None)
-            # Clean up file
-            try:
-                if os.path.exists(file):
-                    os.remove(file)
-            except Exception as e:
-                logger.error(f"Error removing temporary file: {e}")
-            await callback_query.answer("AI response generated.")
-        except Exception as e:
-            logger.error(f"Error processing group image AI: {e}")
-            await callback_query.message.edit_text(f"Error processing the image: {str(e)}")
-            pending_group_images.pop(key, None)
-            await callback_query.answer("Error.")
+        await extract_text_res(bot, update)
 
     @advAiBot.on_message(filters.command("settings"))
     async def settings_command(bot, update):
@@ -1295,13 +1158,20 @@ def create_bot_instance(bot_token, bot_index=1):
         # If we reach here, it's not a special admin action, so proceed with normal message handling
         await handle_message(bot, message)
 
+    @advAiBot.on_message(filters.document & (filters.private | filters.group))
+    async def document_handler(client, message):
+        # Check extension to decide if image or file-to-text
+        ext = os.path.splitext(message.document.file_name)[1].lower()
+        from modules.image.img_to_text import SUPPORTED_IMAGE_EXTENSIONS
+        if ext in SUPPORTED_IMAGE_EXTENSIONS:
+            await extract_text_res(client, message)
+        else:
+            from modules.user.file_to_text import handle_file_upload
+            await handle_file_upload(client, message)
 
-    # Example of integrating the ban check into an existing handler:
-    # @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
-    # async def handle_message(client, message):
-    #     if await check_if_banned_and_reply(client, message):
-    #         return 
-    #     # ... rest of the handler ...
+    @advAiBot.on_message(filters.command("endimage") & (filters.private | filters.group))
+    async def endimage_command_handler(client, message):
+        await handle_vision_followup(client, message)
 
     return advAiBot
 

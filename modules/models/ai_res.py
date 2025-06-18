@@ -53,6 +53,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
                 history[i] = {"role": "user", "content": str(msg)}
         gpt_client = GPTClient()
         if provider == "PollinationsAI":
+            print(f"Using PollinationsAI model: {model}")
             response = gpt_client.chat.completions.create(
                 model=model,
                 messages=history,
@@ -61,6 +62,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
             return response.choices[0].message.content
         elif provider == "DeepInfraChat":
             deep_model = DEEPINFRA_MODEL_MAP.get(model, model)
+            print(f"Using DeepInfraChat model: {deep_model}")
             response = gpt_client.chat.completions.create(
                 model=deep_model,
                 messages=history,
