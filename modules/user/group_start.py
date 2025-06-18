@@ -336,7 +336,6 @@ async def handle_group_command_inline(client, callback):
     img_btn = translated_texts[2]
     main_btn = translated_texts[3]
     back_btn = translated_texts[4]
-    
     # Create base keyboard
     keyboard_buttons = [
         [InlineKeyboardButton(ai_btn, callback_data="group_cmd_ai")],
@@ -348,7 +347,6 @@ async def handle_group_command_inline(client, callback):
     if user_id in ADMINS:
         admin_btn = "⚙️ Admin Commands"
         keyboard_buttons.append([InlineKeyboardButton(admin_btn, callback_data="group_cmd_admin")])
-    
     # Add back button
     keyboard_buttons.append([InlineKeyboardButton(back_btn, callback_data="back_to_group_start")])
     

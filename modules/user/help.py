@@ -1,11 +1,5 @@
-import pyrogram
-from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.types import Message
-from pyrogram.types import InlineQuery
-from pyrogram.types import CallbackQuery
 from modules.lang import async_translate_to_lang, batch_translate, translate_ui_element
-from modules.chatlogs import channel_log
 
 
 help_text = """

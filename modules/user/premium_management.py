@@ -3,8 +3,7 @@ from pymongo import MongoClient
 from config import DATABASE_URL
 from typing import Tuple, Optional
 import asyncio
-from modules.lang import async_translate_to_lang # Import for localization
-from modules.user.ai_model import revert_restricted_models_if_needed, TEXT_MODELS, IMAGE_MODELS
+from modules.user.ai_model import revert_restricted_models_if_needed
 from modules.core.database import db_service
 
 # Initialize MongoDB client and collection

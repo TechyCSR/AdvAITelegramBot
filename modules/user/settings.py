@@ -126,6 +126,7 @@ async def settings_inline(client_obj, callback: CallbackQuery):
         disable_web_page_preview=True
     )
 
+
 async def settings_language_callback(client, callback):
     user_id = callback.from_user.id
     

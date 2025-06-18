@@ -1,5 +1,4 @@
 from pymongo import MongoClient
-from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import DATABASE_URL
 from modules.lang import async_translate_to_lang
