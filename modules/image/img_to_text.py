@@ -25,6 +25,13 @@ SUPPORTED_IMAGE_TYPES = [
     "jpeg", "png", "webp", "bmp", "gif", "tiff"
 ]
 
+# Helper to split long text into Telegram message-sized chunks
+TELEGRAM_MESSAGE_LIMIT = 4096
+
+def split_message(text, limit=TELEGRAM_MESSAGE_LIMIT):
+    """Split text into chunks no longer than Telegram's message limit."""
+    return [text[i:i+limit] for i in range(0, len(text), limit)]
+
 async def extract_text_res(bot, update):
     try:
         is_group_chat = update.chat.type in ["group", "supergroup"]
@@ -183,11 +190,14 @@ async def extract_text_res(bot, update):
                 chat_id=update.chat.id,
                 photo=file
             )
-            await bot.send_message(
-                chat_id=update.chat.id,
-                text=caption,
-                parse_mode=enums.ParseMode.MARKDOWN
-            )
+            # Send the full caption in multiple messages if needed
+            for chunk in split_message(caption):
+                await bot.send_message(
+                    chat_id=update.chat.id,
+                    text=chunk,
+                    parse_mode=enums.ParseMode.MARKDOWN
+                )
+            
         await processing_msg.delete()
         # Log to channel
         try:
