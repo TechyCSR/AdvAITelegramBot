@@ -122,3 +122,7 @@ def get_feature_settings_collection() -> Collection:
 def get_session_collection() -> Collection:
     """Get the session collection for storing temporary user session data"""
     return db_service.get_collection('user_sessions') 
+
+def get_user_interactions_collection() -> Collection:
+    """Get the user interactions collection for storing last interaction times and types."""
+    return db_service.get_collection('user_interactions') 

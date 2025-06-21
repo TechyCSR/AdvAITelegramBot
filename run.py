@@ -2,6 +2,11 @@ import os
 import config
 import pyrogram
 import time
+import datetime 
+import asyncio
+import logging
+import json
+import multiprocessing
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from pyrogram.enums import ChatAction, ChatType, ParseMode
@@ -29,17 +34,14 @@ from modules.user.user_settings_panel import user_settings_panel_command, handle
 from modules.speech.voice_to_text import handle_voice_message, handle_voice_toggle
 from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
 import modules.models.user_db as user_db
-import asyncio
-import logging
-import datetime
 from logging.handlers import RotatingFileHandler
-import json
-import time
 from modules.models.image_service import ImageService
 from modules.user.user_bans_management import ban_user, unban_user, is_user_banned, get_banned_message, get_user_by_id_or_username
 from modules.user.premium_management import add_premium_status, remove_premium_status, is_user_premium, get_premium_status_message, daily_premium_check, get_premium_benefits_message, get_all_premium_users, format_premium_users_list
-import multiprocessing
 from modules.user.file_to_text import handle_file_upload, handle_file_question
+from modules.interaction.interaction_system import start_interaction_system, set_last_interaction
+from modules.core.database import get_user_interactions_collection
+
 
 
 # Create directories if they don't exist
@@ -144,6 +146,7 @@ def create_bot_instance(bot_token, bot_index=1):
         else:
             await message.reply_text(f"User {target_user.mention} was not found with active premium status or could not be unpremiumed.")
 
+
     # Daily premium check scheduler
     async def premium_check_scheduler(client):
         while True:
@@ -202,6 +205,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.command("start"))
     async def start_command(bot, update):
+        set_last_interaction(update.from_user.id, "command_start", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
 
@@ -257,6 +261,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.command("help"))
     async def help_command(bot, update):
+        set_last_interaction(update.from_user.id, "command_help", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
         logger.info(f"User {update.from_user.id} requested help")
@@ -290,6 +295,7 @@ def create_bot_instance(bot_token, bot_index=1):
   
     @advAiBot.on_message(is_chat_text_filter() & filters.text & (filters.private | filters.group))
     async def handle_message(client, message):
+        set_last_interaction(message.from_user.id, "text", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, message): # BAN CHECK
             return
         # Check for maintenance mode
@@ -346,6 +352,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_callback_query()
     async def callback_query(client, callback_query):
+        set_last_interaction(callback_query.from_user.id, "callback_query", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, callback_query):
             try:
                 banned_msg_text = await get_banned_message((await is_user_banned(callback_query.from_user.id))[1])
@@ -658,6 +665,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.voice)
     async def voice(bot, message):
+        set_last_interaction(message.from_user.id, "voice", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, message): # BAN CHECK
             return
         # Check for maintenance mode and voice feature toggle
@@ -678,6 +686,7 @@ def create_bot_instance(bot_token, bot_index=1):
     # Add a new handler for replies to bot messages in groups
     @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
     async def handle_reply_to_bot(bot, message):
+        set_last_interaction(message.from_user.id, "reply_to_bot", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, message): # BAN CHECK
             return
         # Check for maintenance mode and AI response toggle
@@ -751,6 +760,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
     async def handle_group_message(bot, update):
+        set_last_interaction(update.from_user.id, "command_ai_group", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
         # Check for maintenance mode and AI response feature
@@ -778,6 +788,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
     async def handle_new_chat(client, message):
+        set_last_interaction(message.from_user.id, "command_newchat", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, message): # BAN CHECK
             return
         bot_stats["active_users"].add(message.from_user.id)
@@ -787,13 +798,8 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
     async def handle_generate(client, message):
+        set_last_interaction(message.from_user.id, "command_generate", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, message): # BAN CHECK
-            return
-        # Check for maintenance mode and image generation toggle
-        from modules.maintenance import is_feature_enabled
-        if await maintenance_check(message.from_user.id) or not await is_feature_enabled("image_generation"):
-            maint_msg = await maintenance_message(message.from_user.id)
-            await message.reply(maint_msg)
             return
         
         logger.info(f"User {message.from_user.id} using image generation")
@@ -803,14 +809,17 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.photo & filters.private)
     async def handle_private_image(bot, update):
+        set_last_interaction(update.from_user.id, "photo_private", get_user_interactions_collection())
         await extract_text_res(bot, update)
 
     @advAiBot.on_message(filters.photo & filters.group)
     async def handle_group_image(bot, update):
+        set_last_interaction(update.from_user.id, "photo_group", get_user_interactions_collection())
         await extract_text_res(bot, update)
 
     @advAiBot.on_message(filters.command("settings"))
     async def settings_command(bot, update):
+        set_last_interaction(update.from_user.id, "command_settings", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
         logger.info(f"User {update.from_user.id} accessed settings")
@@ -1160,6 +1169,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     @advAiBot.on_message(filters.document & (filters.private | filters.group))
     async def document_handler(client, message):
+        set_last_interaction(message.from_user.id, "document", get_user_interactions_collection())
         # Check extension to decide if image or file-to-text
         ext = os.path.splitext(message.document.file_name)[1].lower()
         from modules.image.img_to_text import SUPPORTED_IMAGE_EXTENSIONS
@@ -1172,6 +1182,9 @@ def create_bot_instance(bot_token, bot_index=1):
     @advAiBot.on_message(filters.command("endimage") & (filters.private | filters.group))
     async def endimage_command_handler(client, message):
         await handle_vision_followup(client, message)
+
+    # Start the interaction system background task
+    start_interaction_system(advAiBot)
 
     return advAiBot
 

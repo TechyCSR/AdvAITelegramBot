@@ -810,7 +810,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             if i == 0:
                 caption = (
                     f"🖼️ **AI Generated Image**\n\nPrompt: `{prompt}`\nStyle: `{style_info['name']}`"
-                    f"{model_note}\n\n{settings_note}"
+                    f"{model_note}"
                 )
             else:
                 caption = ""
