@@ -8,8 +8,8 @@ from modules.models.ai_res import get_response
 from config import LOG_CHANNEL
 from pyrogram.enums import ParseMode
 
-INTERACTION_INTERVAL_MINUTES = 3  # For testing, 3 minutes
-INTERACTION_CHECK_INTERVAL_SECONDS = 60  # Check every minute
+INTERACTION_INTERVAL_MINUTES = 180  # For 3 hours
+INTERACTION_CHECK_INTERVAL_SECONDS = 600  # Check every 10 minutes
 
 logger = logging.getLogger(__name__)
 
