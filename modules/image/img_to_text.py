@@ -5,6 +5,7 @@ import logging
 import imghdr
 from pyrogram import enums
 from pyrogram.types import InputMediaPhoto
+from pyrogram.errors import MediaCaptionTooLong
 from config import LOG_CHANNEL
 from modules.models.ai_res import get_history_collection
 from modules.chatlogs import user_log
@@ -166,12 +167,27 @@ async def extract_text_res(bot, update):
             upsert=True
         )
         # Send image preview with response
-        await bot.send_photo(
-            chat_id=update.chat.id,
-            photo=file,
-            caption=f"📝 **AI Vision Response**\n\n{ai_response}\n\n__You can ask up to {MAX_IMAGE_USES} follow-up questions about this image, or type /endimage to clear the context.__",
-            parse_mode=enums.ParseMode.MARKDOWN
-        )
+        TELEGRAM_CAPTION_LIMIT = 1024  # Telegram's Markdown caption limit for photos
+        caption = f"📝 **AI Vision Response**\n\n{ai_response}\n\n__You can ask up to {MAX_IMAGE_USES} follow-up questions about this image, or type /endimage to clear the context.__"
+        try:
+            await bot.send_photo(
+                chat_id=update.chat.id,
+                photo=file,
+                caption=caption,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+        except MediaCaptionTooLong as e:
+            logger.exception(f"Error in send_photo: {str(e)}")
+            # If error is due to caption too long, send image without caption and text as new message
+            await bot.send_photo(
+                chat_id=update.chat.id,
+                photo=file
+            )
+            await bot.send_message(
+                chat_id=update.chat.id,
+                text=caption,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
         await processing_msg.delete()
         # Log to channel
         try:
@@ -182,7 +198,7 @@ async def extract_text_res(bot, update):
         # Do NOT delete the temp file here; only delete after 3 follow-ups or /endimage
     except Exception as e:
         logger.exception(f"Error in extract_text_res: {str(e)}")
-        await update.reply_text(f"An error occurred: {str(e)}")
+        await update.reply_text(f"please try again later , we are facing some issues use /endimage to clear the context")
 
 async def handle_vision_followup(client, message):
 
