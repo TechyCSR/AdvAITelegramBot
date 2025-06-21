@@ -117,7 +117,8 @@ async def generate_unique_image_prompt(existing_prompts=None):
         "Generate a unique, creative, beautiful, and visually stunning image prompt for an AI image generator. "
         "Do NOT repeat any previous prompt. Do NOT include any sponsor or unrelated text. "
         "Reply ONLY with the prompt inside triple backticks (```). "
-        "Example: ```/img a futuristic city at sunset with neon lights```. "
+        "Example: ```a futuristic city at sunset with neon lights```. "
+        "Example: ```a stunning sunset over a serene lake```. "
         "Make it fun, attractive, and different from previous prompts."
     )
     ai_history = [
