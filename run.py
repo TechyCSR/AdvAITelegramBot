@@ -1263,7 +1263,7 @@ def create_bot_instance(bot_token, bot_index=1):
         await handle_vision_followup(client, message)
 
     # Start the interaction system background task
-    start_interaction_system(advAiBot)
+    # start_interaction_system(advAiBot)
 
 
     return advAiBot
