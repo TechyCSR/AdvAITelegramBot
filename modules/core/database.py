@@ -111,6 +111,10 @@ def get_prompt_storage_collection() -> Collection:
     """Get the prompt storage collection"""
     return db_service.get_collection('prompt_storage')
 
+def get_creative_prompts_collection() -> Collection:
+    """Get the creative prompts collection for storing unique image prompts"""
+    return db_service.get_collection('creative_prompts')
+
 def get_user_images_collection() -> Collection:
     """Get the user images collection"""
     return db_service.get_collection('user_images')
