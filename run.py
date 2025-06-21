@@ -147,8 +147,8 @@ def create_bot_instance(bot_token, bot_index=1):
             f"```\n{prompt}\n```"
             "\n\n**To create more images, just use /img again!!!**\n\n"
         )
-        await callback_query.edit_message_text(
-            f"🚀 Sending snippet to all users...\n\n{snippet_text}",
+        progress_msg = await callback_query.edit_message_text(
+            f"🚀 Sending snippet to all users...\n\nSuccess: 0\nFailed: 0",
             parse_mode=ParseMode.MARKDOWN
         )
         # Send to all users and collect results
@@ -157,14 +157,24 @@ def create_bot_instance(bot_token, bot_index=1):
         user_ids = users_collection.distinct("user_id")
         success = 0
         fail = 0
-        for uid in user_ids:
+        update_every = 10
+        for idx, uid in enumerate(user_ids, 1):
             try:
                 await bot.send_message(uid, snippet_text, parse_mode=ParseMode.MARKDOWN)
                 await asyncio.sleep(0.05)
                 success += 1
             except Exception as e:
                 fail += 1
-        await callback_query.message.reply_text(
+            # Update progress every 20 users
+            if idx % update_every == 0 or idx == len(user_ids):
+                try:
+                    await progress_msg.edit_text(
+                        f"🚀 Sending snippet to all users...\n\nSuccess: {success}\nFailed: {fail}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception:
+                    pass
+        await progress_msg.edit_text(
             f"✅ Snippet sent to {success} users.\n❌ Failed to send to {fail} users.",
             parse_mode=ParseMode.MARKDOWN
         )
