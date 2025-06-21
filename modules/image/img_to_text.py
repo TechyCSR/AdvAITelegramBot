@@ -102,13 +102,12 @@ async def extract_text_res(bot, update):
 
         # Smart caption parsing
         if update.caption:
-            prompt = update.caption.strip()
-            if prompt.endswith("?"):
-                user_question = prompt
-            else:
-                user_question = prompt
+            prompt = update.caption 
+            user_question = prompt
+            print(user_question)
         else:
-            user_question = "Describe this image."
+            user_question = "System: if there is any text in the image, then read the text and answer the question if any question is there in the text and highlight the answer in bold. if there is no text in the image, then describe the image."
+            print(user_question)
 
         await processing_msg.edit_text(
             "🧠 **Analyzing Image with AI...**\n\nThis may take a few seconds."
