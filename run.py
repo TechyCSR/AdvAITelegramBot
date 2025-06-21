@@ -95,6 +95,81 @@ def create_bot_instance(bot_token, bot_index=1):
     pending_group_images = {}
 
 
+    # --- SNIPPET BROADCAST COMMAND (ADMIN ONLY) ---
+    @advAiBot.on_message(filters.command("snippet") & filters.user(config.ADMINS))
+    async def snippet_command(bot, update):
+        try:
+            text = update.text.split(" ", 1)[1].strip()
+            # Ensure /img is present at the start
+            if not re.match(r"^/img", text, re.IGNORECASE):
+                text = f"/img {text}"
+            # Format the snippet with telegt code block
+            snippet_text = (
+                "**🎨 Try this creative image idea!**\nJust copy & paste below with /img to create:\n\n"  
+                "**Prompt:**\n"
+                f"```\n{text}\n```"
+                "\n\n**To create more images, just use /img again!!!**"
+            )
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Yes, send to all", callback_data="snippet_confirm"),
+                    InlineKeyboardButton("❌ No, cancel", callback_data="snippet_cancel")
+                ]
+            ])
+            await update.reply_text(
+                f"**Snippet Preview:**\n\n{snippet_text}",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            if not hasattr(bot, "_snippet_pending"): bot._snippet_pending = {}
+            bot._snippet_pending[update.from_user.id] = text
+        except IndexError:
+            await update.reply_text(
+                "⚠️ Please provide a prompt to share as a snippet.\n\nExample: /snippet a beautiful sunset over the mountains",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["snippet_confirm", "snippet_cancel"]))
+    async def snippet_callback_handler(bot, callback_query):
+        user_id = callback_query.from_user.id
+        if not hasattr(bot, "_snippet_pending") or user_id not in bot._snippet_pending:
+            await callback_query.answer("No pending snippet.", show_alert=True)
+            return
+        if callback_query.data == "snippet_cancel":
+            del bot._snippet_pending[user_id]
+            await callback_query.edit_message_text("❌ Snippet sharing cancelled.")
+            return
+        # Confirm send
+        prompt = bot._snippet_pending[user_id]
+        snippet_text = (
+            "**🎨 Try this creative image idea!**\nJust copy & paste below with /img to create:\n\n"  
+            "**Prompt:**\n"
+            f"```\n{prompt}\n```"
+            "\n\n**To create more images, just use /img again!!!**\n\n"
+        )
+        await callback_query.edit_message_text(
+            f"🚀 Sending snippet to all users...\n\n{snippet_text}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        # Send to all users and collect results
+        from modules.core.database import get_user_collection
+        users_collection = get_user_collection()
+        user_ids = users_collection.distinct("user_id")
+        success = 0
+        fail = 0
+        for uid in user_ids:
+            try:
+                await bot.send_message(uid, snippet_text, parse_mode=ParseMode.MARKDOWN)
+                await asyncio.sleep(0.05)
+                success += 1
+            except Exception as e:
+                fail += 1
+        await callback_query.message.reply_text(
+            f"✅ Snippet sent to {success} users.\n❌ Failed to send to {fail} users.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        del bot._snippet_pending[user_id]
+
 
     # --- PREMIUM COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("premium") & filters.user(config.ADMINS))
