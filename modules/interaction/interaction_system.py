@@ -13,7 +13,7 @@ INTERACTION_CHECK_INTERVAL_SECONDS = 600  # Check every 10 minutes
 
 # --- New Configurable Interval for Image Prompt Suggestions ---
 IMAGE_PROMPT_SUGGESTION_HOURS = 12  # Send every 12 hours (can be changed)
-IMAGE_PROMPT_SUGGESTION_SECONDS = 3600 #every hour
+IMAGE_PROMPT_SUGGESTION_SECONDS = IMAGE_PROMPT_SUGGESTION_HOURS * 3600 #every hour
 IMAGE_PROMPT_ACTIVE_DAYS = 7  # Only send to users active in the last 7 days
 
 logger = logging.getLogger(__name__)
@@ -117,8 +117,8 @@ async def generate_unique_image_prompt(existing_prompts=None):
         "Generate a unique, creative, beautiful, and visually stunning image prompt for an AI image generator. "
         "Do NOT repeat any previous prompt. Do NOT include any sponsor or unrelated text. "
         "Reply ONLY with the prompt inside triple backticks (```). "
+        "Do NOT include the /img prefix in your response. "
         "Example: ```a futuristic city at sunset with neon lights```. "
-        "Example: ```a stunning sunset over a serene lake```. "
         "Make it fun, attractive, and different from previous prompts."
     )
     ai_history = [
@@ -133,11 +133,13 @@ async def generate_unique_image_prompt(existing_prompts=None):
 ```"""
     # Extract the prompt inside triple backticks
     import re
-    match = re.search(r"```(?:/img)?\s*(.*?)```", snippet, re.DOTALL)
+    match = re.search(r"```\s*(.*?)```", snippet, re.DOTALL)
     if match:
         prompt_text = match.group(1).strip()
-        if not prompt_text.startswith("/img"):
-            prompt_text = "/img " + prompt_text
+        # Always add /img prefix, never duplicate
+        if prompt_text.lower().startswith("/img"):
+            prompt_text = prompt_text[4:].strip()
+        prompt_text = "/img " + prompt_text
         # Check for duplicates
         if existing_prompts and prompt_text in existing_prompts:
             return None  # Duplicate, skip
