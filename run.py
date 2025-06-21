@@ -41,6 +41,7 @@ from modules.user.premium_management import add_premium_status, remove_premium_s
 from modules.user.file_to_text import handle_file_upload, handle_file_question
 from modules.interaction.interaction_system import start_interaction_system, set_last_interaction
 from modules.core.database import get_user_interactions_collection
+import re
 
 
 
@@ -93,6 +94,9 @@ def create_bot_instance(bot_token, bot_index=1):
     # Add a global in-memory dict to store pending group image contexts
     pending_group_images = {}
 
+
+
+    # --- PREMIUM COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("premium") & filters.user(config.ADMINS))
     async def premium_command_handler(client, message):
         if len(message.command) < 3:
@@ -1185,6 +1189,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     # Start the interaction system background task
     start_interaction_system(advAiBot)
+
 
     return advAiBot
 

@@ -146,62 +146,63 @@ async def generate_unique_image_prompt(existing_prompts=None):
         return prompt_text
     return None
 
-async def image_prompt_suggestion_worker(client: Client):
-    creative_prompts_col = get_creative_prompts_collection()
-    interactions_col = get_user_interactions_collection()
-    while True:
-        now = datetime.utcnow()
-        # Only users who have interacted in the last N days
-        active_since = now - timedelta(days=IMAGE_PROMPT_ACTIVE_DAYS)
-        users = interactions_col.find({
-            "last_interaction_time": {"$exists": True, "$gte": active_since}
-        })
-        # Get all creative prompts
-        all_prompts = list(creative_prompts_col.find({}, {"prompt": 1}))
-        prompt_texts = [p["prompt"] for p in all_prompts]
-        # If not enough prompts, generate more
-        needed = max(0, len(list(users)) - len(prompt_texts))
-        for _ in range(needed):
-            new_prompt = None
-            tries = 0
-            while not new_prompt and tries < 5:
-                new_prompt = await generate_unique_image_prompt(set(prompt_texts))
-                tries += 1
-            if new_prompt:
-                creative_prompts_col.insert_one({"prompt": new_prompt, "created_at": datetime.utcnow()})
-                prompt_texts.append(new_prompt)
-        # Re-fetch users (cursor was exhausted)
-        users = interactions_col.find({
-            "last_interaction_time": {"$exists": True, "$gte": active_since}
-        })
-        # For each user, send a prompt they haven't received yet
-        for user in users:
-            user_id = user["user_id"]
-            # Track which prompts this user has received
-            received = user.get("image_prompts_sent", [])
-            # Find a prompt not yet sent to this user
-            available = [p for p in prompt_texts if p not in received]
-            if not available:
-                # Reset if all used
-                received = []
-                available = prompt_texts.copy()
-            import random
-            prompt_to_send = random.choice(available)
-            # Send the prompt
-            try:
-                await client.send_message(user_id, f"🎨 Try this creative image idea!\nJust copy & paste below with /img to create:\n\n```\n{prompt_to_send}\n```", parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-                # Update user's sent prompts
-                interactions_col.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"image_prompts_sent": received + [prompt_to_send]}}
-                )
-            except Exception as e:
-                logger.error(f"Failed to send image prompt to {user_id}: {e}")
-                try:
-                    await client.send_message(LOG_CHANNEL, f"[ImagePromptSuggestion] Failed to send to {user_id}: {e}")
-                except Exception:
-                    pass
-        await asyncio.sleep(IMAGE_PROMPT_SUGGESTION_SECONDS)
+# --- Image Prompt Suggestion Worker (DISABLED as per user request) ---
+# async def image_prompt_suggestion_worker(client: Client):
+#     creative_prompts_col = get_creative_prompts_collection()
+#     interactions_col = get_user_interactions_collection()
+#     while True:
+#         now = datetime.utcnow()
+#         # Only users who have interacted in the last N days
+#         active_since = now - timedelta(days=IMAGE_PROMPT_ACTIVE_DAYS)
+#         users = interactions_col.find({
+#             "last_interaction_time": {"$exists": True, "$gte": active_since}
+#         })
+#         # Get all creative prompts
+#         all_prompts = list(creative_prompts_col.find({}, {"prompt": 1}))
+#         prompt_texts = [p["prompt"] for p in all_prompts]
+#         # If not enough prompts, generate more
+#         needed = max(0, len(list(users)) - len(prompt_texts))
+#         for _ in range(needed):
+#             new_prompt = None
+#             tries = 0
+#             while not new_prompt and tries < 5:
+#                 new_prompt = await generate_unique_image_prompt(set(prompt_texts))
+#                 tries += 1
+#             if new_prompt:
+#                 creative_prompts_col.insert_one({"prompt": new_prompt, "created_at": datetime.utcnow()})
+#                 prompt_texts.append(new_prompt)
+#         # Re-fetch users (cursor was exhausted)
+#         users = interactions_col.find({
+#             "last_interaction_time": {"$exists": True, "$gte": active_since}
+#         })
+#         # For each user, send a prompt they haven't received yet
+#         for user in users:
+#             user_id = user["user_id"]
+#             # Track which prompts this user has received
+#             received = user.get("image_prompts_sent", [])
+#             # Find a prompt not yet sent to this user
+#             available = [p for p in prompt_texts if p not in received]
+#             if not available:
+#                 # Reset if all used
+#                 received = []
+#                 available = prompt_texts.copy()
+#             import random
+#             prompt_to_send = random.choice(available)
+#             # Send the prompt
+#             try:
+#                 await client.send_message(user_id, f"🎨 Try this creative image idea!\nJust copy & paste below with /img to create:\n\n```\n{prompt_to_send}\n```", parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+#                 # Update user's sent prompts
+#                 interactions_col.update_one(
+#                     {"user_id": user_id},
+#                     {"$set": {"image_prompts_sent": received + [prompt_to_send]}}
+#                 )
+#             except Exception as e:
+#                 logger.error(f"Failed to send image prompt to {user_id}: {e}")
+#                 try:
+#                     await client.send_message(LOG_CHANNEL, f"[ImagePromptSuggestion] Failed to send to {user_id}: {e}")
+#                 except Exception:
+#                     pass
+#         await asyncio.sleep(IMAGE_PROMPT_SUGGESTION_SECONDS)
 
 def start_interaction_system(client: Client):
     """
@@ -210,4 +211,4 @@ def start_interaction_system(client: Client):
     """
     loop = asyncio.get_event_loop()
     loop.create_task(interaction_worker(client))
-    loop.create_task(image_prompt_suggestion_worker(client)) 
+    # loop.create_task(image_prompt_suggestion_worker(client))  # DISABLED as per user request 
