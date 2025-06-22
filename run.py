@@ -1070,18 +1070,6 @@ def create_bot_instance(bot_token, bot_index=1):
             logger.error(f"Error refreshing admin panel: {str(e)}")
             # Don't re-raise as this is a non-critical refresh
 
-    @advAiBot.on_message(filters.group & filters.command(["pin", "unpin", "promote", "demote", "ban", "warn"]))
-    async def handle_group_admin_commands(bot, message):
-        """Handle admin commands in groups with maintenance mode check"""
-        # Check maintenance mode - exempt admins
-        if await maintenance_check(message.from_user.id):
-            maint_msg = await maintenance_message(message.from_user.id)
-            await message.reply(maint_msg)
-            return
-        
-        # Let normal Telegram permission system handle the actual execution
-        pass
-
     @advAiBot.on_message(filters.command("restart") & filters.user(config.ADMINS))
     async def handle_restart_command(bot, update):
         """Handler for the restart command"""
