@@ -129,6 +129,7 @@ def create_bot_instance(bot_token, bot_index=1):
                 parse_mode=ParseMode.MARKDOWN
             )
 
+    # --- SNIPPET CALLBACK HANDLER (ADMIN ONLY) ---
     @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["snippet_confirm", "snippet_cancel"]))
     async def snippet_callback_handler(bot, callback_query):
         user_id = callback_query.from_user.id
@@ -291,7 +292,7 @@ def create_bot_instance(bot_token, bot_index=1):
         else:
             await message.reply_text(f"User {target_user.mention} was not found in the ban list or could not be unbanned.")
 
-
+    # --- START COMMAND ---
     @advAiBot.on_message(filters.command("start"))
     async def start_command(bot, update):
         set_last_interaction(update.from_user.id, "command_start", get_user_interactions_collection())
@@ -348,6 +349,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
         await channel_log(bot, update, "/start")
 
+    # --- HELP COMMAND ---
     @advAiBot.on_message(filters.command("help"))
     async def help_command(bot, update):
         set_last_interaction(update.from_user.id, "command_help", get_user_interactions_collection())
@@ -381,7 +383,8 @@ def create_bot_instance(bot_token, bot_index=1):
             return False
         return filters.create(func)
 
-  
+
+    # --- MESSAGE HANDLER ---
     @advAiBot.on_message(is_chat_text_filter() & filters.text & (filters.private | filters.group))
     async def handle_message(client, message):
         set_last_interaction(message.from_user.id, "text", get_user_interactions_collection())
@@ -401,6 +404,7 @@ def create_bot_instance(bot_token, bot_index=1):
         logger.info(f"Processing message from user {message.from_user.id}")
         await aires(client, message)
 
+    # --- INLINE QUERY HANDLER ---
     @advAiBot.on_inline_query()
     async def inline_query_handler(client, inline_query):
         # For inline queries, we can't directly reply with a ban message.
@@ -416,8 +420,10 @@ def create_bot_instance(bot_token, bot_index=1):
         
         # Route to appropriate handler based on query content
         await handle_inline_query(client, inline_query)
+    
 
-    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["announce_confirm", "announce_cancel"]))
+    # --- ANNOUNCEMENT CALLBACK HANDLER (ADMIN ONLY) ---
+    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["announce_confirm", "announce_cancel"])) 
     async def announce_callback_handler(bot, callback_query):
         user_id = callback_query.from_user.id
         if not hasattr(bot, "_announce_pending") or user_id not in bot._announce_pending:
@@ -751,7 +757,7 @@ def create_bot_instance(bot_token, bot_index=1):
             except:
                 pass
 
-
+    # --- VOICE MESSAGE HANDLER ---
     @advAiBot.on_message(filters.voice)
     async def voice(bot, message):
         set_last_interaction(message.from_user.id, "voice", get_user_interactions_collection())
@@ -767,12 +773,12 @@ def create_bot_instance(bot_token, bot_index=1):
         bot_stats["active_users"].add(message.from_user.id)
         await handle_voice_message(bot, message)
 
-    # Register the toggle callback for voice/text mode
+    # --- VOICE TOGGLE CALLBACK HANDLER ---
     @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("toggle_voice_")))
     async def voice_toggle_callback(client, callback_query):
         await handle_voice_toggle(client, callback_query)
 
-    # Add a new handler for replies to bot messages in groups
+    # --- REPLY TO BOT MESSAGE HANDLER (GROUP) ---
     @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
     async def handle_reply_to_bot(bot, message):
         set_last_interaction(message.from_user.id, "reply_to_bot", get_user_interactions_collection())
@@ -799,6 +805,7 @@ def create_bot_instance(bot_token, bot_index=1):
         # Process the query using the AI response function
         await aires(bot, message)
 
+    # --- LEAVE GROUP COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("gleave"))
     async def leave_group_command(bot, update):
         if update.from_user.id in config.ADMINS:
@@ -810,12 +817,14 @@ def create_bot_instance(bot_token, bot_index=1):
             await update.reply_text("⛔ You are not authorized to use this command.")
             await channel_log(bot, update, "/gleave", f"Unauthorized access attempt", level="WARNING")
 
+    # --- RATE COMMAND (PRIVATE) ---
     @advAiBot.on_message(filters.command("rate") & filters.private)
     async def rate_commands(bot, update):
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
         await rate_command(bot, update)
 
+    # --- INVITE COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("invite"))
     async def invite_commands(bot, update):
         if update.from_user.id in config.ADMINS:
@@ -827,6 +836,7 @@ def create_bot_instance(bot_token, bot_index=1):
             await update.reply_text("⛔ You are not authorized to use this command.")
             await channel_log(bot, update, "/invite", f"Unauthorized access attempt", level="WARNING")
 
+    # --- UINFO COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("uinfo"))
     async def info_commands(bot, update):
         if update.from_user.id in config.ADMINS:
@@ -838,15 +848,17 @@ def create_bot_instance(bot_token, bot_index=1):
             await update.reply_text("⛔ You are not authorized to use this command.")
             await channel_log(bot, update, "/uinfo", f"Unauthorized access attempt", level="WARNING")
 
-    # Register uinfo panel callbacks
+    # --- UINFO SETTINGS CALLBACK HANDLER ---
     @advAiBot.on_callback_query(filters.create(lambda _, __, q: q.data.startswith("uinfo_settings_")))
     async def uinfo_settings_cb(client, callback_query):
         await uinfo_settings_callback(client, callback_query)
 
+    # --- UINFO HISTORY CALLBACK HANDLER ---
     @advAiBot.on_callback_query(filters.create(lambda _, __, q: q.data.startswith("uinfo_history_")))
     async def uinfo_history_cb(client, callback_query):
         await uinfo_history_callback(client, callback_query)
 
+    # --- GROUP COMMAND HANDLER ---
     @advAiBot.on_message(filters.text & filters.command(["ai", "ask", "say"]) & filters.group)
     async def handle_group_message(bot, update):
         set_last_interaction(update.from_user.id, "command_ai_group", get_user_interactions_collection())
@@ -874,7 +886,7 @@ def create_bot_instance(bot_token, bot_index=1):
         # Process the query using the AI response function
         await aires(bot, update)
 
-
+    # --- NEW CHAT COMMAND ---  
     @advAiBot.on_message(filters.command(["newchat", "reset", "new_conversation", "clear_chat", "new"]))
     async def handle_new_chat(client, message):
         set_last_interaction(message.from_user.id, "command_newchat", get_user_interactions_collection())
@@ -884,7 +896,7 @@ def create_bot_instance(bot_token, bot_index=1):
         await new_chat(client, message)
         await channel_log(client, message, "/newchat")
 
-
+    # --- GENERATE COMMAND ---
     @advAiBot.on_message(filters.command(["generate", "gen", "image", "img"]))
     async def handle_generate(client, message):
         set_last_interaction(message.from_user.id, "command_generate", get_user_interactions_collection())
@@ -896,16 +908,19 @@ def create_bot_instance(bot_token, bot_index=1):
         # Log the command usage
         await channel_log(client, message, f"/{message.command[0]}", "Image generation requested")
 
+    # --- PRIVATE IMAGE HANDLER ---
     @advAiBot.on_message(filters.photo & filters.private)
     async def handle_private_image(bot, update):
         set_last_interaction(update.from_user.id, "photo_private", get_user_interactions_collection())
         await extract_text_res(bot, update)
 
+    # --- GROUP IMAGE HANDLER ---
     @advAiBot.on_message(filters.photo & filters.group)
     async def handle_group_image(bot, update):
         set_last_interaction(update.from_user.id, "photo_group", get_user_interactions_collection())
         await extract_text_res(bot, update)
 
+    # --- SETTINGS COMMAND ---
     @advAiBot.on_message(filters.command("settings"))
     async def settings_command(bot, update):
         set_last_interaction(update.from_user.id, "command_settings", get_user_interactions_collection())
@@ -915,6 +930,7 @@ def create_bot_instance(bot_token, bot_index=1):
         await user_settings_panel_command(bot, update)
         await channel_log(bot, update, "/settings")
 
+    # --- STATS COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("stats") & filters.user(config.ADMINS))
     async def stats_command(bot, update):
         logger.info(f"Admin {update.from_user.id} requested stats")
@@ -928,6 +944,7 @@ def create_bot_instance(bot_token, bot_index=1):
         await update.reply_text(stats_text)
         await channel_log(bot, update, "/stats", "Admin requested bot statistics")
 
+    # --- ANNOUNCE COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command(["announce", "broadcast", "acc"]))
     async def announce_command(bot, update):
         if update.from_user.id in config.ADMINS:
@@ -1018,6 +1035,7 @@ def create_bot_instance(bot_token, bot_index=1):
             # Log the error
             await error_log(bot, "LOGS_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
 
+    # --- CLEAR CACHE COMMAND ---
     @advAiBot.on_message(filters.command(["clear_cache", "clearcache", "clear_images"]))
     async def clear_user_cache(client, message):
         if await check_if_banned_and_reply(client, message): # BAN CHECK
@@ -1036,6 +1054,7 @@ def create_bot_instance(bot_token, bot_index=1):
         
         await channel_log(client, message, "/clear_cache", f"User cleared their image cache")
 
+    # --- STATS ALERT (ADMIN ONLY) ---
     async def stats_alert(client, callback_query):
         """Show bot statistics in an alert popup"""
         from modules.maintenance import is_admin_user
@@ -1070,6 +1089,7 @@ def create_bot_instance(bot_token, bot_index=1):
             logger.error(f"Error refreshing admin panel: {str(e)}")
             # Don't re-raise as this is a non-critical refresh
 
+    # --- RESTART COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("restart") & filters.user(config.ADMINS))
     async def handle_restart_command(bot, update):
         """Handler for the restart command"""
@@ -1077,6 +1097,7 @@ def create_bot_instance(bot_token, bot_index=1):
         await restart_command(bot, update)
         await channel_log(bot, update, "/restart", "Admin initiated restart command")
 
+    # --- NEW CHAT MEMBERS HANDLER ---
     @advAiBot.on_message(filters.new_chat_members)
     async def handle_new_chat_members(client, message):
         """Handle when new members are added to a group, including the bot itself"""
@@ -1090,6 +1111,7 @@ def create_bot_instance(bot_token, bot_index=1):
         except Exception as e:
             logger.error(f"Error logging new chat members: {e}")
 
+    # --- HISTORY COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("history") & filters.user(config.ADMINS))
     async def history_command(bot, update):
         """Handler for the history command to view a user's chat history"""
@@ -1127,7 +1149,7 @@ def create_bot_instance(bot_token, bot_index=1):
             await update.reply_text(f"❌ **Error retrieving chat history**: {str(e)}")
             await error_log(bot, "HISTORY_COMMAND", str(e), context=update.text, user_id=update.from_user.id)
 
-
+    # --- BENEFITS COMMAND ---
     @advAiBot.on_message(filters.command("benefits"))
     async def benefits_command_handler(client, message):
         if await check_if_banned_and_reply(client, message): # BAN CHECK
@@ -1150,13 +1172,14 @@ def create_bot_instance(bot_token, bot_index=1):
         )
         await channel_log(client, message, "/benefits")
 
+    # --- UPREMIUM COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("upremium") & filters.user(config.ADMINS))
     async def upremium_command(bot, message):
         users = await get_all_premium_users()
         formatted = await format_premium_users_list(users)
         await message.reply_text(formatted, parse_mode=ParseMode.HTML)
 
-    # IMPORTANT: Ensure this new ban check is added to all relevant message/command handlers
+    # --- BAN CHECK ---
     async def check_if_banned_and_reply(client, update_obj): # Renamed to update_obj for clarity
         user_id = update_obj.from_user.id
         # Admins cannot be banned by the bot, so skip check for them.
@@ -1179,7 +1202,7 @@ def create_bot_instance(bot_token, bot_index=1):
             return True
         return False
 
-
+    # --- HANDLE ADMIN TEXT INPUT ---
     @advAiBot.on_message(filters.text & filters.private & filters.user(config.ADMINS))
     async def handle_admin_text_input(bot, message):
         """Handler for admin text input, including user ID for history search"""
@@ -1244,6 +1267,7 @@ def create_bot_instance(bot_token, bot_index=1):
         # If we reach here, it's not a special admin action, so proceed with normal message handling
         await handle_message(bot, message)
 
+    # --- DOCUMENT HANDLER ---
     @advAiBot.on_message(filters.document & (filters.private | filters.group))
     async def document_handler(client, message):
         set_last_interaction(message.from_user.id, "document", get_user_interactions_collection())
@@ -1256,22 +1280,24 @@ def create_bot_instance(bot_token, bot_index=1):
             from modules.user.file_to_text import handle_file_upload
             await handle_file_upload(client, message)
 
+    # --- ENDIMAGE COMMAND ---
     @advAiBot.on_message(filters.command("endimage") & (filters.private | filters.group))
     async def endimage_command_handler(client, message):
         await handle_vision_followup(client, message)
 
-    # Start the interaction system background task
+    # --- START THE INTERACTION SYSTEM BACKGROUND TASK ---
     # start_interaction_system(advAiBot)
 
 
     return advAiBot
 
-
+# --- RUN BOT ---
 def run_bot(bot_token, bot_index=1):
     # No need to set event loop, .run() will handle it in the main thread of the process
     bot = create_bot_instance(bot_token, bot_index)
     bot.run()
 
+# --- MAIN FUNCTION ---
 if __name__ == "__main__":
     logger.info("🤖 Advanced AI Telegram Bot starting...")
     print("🤖 Advanced AI Telegram Bot starting...")
