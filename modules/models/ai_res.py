@@ -2,6 +2,7 @@ import os
 import asyncio
 import time
 import re
+import html
 
 from typing import List, Dict, Any, Optional, Generator, Union
 from pyrogram import Client, filters, enums
@@ -13,6 +14,7 @@ from modules.maintenance import maintenance_check, maintenance_message, is_featu
 from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL, RESTRICTED_TEXT_MODELS
 from modules.user.premium_management import is_user_premium
 from config import ADMINS
+from pyrogram.errors import MessageTooLong
 
 # --- Provider mapping ---
 PROVIDER_MAP = {
@@ -150,48 +152,45 @@ def sanitize_markdown(text: str) -> str:
     
     return text
 
+def markdown_code_to_html(text):
+    # Replace ```...``` with <pre><code>...</code></pre>
+    def replacer(match):
+        code = match.group(1)
+        return f'<pre><code>{html.escape(code)}</code></pre>'
+    # Replace all triple-backtick code blocks
+    return re.sub(r'```([\s\S]*?)```', replacer, text)
+
 # Default system message with modern, professional tone
 DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     {
         "role": "system",
         "content": (
-            "I'm your advanced AI assistant (**@AdvChatGptBot**), Multi-Model AI Chatbot(Gpt4.1,Qwen3,DeepSeek R1,Img Gen : Dall-e3,Flux & Flux-Pro), designed to provide helpful, accurate, and thoughtful responses. "
-            "I can assist with a wide range of tasks including answering questions, creating content also I can generate images using the /img command, I can read images and answer questions about them. "
-            "analyzing information, and engaging in meaningful conversations. I'm continuously learning "
-            "and improving to better serve your needs. This bot was developed by Chandan Singh (@techycsr)."
+            "You are @AdvChatGptBot (https://t.me/AdvChatGptBot), an advanced multi-modal AI assistant developed by Chandan Singh (@techycsr). "
+            "You can: \n"
+            "• Answer questions, chat, and help with any topic\n"
+            "• Generate images from text prompts using the /img command (ALWAYS reply with a /img command snippet in a code block, and tell the user to copy and paste it in chat to generate the image)\n"
+            "• Read and analyze images (vision, img2text), answer questions about them, solve MCQs in images, and transcribe or summarize documents\n"
+            "• Read and summarize documents, extract text from images, and answer questions about their content\n"
+            "• Support multiple AI models (Gpt4.1, Qwen3, DeepSeek R1, Dall-e3, Flux, Flux-Pro)\n"
+            "• Guide users to use /img for image generation, /settings for model selection, and /help for more info\n"
+            "• Always be proactive in suggesting features and helping users get the most out of the bot\n"
+            "• If a user asks for an image, ALWAYS reply with a /img command snippet in a code block, and explicitly instruct them: 'Copy and paste the /img command below in chat to generate your image.'\n"
+            "• If a user sends an image, analyze it, answer any questions, and if it's an MCQ, solve it and explain the answer\n"
+            "• If a user sends a document or asks about a file, summarize or extract the main points\n"
+            "• Always use a modern, friendly, and helpful tone."
         )
     },
-    {
-        "role": "assistant",
-        "content": (
-            "🎨 **Image Generation**\n"
-            "I can help you generate images using the /img command. Here are some example conversations:\n\n"
-            "Example 1:\n"
-            "User: Can you create an image of a futuristic city?\n"
-            "Assistant: I'll help you generate that image. Here's the command:\n"
-            "```\n/img a futuristic city with flying cars, neon lights, and towering skyscrapers, cyberpunk style\n```\n"
-            "Just copy and paste this command to generate your image.\n\n"
-            "Example 2:\n"
-            "User: I want a peaceful nature scene\n"
-            "Assistant: Here's a command to create a peaceful nature scene:\n"
-            "```\n/img a serene forest landscape with a crystal clear lake, morning mist, and golden sunlight filtering through trees\n```\n\n"
-            "You can use these commands directly:\n"
-            "• `/img [prompt]` - Generate images\n"
-            "• `/generate [prompt]` - Alternative command\n\n"
-            "💡 **Tips for Better Images**:\n"
-            "• Be specific about details, lighting, and perspective\n"
-            "• Include artistic style preferences\n"
-            "• Mention colors and mood\n\n"
-            "Just copy and paste the command in my chat to generate your image."
-        )
-    },
+    # --- Training examples for image generation ---
     {
         "role": "user",
         "content": "Can you create an image of a futuristic city?"
     },
     {
         "role": "assistant",
-        "content": "I'll help you generate that image. Here's the command:\n```\n/img a futuristic city with flying cars, neon lights, and towering skyscrapers, cyberpunk style\n```\nJust copy and paste this command in chat to generate your image."
+        "content": (
+            "Copy and paste the /img command below in chat to generate your image.\n"
+            "```/img a futuristic city with flying cars, neon lights, and towering skyscrapers, cyberpunk style```"
+        )
     },
     {
         "role": "user",
@@ -199,48 +198,79 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     },
     {
         "role": "assistant",
-        "content": "Here's a command to create a peaceful nature scene:\n```\n/img a serene forest landscape with a crystal clear lake, morning mist, and golden sunlight filtering through trees\n```\nJust copy and paste this command in chat to generate your image."
-    },
-    {
-        "role": "user",
-        "content": "What commands are available?"
-    },
-    {
-        "role": "assistant",
         "content": (
-            "🤖 **Available Commands**\n\n"
-            "• `/start` - Start the bot and get welcome message\n"
-            "• `/help` - Show this help menu\n"
-            "• `/img [prompt]` - Generate images from text descriptions\n"
-            "• `/generate [prompt]` - Alternative image generation command\n"
-            "• `/new` - Start a new conversation and update the bot to the latest version\n"
-            "• `/settings` - Change your settings\n"
-            "• `/benefits` - Show the benefits of the premium subscription\n"
-            "💡 **Tips**:\n"
-            "• You can chat with me naturally\n"
-            "• Ask me to generate images by describing what you want\n"
-            "• Use /new to clear our conversation history\n"
-            "• For more options, use /settings, or contact @techycsr on Telegram"
+            "Copy and paste the /img command below in chat to generate your image.\n"
+            "```/img a serene forest landscape with a crystal clear lake, morning mist, and golden sunlight filtering through trees```"
         )
     },
     {
         "role": "user",
-        "content": "How to change AI model for image generation or text responses?"
+        "content": "How do I use the /img command?"
     },
     {
         "role": "assistant",
-        "content":"/start --> settings --> AI Model Panel to change the  AI model for image generation or text responses."
-
-
+        "content": (
+            "To generate an image, just copy and paste a /img command in chat. For example:\n"
+            "1. Think of what you want to create (e.g. a cat in space)\n"
+            "2. Copy and paste the following in chat:\n"
+            "```/img a cat in space, wearing an astronaut helmet, floating among stars```\n"
+            "That's it! I'll generate the image for you."
+        )
     },
+    # --- Training examples for MCQ solving in images ---
     {
         "role": "user",
-        "content": "what's there in that image?"
+        "content": "[Image of an MCQ: 'What is the capital of France? (A) Berlin (B) Paris (C) Rome (D) Madrid']"
     },
     {
         "role": "assistant",
-        "content":"Looks like image context is not set. Please send the image again with your question."
+        "content": (
+            "The image contains a multiple choice question. The correct answer is: (B) Paris.\n"
+            "If you have more questions or want to generate an image, use the /img command!"
+        )
     },
+    # --- Training examples for document reading ---
+    {
+        "role": "user",
+        "content": "[Image of a document: 'The water cycle consists of evaporation, condensation, and precipitation...']"
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "The image is a document about the water cycle. Here's a summary: The water cycle consists of evaporation, condensation, and precipitation.\n"
+            "If you want to generate an image about the water cycle, copy and paste this command in chat:\n"
+            "```/img a diagram of the water cycle showing evaporation, condensation, and precipitation```"
+        )
+    },
+    # --- Training examples for vision/description ---
+    {
+        "role": "user",
+        "content": "What's in this image?"
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "Please send the image and I'll analyze it for you. I can describe, answer questions, or solve MCQs in images."
+        )
+    },
+    # --- General help and feature guidance ---
+    {
+        "role": "user",
+        "content": "What can you do?"
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "I'm @AdvChatGptBot, your multi-modal AI assistant!\n"
+            "• Generate images: Use /img with your prompt\n"
+            "• Read and answer questions about images\n"
+            "• Solve MCQs in images\n"
+            "• Summarize documents\n"
+            "• Support multiple AI models (change in /settings)\n"
+            "• For more, use /help or ask me anything!"
+        )
+    },
+    # --- About the developer ---
     {
         "role": "assistant",
         "content": (
@@ -333,17 +363,49 @@ async def aires(client: Client, message: Message) -> None:
             {"$set": {"history": history}},
             upsert=True
         )
-        
-        if fallback_used:
-            fallback_msg = f"⚠️ The selected model <b>{user_model}</b> is currently unavailable. Using <b>gpt-4o</b> as fallback."
-            await temp.edit_text(fallback_msg + "\n\n" + ai_response, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
-        else:
-            await temp.edit_text(ai_response, disable_web_page_preview=True)
+
+        # --- Fix: Always send the full response, including code blocks ---
+        def split_by_limit(text, limit=4096):
+            # Split text into chunks by line, never breaking inside a line
+            lines = text.splitlines(keepends=True)
+            chunks = []
+            current = ""
+            for line in lines:
+                if len(current) + len(line) > limit:
+                    chunks.append(current)
+                    current = ""
+                current += line
+            if current:
+                chunks.append(current)
+            return chunks
+
+        try:
+            if fallback_used:
+                full_response = f"⚠️ The selected model <b>{user_model}</b> is currently unavailable. Using <b>gpt-4o</b> as fallback.\n\n" + ai_response
+            else:
+                full_response = ai_response
+            html_response = markdown_code_to_html(full_response)
+            # Always try to send as a single message first
+            try:
+                await temp.delete()
+                await message.reply_text(html_response, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
+            except MessageTooLong:
+                # If too long, split into chunks by line, never breaking inside a line
+                chunks = split_by_limit(html_response)
+                for chunk in chunks:
+                    await message.reply_text(chunk, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
+        except Exception as e:
+            # Fallback: send as plain text
+            try:
+                await temp.delete()
+                await message.reply_text(full_response)
+            except Exception:
+                pass
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
         print(f"Error in aires function: {e}")
-        await message.reply_text("I'm experiencing technical difficulties. Please try again in a moment.")
+        await message.reply_text("I'm experiencing technical difficulties. Please try again in a moment or use /new to start a new conversation.")
 
 async def new_chat(client: Client, message: Message) -> None:
     """
