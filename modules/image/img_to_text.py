@@ -30,7 +30,7 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 
 # Add at the top, after logger definition
 image_cleanup_tasks = {}
-IMAGE_EXPIRY_SECONDS = 2 * 60  # 15 minutes
+IMAGE_EXPIRY_SECONDS = 15 * 60  # 15 minutes
 
 def split_message(text, limit=TELEGRAM_MESSAGE_LIMIT):
     """Split text into chunks no longer than Telegram's message limit."""
