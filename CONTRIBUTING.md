@@ -9,7 +9,7 @@ Thank you for your interest in contributing! Your help makes this project better
 ## 🛠️ Development Setup
 1. **Fork the repository** and clone your fork:
    ```bash
-   git clone https://github.com/your-username/AdvAITelegramBot.git
+   git clone https://github.com/TechyCSR/AdvAITelegramBot.git
    cd AdvAITelegramBot
    ```
 2. **Create a virtual environment**:
