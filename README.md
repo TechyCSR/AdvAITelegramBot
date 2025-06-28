@@ -28,27 +28,45 @@
 <table>
   <tr>
     <td align="center">💬</td>
-    <td><b>AI Chat</b><br>Natural conversations powered by GPT-4o</td>
+    <td><b>AI Chat</b><br>Natural conversations powered by GPT-4o and other models</td>
     <td align="center">🎨</td>
-    <td><b>Image Generation</b><br>Create stunning images from text descriptions</td>
+    <td><b>Image Generation</b><br>Create stunning images from text descriptions, with /img and inline mode</td>
   </tr>
   <tr>
     <td align="center">🔊</td>
-    <td><b>Voice Processing</b><br>Two-way voice message and text conversion</td>
+    <td><b>Voice Processing</b><br>Two-way voice message and text conversion (speech-to-text, text-to-speech)</td>
     <td align="center">📝</td>
-    <td><b>Text Extraction</b><br>Extract text from any image with OCR</td>
+    <td><b>Text Extraction (img2text)</b><br>Extract text, solve MCQs, and answer questions from images and documents</td>
   </tr>
   <tr>
     <td align="center">🌐</td>
-    <td><b>Multi-language Support</b><br>Communicate in your preferred language</td>
+    <td><b>Multi-language Support</b><br>Communicate in your preferred language, with translation and language settings</td>
     <td align="center">👥</td>
-    <td><b>Group Integration</b><br>Full AI functionality in group chats</td>
+    <td><b>Group Integration</b><br>Full AI functionality in group chats, with group-specific settings</td>
   </tr>
   <tr>
     <td align="center">📱</td>
-    <td><b>Inline Mode</b><br>Generate AI responses and images in any chat</td>
+    <td><b>Inline Mode</b><br>Generate AI responses and images in any chat, with advanced inline query handling</td>
     <td align="center">⚡</td>
-    <td><b>Fast Response</b><br>Optimized for quick, efficient interactions</td>
+    <td><b>Fast, Reliable Delivery</b><br>Optimized for quick, robust interactions, including large code/image snippets</td>
+  </tr>
+  <tr>
+    <td align="center">🗂️</td>
+    <td><b>File-to-Text (img2text)</b><br>Upload images or documents and interact with their content via AI</td>
+    <td align="center">⏳</td>
+    <td><b>Image Context Expiry</b><br>Uploaded images for vision/AI analysis are auto-deleted after 2 minutes (configurable)</td>
+  </tr>
+  <tr>
+    <td align="center">🔒</td>
+    <td><b>Premium Model Handling</b><br>Premium AI/image models are shown only to eligible users</td>
+    <td align="center">🛡️</td>
+    <td><b>Admin Tools</b><br>Broadcast images (/share), code snippets (/snippet), ban/unban, premium management, logs, and more</td>
+  </tr>
+  <tr>
+    <td align="center">🧩</td>
+    <td><b>Multi-Bot Support</b><br>Run multiple bots with isolated sessions and MongoDB fork safety</td>
+    <td align="center">🧠</td>
+    <td><b>Advanced Prompting</b><br>Smart prompt logic for images, MCQs, and document Q&A</td>
   </tr>
 </table>
 
@@ -84,88 +102,50 @@ python run.py
 |---------|-------------|
 | `/start` | 🏁 Start a conversation with the bot |
 | `/help` | ❓ Get help and see available commands |
-| `/generate [prompt]` | 🎨 Generate an image from text |
-| `/newchat` | 🔄 Clear conversation history |
-| `/settings` | ⚙️ Adjust bot preferences |
-| `/rate` | ⭐ Rate your experience |
-| `/clear_cache` | 🧹 Clear your stored images |
+| `/settings` | ⚙️ Adjust preferences, language, and models |
+| `/img [prompt]` or `/generate [prompt]` | 🎨 Generate an image from text |
+| `/newchat`, `/reset`, `/new`, `/clear_chat` | 🔄 Start a new conversation |
+| *Upload image/document* | 📝 Extract text, solve MCQs, or ask questions about content |
 
-## 💡 Inline Features
+**How to use:**
+- Upload an image or document in private chat to extract text, solve MCQs, or ask questions about its content. Only one image context is active per user; uploading a new image replaces the previous one. Images are auto-deleted after 2 minutes (user is notified).
+- For image generation, the bot always replies with a `/img` command snippet and clear copy-paste instructions.
+- All code/image snippets are delivered unbroken, using HTML formatting for reliability.
 
-The bot offers powerful inline mode capabilities:
+## 🛠️ Configuration
 
-### Inline AI Responses
-Type `@YourBot your question?` in any chat to quickly get AI responses without leaving the conversation.
+Edit `config.py` with the following fields:
 
-### Inline Image Generation
-Type `@YourBot image your description.` to generate and share images instantly in any chat.
-
-**Pro Tip:** End your AI queries with `.` or `?` and your image prompts with `.` to trigger generation. If the response takes time, simply add a space every 5-7 seconds to refresh the query without losing your prompt.
-
-<details>
-<summary>How to use inline mode effectively</summary>
-
-1. **AI Responses**: Type `@YourBot What is quantum computing?` in any chat
-2. **Image Generation**: Type `@YourBot image beautiful sunset over mountains.` 
-3. Select the result when it appears to send it to the chat
-4. For complex queries, wait a few seconds and you'll see "Still generating..." which will update with your response
-5. **If no response appears**: Add a space after your prompt every 5-7 seconds to refresh the query while maintaining your place in the generation queue
-6. You can use this in private chats, group conversations, or channels
-
-</details>
-
-## 🏗️ Project Structure
-
-<details>
-<summary>Click to expand folder structure</summary>
-
+```python
+BOT_TOKEN = "your_telegram_bot_token"  # From BotFather
+API_KEY = "your_telegram_api_key"      # From my.telegram.org
+API_HASH = "your_telegram_api_hash"    # From my.telegram.org
+DATABASE_URL = "mongodb://localhost:27017/"  # MongoDB connection string
+ADMINS = [123456789]  # List of Telegram user IDs with admin rights
+# Optional advanced settings:
+IMAGE_CONTEXT_EXPIRY_MINUTES = 2        # Minutes before uploaded images are auto-deleted
+PREMIUM_MODELS = ["gpt-4o", "dalle3", ...] # List of premium models (shown only to premium users)
+MULTI_BOT = True                        # Enable multi-bot support (one process per bot)
 ```
-AdvAITelegramBot/
-├── modules/                  # Core application modules
-│   ├── core/                 # Core infrastructure components
-│   │   ├── database.py       # DatabaseService with connection pooling
-│   │   └── service_container.py # Dependency injection container
-│   ├── models/               # Data models and services
-│   │   ├── ai_res.py         # AI conversation functionality
-│   │   ├── user_db.py        # User data operations
-│   │   ├── inline_ai_response.py # Inline mode AI responses
-│   │   └── image_service.py  # Image generation and management
-│   ├── user/                 # User interaction modules
-│   │   ├── start.py          # Bot start and onboarding
-│   │   ├── settings.py       # User settings management
-│   │   ├── help.py           # Help and documentation
-│   │   ├── commands.py       # Command handling
-│   │   ├── assistant.py      # Assistant mode settings
-│   │   ├── lang_settings.py  # Language preferences
-│   │   └── user_support.py   # User support functionality
-│   ├── group/                # Group chat functionality
-│   │   ├── group_info.py     # Group information
-│   │   ├── group_settings.py # Group configuration
-│   │   └── new_group.py      # New group handling
-│   ├── image/                # Image processing components
-│   │   ├── img_to_text.py    # OCR and text extraction
-│   │   ├── image_generation.py # Image generation from prompts
-│   │   └── inline_image_generation.py # Inline mode image generation
-│   ├── speech/               # Voice processing components
-│   │   ├── voice_to_text.py  # Speech recognition
-│   │   └── text_to_voice.py  # Text-to-speech conversion
-│   ├── chatlogs.py           # Logging user interactions
-│   ├── feedback_nd_rating.py # User feedback system
-│   ├── lang.py               # Language translation
-│   └── maintenance.py        # Maintenance utilities
-├── database/                 # Database configuration
-├── generated_images/         # Local storage for generated images
-├── sessions/                 # Pyrogram session files
-├── logs/                     # Application logs
-├── assets/                   # Static assets
-├── ImgGenModel/              # Image generation models
-├── run.py                    # Main application entry point
-├── config.py                 # Configuration settings
-├── requirements.txt          # Python dependencies
-├── Dockerfile                # Container configuration
-└── LICENSE                   # MIT License
-```
-</details>
+
+- For multi-bot, provide multiple `BOT_TOKEN`s and set `MULTI_BOT = True`.
+- For MongoDB fork safety, each process creates its own MongoClient.
+- All settings are documented in `config.py`.
+
+## 🧠 Usage Notes
+
+- **Image/Document Upload:**
+  - Upload an image or document, then ask questions, solve MCQs, or request a description.
+  - If a caption is present, it is used as the prompt; otherwise, the bot will prompt the AI to answer questions, solve MCQs, or describe the image.
+  - Only one image context is active per user; uploading a new image replaces the previous one.
+  - Images are auto-deleted after expiry, and the user is notified.
+
+- **AI Prompting:**
+  - The bot is aware of all its capabilities (text, image, vision, MCQ, document, multi-model).
+  - For any image generation request, the bot always replies with a `/img` command snippet and clear copy-paste instructions.
+
+- **Code/Prompt Snippets:**
+  - Code and image generation snippets are always delivered unbroken, using HTML formatting for reliability.
 
 ## 🧠 Architecture
 
@@ -222,7 +202,10 @@ API_KEY = "your_telegram_api_key"      # From my.telegram.org
 API_HASH = "your_telegram_api_hash"    # From my.telegram.org
 DATABASE_URL = "mongodb://localhost:27017/"
 ADMINS = [123456789]  # Your Telegram user ID
-OCR_KEY = "your_ocr_space_api_key"     # From ocr.space
+# Optional advanced settings:
+IMAGE_CONTEXT_EXPIRY_MINUTES = 2        # Minutes before uploaded images are auto-deleted
+PREMIUM_MODELS = ["gpt-4o", "dalle3", ...] # List of premium models (shown only to premium users)
+MULTI_BOT = True                        # Enable multi-bot support (one process per bot)
 ```
 </details>
 
@@ -278,11 +261,11 @@ export DATABASE_URL="mongodb://localhost:27017/"
 
 ## 💻 Technologies
 
-- [**Pyrogram**](https://docs.pyrogram.org/): Modern Telegram client library
-- [**MongoDB**](https://www.mongodb.com/): NoSQL database for user data
-- [**GPT-4o**](https://openai.com/): Advanced language model
-- [**OCR.space**](https://ocr.space/): Text extraction API
-- [**Various Image Generators**](https://github.com): High-quality AI image creation
+- [**Pyrogram**](https://docs.pyrogram.org/): Modern, fast, and elegant Telegram client library for Python.
+- [**MongoDB**](https://www.mongodb.com/): Scalable NoSQL database for user data and bot state.
+- [**OpenAI GPT-4o & Vision**](https://platform.openai.com/docs/models/gpt-4o): Advanced language and vision models for text, image, and document understanding.
+- [**Docker**](https://www.docker.com/): Containerization for easy deployment and scaling.
+- [**Python 3.8+**](https://www.python.org/): The core language powering all features and async operations.
 
 ## 🤝 Contributing
 
@@ -304,15 +287,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 👥 Maintainers
-
-- **[TechyCSR](https://techycsr.me)**
-- **[Ankit](@Ankit-Sharma-Dev)**
-- **[Aarushi](@111Aaru11)**
-
 
 <div align="center">
-  Made with ❤️ by TechyCSR
+  Made with ❤️ by @TechyCSR
   <br>
   <a href="https://techycsr.me">Website</a> •
   <a href="https://x.com/techycsr">Twitter</a> •

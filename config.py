@@ -22,9 +22,7 @@ OWNER_ID = os.environ.get('OWNER_ID') or os.getenv("OWNER_ID") or "123456789" # 
 ADMINS+=[OWNER_ID] # Add the owner ID to the list
 LOG_CHANNEL = os.environ.get('LOG_CHANNEL') or os.getenv("LOG_CHANNEL") or "advchatgptlogs" # Log Channel username preferance
 DATABASE_URL=os.environ.get('DATABASE_URL') or os.getenv("DATABASE_URL") or "DATABASE_URL"
-BING_COOKIE = os.environ.get('BING_COOKIE') or os.getenv("BING_COOKIE") or "BING_COOKIE"
 OCR_KEY = os.environ.get('OCR_KEY') or os.getenv("OCR_KEY") or "OCR_KEY"
-
 MULTIPLE_BOTS = os.environ.get('MULTIPLE_BOTS') or os.getenv("MULTIPLE_BOTS") or "false"
 MULTIPLE_BOTS = MULTIPLE_BOTS.lower() in ["true", "1", "yes", "y"]
 NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS')) or int(os.getenv("NUM_OF_BOTS")) or 1
