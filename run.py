@@ -94,6 +94,101 @@ def create_bot_instance(bot_token, bot_index=1):
     # Add a global in-memory dict to store pending group image contexts
     pending_group_images = {}
 
+    # --- SHARE IMAGE COMMAND (ADMIN ONLY) ---
+
+    @advAiBot.on_message(filters.command("share") & filters.user(config.ADMINS) & filters.reply & filters.private)
+    async def share_image_command(bot, update):
+        # Only allow if replying to a photo
+
+        if not update.reply_to_message or not update.reply_to_message.photo:
+            await update.reply_text("⚠️ Please reply to an image/photo to use /share.")
+            return
+        # Get the prompt from the command (optional)
+        prompt = update.text.split(" ", 1)[1].strip() if len(update.text.split(" ", 1)) > 1 else (update.reply_to_message.caption or "")
+        # Download the photo
+        photo = update.reply_to_message.photo
+        file_id = photo.file_id
+        file = await bot.download_media(file_id)
+        # Format preview message
+        preview_text = (
+            "**🖼️ Want to create your own image like this ?**\n\nJust copy & paste snippet below to create:\n\n"  
+            "**Prompt:**\n"
+            f"```\n{prompt}\n```"
+            "\n\n**To create your own images, just use /img again!!!**"
+            "\n\n**This image and snippet will be sent to all users.**"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Yes, send to all", callback_data="shareimg_confirm"),
+                InlineKeyboardButton("❌ No, cancel", callback_data="shareimg_cancel")
+            ]
+        ])
+        # Send preview with image
+        sent = await update.reply_photo(
+            photo=file,
+            caption=preview_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        # Store pending share in memory
+        if not hasattr(bot, "_shareimg_pending"): bot._shareimg_pending = {}
+        bot._shareimg_pending[update.from_user.id] = {
+            "file": file,
+            "prompt": prompt,
+            "message_id": sent.id
+        }
+
+    # --- SHARE IMAGE CALLBACK HANDLER (ADMIN ONLY) ---
+    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data in ["shareimg_confirm", "shareimg_cancel"]))
+    async def share_image_callback_handler(bot, callback_query):
+        user_id = callback_query.from_user.id
+        if not hasattr(bot, "_shareimg_pending") or user_id not in bot._shareimg_pending:
+            await callback_query.answer("No pending image share.", show_alert=True)
+            return
+        pending = bot._shareimg_pending[user_id]
+        if callback_query.data == "shareimg_cancel":
+            del bot._shareimg_pending[user_id]
+            await callback_query.edit_message_caption("❌ Image sharing cancelled.")
+            return
+        # Confirm send
+        file = pending["file"]
+        prompt = pending["prompt"]
+        share_text = (
+            "**🖼️ Want to create your own image like this ?**\n\nJust copy & paste snippet below to create:\n\n"  
+            "**Prompt:**\n"
+            f"```\n{prompt}\n```"
+            "\n\n**To create your own images, just use /img again!!!**"
+        )
+        progress_msg = await callback_query.edit_message_caption(
+            f"🚀 Sending image to all users...\n\nSuccess: 0\nFailed: 0",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        from modules.core.database import get_user_collection
+        users_collection = get_user_collection()
+        user_ids = users_collection.distinct("user_id")
+        success = 0
+        fail = 0
+        update_every = 10
+        for idx, uid in enumerate(user_ids, 1):
+            try:
+                await bot.send_photo(uid, photo=file, caption=share_text, parse_mode=ParseMode.MARKDOWN)
+                await asyncio.sleep(0.05)
+                success += 1
+            except Exception as e:
+                fail += 1
+            if idx % update_every == 0 or idx == len(user_ids):
+                try:
+                    await progress_msg.edit_caption(
+                        f"🚀 Sending image to all users...\n\nSuccess: {success}\nFailed: {fail}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception:
+                    pass
+        await progress_msg.edit_caption(
+            f"✅ Image sent to {success} users.\n❌ Failed to send to {fail} users.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        del bot._shareimg_pending[user_id]
 
     # --- SNIPPET BROADCAST COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("snippet") & filters.user(config.ADMINS))
@@ -105,7 +200,7 @@ def create_bot_instance(bot_token, bot_index=1):
                 text = f"/img {text}"
             # Format the snippet with telegt code block
             snippet_text = (
-                "**🎨 Try this creative image idea!**\nJust copy & paste below with /img to create:\n\n"  
+                "**🎨 Try this creative image idea!**\nJust copy & paste below prompt to create:\n\n"  
                 "**Prompt:**\n"
                 f"```\n{text}\n```"
                 "\n\n**To create more images, just use /img again!!!**"
@@ -143,7 +238,7 @@ def create_bot_instance(bot_token, bot_index=1):
         # Confirm send
         prompt = bot._snippet_pending[user_id]
         snippet_text = (
-            "**🎨 Try this creative image idea!**\nJust copy & paste below with /img to create:\n\n"  
+            "**🎨 Try this creative image idea!**\nJust copy & paste below prompt to create:\n\n"  
             "**Prompt:**\n"
             f"```\n{prompt}\n```"
             "\n\n**To create more images, just use /img again!!!**\n\n"
@@ -1287,6 +1382,7 @@ def create_bot_instance(bot_token, bot_index=1):
 
     # --- START THE INTERACTION SYSTEM BACKGROUND TASK ---
     # start_interaction_system(advAiBot)
+
 
 
     return advAiBot
