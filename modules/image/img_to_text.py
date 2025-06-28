@@ -28,9 +28,77 @@ SUPPORTED_IMAGE_TYPES = [
 # Helper to split long text into Telegram message-sized chunks
 TELEGRAM_MESSAGE_LIMIT = 4096
 
+# Add at the top, after logger definition
+image_cleanup_tasks = {}
+IMAGE_EXPIRY_SECONDS = 2 * 60  # 15 minutes
+
 def split_message(text, limit=TELEGRAM_MESSAGE_LIMIT):
     """Split text into chunks no longer than Telegram's message limit."""
     return [text[i:i+limit] for i in range(0, len(text), limit)]
+
+async def schedule_image_cleanup(bot, user_id, chat_id, file_path):
+    # Cancel any previous cleanup for this user
+    if user_id in image_cleanup_tasks:
+        image_cleanup_tasks[user_id]["task"].cancel()
+    async def cleanup():
+        try:
+            await asyncio.sleep(IMAGE_EXPIRY_SECONDS)
+            # Remove image context from DB
+            history_collection = get_history_collection()
+            user_history = history_collection.find_one({"user_id": user_id})
+            image_context = user_history.get(IMAGE_CONTEXT_KEY) if user_history else None
+            if image_context and image_context.get("file_path") == file_path:
+                history_collection.update_one(
+                    {"user_id": user_id},
+                    {"$unset": {IMAGE_CONTEXT_KEY: ""}},
+                    upsert=True
+                )
+                # Delete the file
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception:
+                    pass
+                # Inform the user
+                try:
+                    await bot.send_message(chat_id, "🗑️ Your last image query has been cleared after 15 minutes for privacy and storage safety.")
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            pass
+    task = asyncio.create_task(cleanup())
+    image_cleanup_tasks[user_id] = {"task": task, "file_path": file_path}
+
+async def clear_previous_image_context(bot, user_id, chat_id):
+    # Cancel and cleanup any previous image context for this user
+    informed = False
+    history_collection = get_history_collection()
+    user_history = history_collection.find_one({"user_id": user_id})
+    image_context = user_history.get(IMAGE_CONTEXT_KEY) if user_history else None
+    if user_id in image_cleanup_tasks:
+        image_cleanup_tasks[user_id]["task"].cancel()
+        file_path = image_cleanup_tasks[user_id]["file_path"]
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+        del image_cleanup_tasks[user_id]
+        if image_context:
+            # Only inform if there was a previous image context
+            try:
+                await bot.send_message(chat_id, "🗑️ Your previous image query has been cleared as you uploaded a new image.")
+                informed = True
+            except Exception:
+                pass
+    # Remove from DB
+    if image_context:
+        history_collection.update_one(
+            {"user_id": user_id},
+            {"$unset": {IMAGE_CONTEXT_KEY: ""}},
+            upsert=True
+        )
+    return informed
 
 async def extract_text_res(bot, update):
     try:
@@ -44,6 +112,16 @@ async def extract_text_res(bot, update):
             if not ("ai" in caption_lower or "/ai" in caption_lower):
                 await update.reply_text("❌ Please include 'AI' or '/ai' in your caption to trigger vision analysis.")
                 return
+
+        # --- Clear previous image context if any ---
+        previous_cleared = await clear_previous_image_context(bot, update.from_user.id, update.chat.id)
+        # Inform about expiry policy before processing
+        # expiry_info = "⏳ Note: Your image will be automatically cleared after 15 minutes for privacy and storage safety."
+        # if previous_cleared:
+        #     await update.reply_text(expiry_info)
+        # else:
+        #     # Only show expiry info if not already shown in previous_cleared message
+        #     await update.reply_text(expiry_info)
 
         processing_msg = await update.reply_text(
             "🖼️ **Image received!**\n\n⏳ Analyzing with AI Vision..."
@@ -110,12 +188,16 @@ async def extract_text_res(bot, update):
 
         # Smart caption parsing
         if update.caption:
-            prompt = update.caption 
+            prompt = update.caption
             user_question = prompt
-            print(user_question)
         else:
-            user_question = "System: if there is any text in the image, then read the text and answer the question if any question is there in the text and highlight the answer in bold. if there is no text in the image, then describe the image."
-            print(user_question)
+            user_question = (
+                "System: You are @AdvChatGptBot (https://t.me/AdvChatGptBot) , an expert at reading and understanding images. "
+                "If the image contains a question (including MCQs), answer it directly and help the user to understand the question and answer it. "
+                "If it is a multiple choice question (MCQ), answer with the correct option (e.g., 'The correct answer is: B'). "
+                "If there is no question, describe and explain the image in detail. "
+                "If there is text, read it and use it to help answer or explain the image."
+            )
 
         await processing_msg.edit_text(
             "🧠 **Analyzing Image with AI...**\n\nThis may take a few seconds."
@@ -173,6 +255,8 @@ async def extract_text_res(bot, update):
             {"$set": {"history": history}},
             upsert=True
         )
+        # --- Schedule cleanup for this image ---
+        await schedule_image_cleanup(bot, user_id, update.chat.id, file)
         # Send image preview with response
         TELEGRAM_CAPTION_LIMIT = 1024  # Telegram's Markdown caption limit for photos
         caption = f"📝 **AI Vision Response**\n\n{ai_response}\n\n__You can ask up to {MAX_IMAGE_USES} follow-up questions about this image, or type /endimage to clear the context.__"
@@ -211,7 +295,6 @@ async def extract_text_res(bot, update):
         await update.reply_text(f"please try again later , we are facing some issues use /endimage to clear the context")
 
 async def handle_vision_followup(client, message):
-
     user_id = message.from_user.id
     history_collection = get_history_collection()
     user_history = history_collection.find_one({"user_id": user_id})
@@ -222,7 +305,15 @@ async def handle_vision_followup(client, message):
     # Only use image for next MAX_IMAGE_USES responses
     if image_context['uses_left'] <= 0:
         # Remove image context
-
+        if user_id in image_cleanup_tasks:
+            image_cleanup_tasks[user_id]["task"].cancel()
+            file_path = image_cleanup_tasks[user_id]["file_path"]
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+            del image_cleanup_tasks[user_id]
         history_collection.update_one(
             {"user_id": user_id},
             {"$unset": {IMAGE_CONTEXT_KEY: ""}},
@@ -238,6 +329,15 @@ async def handle_vision_followup(client, message):
         return True
     # Check for /endimage command
     if message.text and message.text.strip().lower() == "/endimage":
+        if user_id in image_cleanup_tasks:
+            image_cleanup_tasks[user_id]["task"].cancel()
+            file_path = image_cleanup_tasks[user_id]["file_path"]
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+            del image_cleanup_tasks[user_id]
         history_collection.update_one(
             {"user_id": user_id},
             {"$unset": {IMAGE_CONTEXT_KEY: ""}},
@@ -251,10 +351,12 @@ async def handle_vision_followup(client, message):
         await message.reply_text("🗑️ The last image context has been cleared. If you want to analyze another image, please send a new one.")
         return True
     # Use image in this response
-
     prompt = message.text
     # Check if file exists before using
     if not os.path.exists(image_context['file_path']):
+        if user_id in image_cleanup_tasks:
+            image_cleanup_tasks[user_id]["task"].cancel()
+            del image_cleanup_tasks[user_id]
         history_collection.update_one(
             {"user_id": user_id},
             {"$unset": {IMAGE_CONTEXT_KEY: ""}},
@@ -288,6 +390,15 @@ async def handle_vision_followup(client, message):
     uses_left = image_context['uses_left']
     # Remove image if done
     if image_context['uses_left'] <= 0:
+        if user_id in image_cleanup_tasks:
+            image_cleanup_tasks[user_id]["task"].cancel()
+            file_path = image_cleanup_tasks[user_id]["file_path"]
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+            del image_cleanup_tasks[user_id]
         try:
             if os.path.exists(image_context['file_path']):
                 os.remove(image_context['file_path'])
