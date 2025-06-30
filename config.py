@@ -29,6 +29,8 @@ NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS')) or int(os.getenv("NUM_OF_BOTS")
 POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY') or os.getenv("POLLINATIONS_KEY") or "POLLINATIONS_KEY"
 
 
+print("MULTIPLE BOTS RUNNING: ", MULTIPLE_BOTS)
+print("\nNUM OF BOTS: ", NUM_OF_BOTS)
 
 # Function to get all bot tokens
 
