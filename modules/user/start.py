@@ -23,31 +23,37 @@ button_list = [
 ]
 
 welcome_text = """
-✨ **Welcome {user_mention}!** ✨
+**Hey there, {user_mention}!** 
 
-🤖 **Advanced AI Bot**
+Welcome to your new AI companion! 🤖✨
 
-I can help you with:
+I'm here to make your life easier and more creative. Here's what we can do together ✨
 
-🧠 **Smart Chat** - Intelligent conversations with Multi-Model
-🗣️ **Voice & Text** - Convert voice to text and back
-🖼️ **Image Creation** - Generate stunning visuals from text
-📝 **Text Extraction** - Analyze text from any image
-🌐 **Multilingual** - Communicate in your language
+💬 **Chat & Brainstorm** 
+   Talk to me about anything! I'm powered by multiple AI models (Just type/write anything to chat)
+
+🎨 **Create Amazing Images** 
+   Just describe what you want with `/img`, and I'll bring it to life
+
+🗣️ **Voice Magic** 
+   Send voice messages or convert text to speech
+
+👁️ **Image Analysis** 
+   Upload any image and I'll describe it or answer questions
 
 ━━━━━━━━━━━━━━━━━━━━━
+🔥 **What makes me special?**
 
-<b>🧠 AI Text Models Supported:</b>
-""" + ", ".join(TEXT_MODELS.values()) + """
+🧠 **Multiple AI Brains:** """ + ", ".join(TEXT_MODELS.values()) + """
 
-<b>🖼️ Image Generation Models Supported:</b>
-""" + ", ".join(IMAGE_MODELS.values()) + """
+🎨 **Creative Models:** """ + ", ".join(IMAGE_MODELS.values()) + """
 
-<b>✨ Multi-Model Support:</b> You can choose your preferred AI and image models in Settings → AI Model Panel.
+⚙️ **Your Choice:** Switch between models anytime in Settings!
 
-👨‍💻 **Developed by [Chandan Singh](https://techycsr.me)**(**@techycsr**)
+━━━━━━━━━━━━━━━━━━━━━
+**Built with ❤️ by [Chandan Singh](https://techycsr.me) (@techycsr)**
 
-**Select a button below to get started!**
+**Ready to explore? Pick an option below!**
 """
 
 tip_text = "💡 **Pro Tip:** Type any message to start chatting with me **OR**\nuse `/img` with your prompt to generate images!\n**For more commands use /help.**"
