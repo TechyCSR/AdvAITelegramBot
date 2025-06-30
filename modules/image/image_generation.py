@@ -9,11 +9,10 @@ from typing import Dict, List, Optional, Tuple, Union
 import re
 import hashlib
 import urllib.parse
-
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
 from pyrogram import Client, filters
 from pymongo import MongoClient
-from config import DATABASE_URL, LOG_CHANNEL, ADMINS
+from config import DATABASE_URL, LOG_CHANNEL, ADMINS, POLLINATIONS_KEY
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 from modules.user.premium_management import is_user_premium
 from modules.user.ai_model import get_user_ai_models, DEFAULT_IMAGE_MODEL, IMAGE_MODELS, RESTRICTED_IMAGE_MODELS
@@ -200,7 +199,7 @@ async def generate_images(prompt: str, style: str, max_images: int = 1, user_id:
 
     image_urls_list = []
     try:
-        client = AsyncClient(image_provider=PollinationsImage)
+        client = AsyncClient(image_provider=PollinationsImage, api_key=POLLINATIONS_KEY)
         response = await client.images.generate(
             prompt=enhanced_prompt,
             model=user_image_model,

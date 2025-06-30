@@ -9,11 +9,11 @@ from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 from g4f.client import Client as GPTClient
 from modules.core.database import get_history_collection
-from modules.chatlogs import user_log
+from modules.chatlogs import user_log, error_log
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL, RESTRICTED_TEXT_MODELS
 from modules.user.premium_management import is_user_premium
-from config import ADMINS
+from config import ADMINS, POLLINATIONS_KEY
 from pyrogram.errors import MessageTooLong
 
 # --- Provider mapping ---
@@ -57,6 +57,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
         if provider == "PollinationsAI":
             print(f"Using PollinationsAI model: {model}")
             response = gpt_client.chat.completions.create(
+                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
                 model=model,
                 messages=history,
                 provider="PollinationsAI"
@@ -74,13 +75,14 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
         else:
             # fallback to default
             response = gpt_client.chat.completions.create(
+                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
                 model="gpt-4o",
                 messages=history,
                 provider="PollinationsAI"
             )
             return response.choices[0].message.content
     except Exception as e:
-        print(f"Error generating response: {e}")
+        print(f"Error generating response with model {model} and provider {provider}: {e}")
         raise
 
 def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]:
@@ -109,6 +111,7 @@ def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]
                 
         # Stream parameter set to True to get response chunks
         response = gpt_client.chat.completions.create(
+            api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
             model="gpt-4o",  # Using more capable model for higher quality responses
             messages=history,
             stream=True
@@ -395,15 +398,20 @@ async def aires(client: Client, message: Message) -> None:
                 for chunk in chunks:
                     await message.reply_text(chunk, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
         except Exception as e:
+            # Log the error to log channel
+            await error_log(client, "MESSAGE_SEND", str(e), f"Failed to send HTML response, falling back to plain text", user_id)
             # Fallback: send as plain text
             try:
                 await temp.delete()
                 await message.reply_text(full_response)
-            except Exception:
-                pass
+            except Exception as fallback_error:
+                # Log fallback failure too
+                await error_log(client, "MESSAGE_SEND_FALLBACK", str(fallback_error), f"Failed to send even plain text response", user_id)
         await user_log(client, message, "\nUser: "+ ask + ".\nAI: "+ ai_response)
 
     except Exception as e:
+        # Log the error to log channel
+        await error_log(client, "AIRES_FUNCTION", str(e), f"User query: {ask[:100]}..." if 'ask' in locals() else "Unknown query", user_id)
         print(f"Error in aires function: {e}")
         await message.reply_text("I'm experiencing technical difficulties. Please try again in a moment or use /new to start a new conversation.")
 
@@ -434,5 +442,7 @@ async def new_chat(client: Client, message: Message) -> None:
         await message.reply_text("🔄 **Conversation Reset**\n\nYour chat history has been cleared. Ready for a fresh conversation!")
 
     except Exception as e:
+        # Log the error to log channel
+        await error_log(client, "NEW_CHAT", str(e), "Error clearing chat history", user_id)
         await message.reply_text(f"Error clearing chat history: {e}")
         print(f"Error in new_chat function: {e}") 

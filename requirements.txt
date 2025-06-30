@@ -1,7 +1,7 @@
 pyrogram>=2.0.106
 python-dotenv>=1.0.0
 tgcrypto>=1.2.5
-g4f>=0.4.0.0
+g4f
 pytz>=2023.3
 # py3langid>=0.2.2
 soundfile>=0.12.1
