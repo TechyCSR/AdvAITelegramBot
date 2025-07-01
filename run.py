@@ -33,6 +33,7 @@ from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.user_settings_panel import user_settings_panel_command, handle_user_settings_callback
 from modules.speech.voice_to_text import handle_voice_message, handle_voice_toggle
 from modules.admin.restart import restart_command, handle_restart_callback, check_restart_marker
+from modules.admin.update import update_command, handle_update_callback, check_update_marker
 import modules.models.user_db as user_db
 from logging.handlers import RotatingFileHandler
 from modules.models.image_service import ImageService
@@ -410,8 +411,9 @@ def create_bot_instance(bot_token, bot_index=1):
             logger.info("Started daily premium check scheduler task")
 
         if not hasattr(advAiBot, "_restart_checked"):
-            logger.info("Checking for restart marker on first command")
+            logger.info("Checking for restart and update markers on first command")
             await check_restart_marker(bot)
+            await check_update_marker(bot)
             setattr(advAiBot, "_restart_checked", True)
             
         bot_stats["active_users"].add(update.from_user.id)
@@ -554,6 +556,11 @@ def create_bot_instance(bot_token, bot_index=1):
             # Handle restart callbacks
             if callback_query.data == "confirm_restart" or callback_query.data == "cancel_restart":
                 await handle_restart_callback(client, callback_query)
+                return
+            
+            # Handle update callbacks
+            if callback_query.data == "confirm_update" or callback_query.data == "cancel_update":
+                await handle_update_callback(client, callback_query)
                 return
             
             # Handle maintenance mode toggle and feature callbacks
@@ -1191,6 +1198,14 @@ def create_bot_instance(bot_token, bot_index=1):
         logger.info(f"Admin {update.from_user.id} used restart command")
         await restart_command(bot, update)
         await channel_log(bot, update, "/restart", "Admin initiated restart command")
+
+    # --- UPDATE COMMAND (ADMIN ONLY) ---
+    @advAiBot.on_message(filters.command("update") & filters.user(config.ADMINS))
+    async def handle_update_command(bot, update):
+        """Handler for the update command"""
+        logger.info(f"Admin {update.from_user.id} used update command")
+        await update_command(bot, update)
+        await channel_log(bot, update, "/update", "Admin initiated update command")
 
     # --- NEW CHAT MEMBERS HANDLER ---
     @advAiBot.on_message(filters.new_chat_members)
