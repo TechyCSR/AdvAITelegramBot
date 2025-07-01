@@ -40,8 +40,8 @@ async def update_command(client: Client, message: Message):
         f"🔄 **Update Confirmation**\n\n"
         f"Are you sure you want to update the bot from GitHub, {user_name}?\n\n"
         "This will:\n"
-        "• Pull the latest code from GitHub\n"
         "• Update g4f library to latest version\n"
+        "• Pull the latest code from GitHub\n"
         "• Restart the bot with new changes\n"
         "• Bot will be unavailable for 15-45 seconds\n\n"
         "⚠️ **Warning**: Any uncommitted local changes may be lost!",
@@ -61,7 +61,7 @@ async def handle_update_callback(client: Client, callback_query):
         # Update the message to show update is in progress
         await callback_query.message.edit_text(
             "🔄 **Updating Bot**\n\n"
-            "Step 1/4: Fetching latest code from GitHub...\n\n"
+            "Step 1/4: Updating g4f library to latest version...\n\n"
             "Please wait, this may take a moment."
         )
         
@@ -82,10 +82,34 @@ async def handle_update_callback(client: Client, callback_query):
 async def perform_update(client: Client, callback_query):
     """Actually perform the update operation"""
     try:
-        # Step 1: Check git status
+        # Step 1: Update g4f to latest version
         await callback_query.message.edit_text(
             "🔄 **Updating Bot**\n\n"
-            "Step 1/4: Checking repository status...\n\n"
+            "Step 1/4: Updating g4f library to latest version...\n\n"
+            "📦 Installing latest dependencies..."
+        )
+        
+        # Update g4f to latest version
+        try:
+            result = subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'g4f'], 
+                                  capture_output=True, text=True, cwd='.')
+            
+            if result.returncode != 0:
+                logger.warning(f"g4f update warning: {result.stderr}")
+                # Don't fail the entire update if g4f update fails, just log it
+                g4f_status = "⚠️ g4f update had warnings (check logs)"
+            else:
+                logger.info("g4f updated successfully")
+                g4f_status = "✅ g4f updated to latest version"
+                
+        except Exception as e:
+            logger.error(f"Error updating g4f: {str(e)}")
+            g4f_status = "⚠️ g4f update failed (check logs)"
+        
+        # Step 2: Check git status
+        await callback_query.message.edit_text(
+            "🔄 **Updating Bot**\n\n"
+            "Step 2/4: Checking repository status...\n\n"
             "⏳ Please wait..."
         )
         
@@ -102,10 +126,10 @@ async def perform_update(client: Client, callback_query):
             logger.error("Update failed: Not a git repository")
             return
         
-        # Step 2: Fetch latest changes
+        # Step 3: Fetch latest changes
         await callback_query.message.edit_text(
             "🔄 **Updating Bot**\n\n"
-            "Step 2/4: Fetching latest changes from GitHub...\n\n"
+            "Step 3/4: Fetching latest changes from GitHub...\n\n"
             "📡 Downloading updates..."
         )
         
@@ -138,10 +162,10 @@ async def perform_update(client: Client, callback_query):
             logger.info("No updates available")
             return
         
-        # Step 3: Pull changes and update dependencies
+        # Step 4: Pull changes
         await callback_query.message.edit_text(
             "🔄 **Updating Bot**\n\n"
-            f"Step 3/4: Applying {commits_behind} new update(s)...\n\n"
+            f"Step 4/4: Applying {commits_behind} new update(s)...\n\n"
             "🔄 Pulling changes from GitHub..."
         )
         
@@ -158,30 +182,6 @@ async def perform_update(client: Client, callback_query):
             )
             logger.error(f"Git pull failed: {result.stderr}")
             return
-        
-        # Step 4: Update g4f to latest version
-        await callback_query.message.edit_text(
-            "🔄 **Updating Bot**\n\n"
-            f"Step 4/4: Updating g4f library to latest version...\n\n"
-            "📦 Installing latest dependencies..."
-        )
-        
-        # Update g4f to latest version
-        try:
-            result = subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'g4f'], 
-                                  capture_output=True, text=True, cwd='.')
-            
-            if result.returncode != 0:
-                logger.warning(f"g4f update warning: {result.stderr}")
-                # Don't fail the entire update if g4f update fails, just log it
-                g4f_status = "⚠️ g4f update had warnings (check logs)"
-            else:
-                logger.info("g4f updated successfully")
-                g4f_status = "✅ g4f updated to latest version"
-                
-        except Exception as e:
-            logger.error(f"Error updating g4f: {str(e)}")
-            g4f_status = "⚠️ g4f update failed (check logs)"
         
         # Success message before restart
         await callback_query.message.edit_text(
