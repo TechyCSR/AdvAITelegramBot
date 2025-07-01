@@ -7,6 +7,13 @@ from g4f.Provider import PollinationsAI
 
 str="""
 Qwen/Qwen3-235B-A22B Done
+grok-3-mini Done
+gpt-4o Done
+gpt-4o-mini Done
+gpt-4.1-mini Done
+gpt-4.1-nano Done
+gpt-4.1 Done
+gpt-4.1-mini Done
 
 """
 
