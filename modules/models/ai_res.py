@@ -57,7 +57,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
         if provider == "PollinationsAI":
             print(f"Using {provider} model: {model}")
             response = gpt_client.chat.completions.create(
-                # api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
+                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
                 model=model,
                 messages=history,
             )
@@ -73,10 +73,11 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
             return response.choices[0].message.content
         else:
             # fallback to default
-            gpt_client = GPTClient(provider="Chatai")
+            gpt_client = GPTClient()
             response = gpt_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="Qwen/Qwen3-235B-A22B",
                 messages=history,
+                provider="DeepInfraChat"
             )
             return response.choices[0].message.content
     except Exception as e:
@@ -354,7 +355,7 @@ async def aires(client: Client, message: Message) -> None:
         except Exception as e:
             # fallback to gpt-4o
             fallback_used = True
-            ai_response = get_response(history, model="gpt-4o", provider="PollinationsAI")
+            ai_response = get_response(history, model="Qwen/Qwen3-235B-A22B", provider="DeepInfraChat")
         
         # Add the AI response to the history
         history.append({"role": "assistant", "content": ai_response})
@@ -383,7 +384,8 @@ async def aires(client: Client, message: Message) -> None:
 
         try:
             if fallback_used:
-                full_response = f"⚠️ The selected model <b>{user_model}</b> is currently unavailable. Using <b>gpt-4o</b> as fallback.\n\n" + ai_response
+                # full_response = ai_response + "\n\n<b>Note: The selected model is currently unavailable. Using <b>Qwen-3</b> as fallback till it's fixed.</b>"
+                full_response = ai_response
             else:
                 full_response = ai_response
             html_response = markdown_code_to_html(full_response)
