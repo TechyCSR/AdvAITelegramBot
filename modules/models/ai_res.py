@@ -59,12 +59,23 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
         gpt_client = GPTClient()
         if provider == "PollinationsAI":
             print(f"Using PollinationsAI model: {model}")
-            response = gpt_client.chat.completions.create(
-                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
-                model=model,
-                messages=history,
-                provider="PollinationsAI"
-            )
+            try:
+                response = gpt_client.chat.completions.create(
+                    api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
+                    model=model,
+                    messages=history,
+                    provider="PollinationsAI"
+                )
+            except Exception as e:
+                print(f"Error generating response with model {model} and provider {provider}: {e}")
+                print("Falling back to grok-3-mini")
+                response = gpt_client.chat.completions.create(
+                    api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
+                    model="grok-3-mini",
+                    messages=history,
+                    provider="PollinationsAI"
+                )
+
             return response.choices[0].message.content
         elif provider == "DeepInfraChat":
             deep_model = DEEPINFRA_MODEL_MAP.get(model, model)
