@@ -1,6 +1,7 @@
 
 from g4f.client import Client as GPTClient
 from g4f.cookies import set_cookies
+from g4f.Provider import PollinationsAI
 
 # Initialize the GPT-4 client
 
@@ -9,7 +10,7 @@ Qwen/Qwen3-235B-A22B Done
 
 """
 
-gpt_client = GPTClient(provider="DeepInfraChat")    
+gpt_client = GPTClient(provider="PollinationsAI")
 
 history = []
 history.append({"role": "system", "content": "Hello! I a  chatbot."})
@@ -18,7 +19,6 @@ history.append({"role": "system", "content": "Hello! I a  chatbot."})
 def get_response(ask):
         
         response = gpt_client.chat.completions.create(
-        model="deepseek-r1",
         messages=history + [{"role": "user", "content": ask}],
         )
         history.append({"role": "system", "content": response.choices[0].message.content})

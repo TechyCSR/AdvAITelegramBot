@@ -31,7 +31,7 @@ DEEPINFRA_MODEL_MAP = {
 }
 
 # Initialize the GPT client with a more efficient provider
-gpt_client = GPTClient(provider="PollinationsAI")
+# gpt_client = GPTClient(provider="PollinationsAI")
 
 def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider: str = "PollinationsAI") -> str:
     """
@@ -53,19 +53,18 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
         for i, msg in enumerate(history):
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
-        gpt_client = GPTClient()
+        gpt_client = GPTClient(provider=provider)
         if provider == "PollinationsAI":
-            print(f"Using PollinationsAI model: {model}")
+            print(f"Using {provider} model: {model}")
             response = gpt_client.chat.completions.create(
-                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
+                # api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
                 model=model,
                 messages=history,
-                provider="PollinationsAI"
             )
             return response.choices[0].message.content
         elif provider == "DeepInfraChat":
             deep_model = DEEPINFRA_MODEL_MAP.get(model, model)
-            print(f"Using DeepInfraChat model: {deep_model}")
+            print(f"Using {provider} model: {deep_model}")
             response = gpt_client.chat.completions.create(
                 model=deep_model,
                 messages=history,
@@ -74,11 +73,10 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
             return response.choices[0].message.content
         else:
             # fallback to default
+            gpt_client = GPTClient(provider="Chatai")
             response = gpt_client.chat.completions.create(
-                api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=history,
-                provider="PollinationsAI"
             )
             return response.choices[0].message.content
     except Exception as e:
@@ -108,6 +106,7 @@ def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]
         for i, msg in enumerate(history):
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
+        gpt_client = GPTClient()
                 
         # Stream parameter set to True to get response chunks
         response = gpt_client.chat.completions.create(
