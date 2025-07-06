@@ -33,8 +33,6 @@ DEEPINFRA_MODEL_MAP = {
     "deepseek-r1": "deepseek-r1"
 }
 
-# Initialize the GPT client with a more efficient provider
-gpt_client = GPTClient(provider="PollinationsAI")
 
 def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider: str = "PollinationsAI") -> str:
     """
@@ -124,6 +122,7 @@ def get_streaming_response(history: List[Dict[str, str]]) -> Optional[Generator]
                 history[i] = {"role": "user", "content": str(msg)}
                 
         # Stream parameter set to True to get response chunks
+        gpt_client = GPTClient(provider="PollinationsAI")
         response = gpt_client.chat.completions.create(
             api_key=POLLINATIONS_KEY,  # Add API key to the request( if you have one )
             model="gpt-4o",  # Using more capable model for higher quality responses
