@@ -89,6 +89,20 @@ async def perform_update(client: Client, callback_query):
             "📦 Installing latest dependencies..."
         )
         
+        # Get current g4f version before update
+        g4f_updated = False
+        try:
+            result = subprocess.run([sys.executable, '-m', 'pip', 'show', 'g4f'], 
+                                  capture_output=True, text=True, cwd='.')
+            current_g4f_version = ""
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if line.startswith('Version:'):
+                        current_g4f_version = line.split(':')[1].strip()
+                        break
+        except:
+            current_g4f_version = "unknown"
+        
         # Update g4f to latest version
         try:
             result = subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'g4f'], 
@@ -96,11 +110,29 @@ async def perform_update(client: Client, callback_query):
             
             if result.returncode != 0:
                 logger.warning(f"g4f update warning: {result.stderr}")
-                # Don't fail the entire update if g4f update fails, just log it
                 g4f_status = "⚠️ g4f update had warnings (check logs)"
             else:
-                logger.info("g4f updated successfully")
-                g4f_status = "✅ g4f updated to latest version"
+                # Check if g4f version changed
+                try:
+                    result = subprocess.run([sys.executable, '-m', 'pip', 'show', 'g4f'], 
+                                          capture_output=True, text=True, cwd='.')
+                    new_g4f_version = ""
+                    if result.returncode == 0:
+                        for line in result.stdout.split('\n'):
+                            if line.startswith('Version:'):
+                                new_g4f_version = line.split(':')[1].strip()
+                                break
+                    
+                    if new_g4f_version != current_g4f_version and new_g4f_version:
+                        g4f_updated = True
+                        g4f_status = f"✅ g4f updated: {current_g4f_version} → {new_g4f_version}"
+                        logger.info(f"g4f updated from {current_g4f_version} to {new_g4f_version}")
+                    else:
+                        g4f_status = "✅ g4f already latest version"
+                        logger.info("g4f was already at latest version")
+                except:
+                    g4f_status = "✅ g4f updated to latest version"
+                    logger.info("g4f updated successfully")
                 
         except Exception as e:
             logger.error(f"Error updating g4f: {str(e)}")
@@ -153,46 +185,65 @@ async def perform_update(client: Client, callback_query):
         
         commits_behind = result.stdout.strip()
         
-        if commits_behind == "0":
+        # Check if we need to restart (either commits or g4f update)
+        if commits_behind == "0" and not g4f_updated:
             await callback_query.message.edit_text(
                 "✅ **Already Up to Date**\n\n"
-                "The bot is already running the latest version from GitHub.\n"
-                "No updates are available."
+                "The bot is already running the latest version:\n"
+                f"• Code: Latest from GitHub\n"
+                f"• g4f: {g4f_status.replace('✅ ', '').replace('⚠️ ', '')}\n\n"
+                "No restart needed."
             )
-            logger.info("No updates available")
+            logger.info("No updates available - both code and g4f are up to date")
             return
         
-        # Step 4: Pull changes
-        await callback_query.message.edit_text(
-            "🔄 **Updating Bot**\n\n"
-            f"Step 4/4: Applying {commits_behind} new update(s)...\n\n"
-            "🔄 Pulling changes from GitHub..."
-        )
+        # Determine what needs updating
+        update_reasons = []
+        if commits_behind != "0":
+            update_reasons.append(f"{commits_behind} new code update(s)")
+        if g4f_updated:
+            update_reasons.append("g4f library updated")
         
-        # Pull the latest changes
-        result = subprocess.run(['git', 'pull', 'origin', 'main'], 
-                              capture_output=True, text=True, cwd='.')
-        
-        if result.returncode != 0:
+        # Step 4: Pull changes (if there are commits)
+        if commits_behind != "0":
             await callback_query.message.edit_text(
-                f"❌ **Update Failed**\n\n"
-                f"Error pulling changes:\n"
-                f"```\n{result.stderr}\n```\n\n"
-                f"You may need to resolve conflicts manually."
+                "🔄 **Updating Bot**\n\n"
+                f"Step 4/4: Applying {commits_behind} new update(s)...\n\n"
+                "🔄 Pulling changes from GitHub..."
             )
-            logger.error(f"Git pull failed: {result.stderr}")
-            return
+            
+            # Pull the latest changes
+            result = subprocess.run(['git', 'pull', 'origin', 'main'], 
+                                  capture_output=True, text=True, cwd='.')
+            
+            if result.returncode != 0:
+                await callback_query.message.edit_text(
+                    f"❌ **Update Failed**\n\n"
+                    f"Error pulling changes:\n"
+                    f"```\n{result.stderr}\n```\n\n"
+                    f"You may need to resolve conflicts manually."
+                )
+                logger.error(f"Git pull failed: {result.stderr}")
+                return
+        else:
+            # Only g4f was updated, skip git pull
+            await callback_query.message.edit_text(
+                "🔄 **Updating Bot**\n\n"
+                "Step 4/4: Preparing to restart...\n\n"
+                "📦 g4f library has been updated, restart required."
+            )
         
         # Success message before restart
+        update_summary = " & ".join(update_reasons)
         await callback_query.message.edit_text(
             "✅ **Update Successful**\n\n"
-            f"✅ Downloaded {commits_behind} new update(s) from GitHub\n"
-            f"{g4f_status}\n\n"
+            f"✅ {update_summary}\n"
+            f"📦 {g4f_status}\n\n"
             "🔄 **Restarting bot now...**\n"
             "The bot will be back online in 10-15 seconds."
         )
         
-        logger.info(f"Update successful: {commits_behind} commits pulled")
+        logger.info(f"Update successful: {update_summary}")
         
         # Give a moment for the message to be sent
         await asyncio.sleep(2)
