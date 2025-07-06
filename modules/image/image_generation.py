@@ -181,7 +181,7 @@ user_states: Dict[int, UserGenerationState] = {}
 
 # ====== CORE IMAGE GENERATION ======
 
-async def generate_images(prompt: str, style: str, max_images: int = 1, user_id: int = None) -> Tuple[Optional[List[str]], Optional[str]]:
+async def generate_images(prompt: str, style: str, max_images: int = 1, user_id: int = None, client: Client = None, chat_id: int = None, message_id: int = None) -> Tuple[Optional[List[str]], Optional[str]]:
     logger.info(f"Starting generate_images. Prompt: '{prompt[:50]}...', Style: '{style}', Max images requested: {max_images}")
     style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
     enhanced_prompt = f"{prompt}, {style_info['prompt_additions']}"
@@ -198,9 +198,12 @@ async def generate_images(prompt: str, style: str, max_images: int = 1, user_id:
         user_image_model = DEFAULT_IMAGE_MODEL
 
     image_urls_list = []
+    
+    # Try with primary model first
     try:
-        client = AsyncClient(image_provider=PollinationsImage, api_key=POLLINATIONS_KEY)
-        response = await client.images.generate(
+        async_client = AsyncClient(image_provider=PollinationsImage, api_key=POLLINATIONS_KEY)
+        logger.info(f"Attempting image generation with primary model: {user_image_model}")
+        response = await async_client.images.generate(
             prompt=enhanced_prompt,
             model=user_image_model,
             n=max_images,
@@ -210,26 +213,103 @@ async def generate_images(prompt: str, style: str, max_images: int = 1, user_id:
             quality="standard"
         )
         if not response or not response.data:
-            logger.warning(f"g4f returned no image data (empty/None response.data).")
-            return None, "Failed to generate images. No images were returned by the provider. Please try a different prompt or try again later."
+            logger.warning(f"Primary model {user_image_model} returned no image data (empty/None response.data).")
+            raise Exception(f"Primary model {user_image_model} returned no image data")
+        
         for i, image_object in enumerate(response.data):
             if hasattr(image_object, 'url') and image_object.url and image_object.url.startswith("https://"):
                 image_urls_list.append(image_object.url)
             else:
-                logger.warning(f"Image object {i} from g4f has no valid HTTPS URL. Skipping.")
-    except Exception as e_generate:
-        logger.error(f"Exception with g4f image generation: {str(e_generate)}.")
-        # Log the error to the log channel
-        try:
-            await client.send_message(
-                LOG_CHANNEL,
-                f"#ImgGenError\nPrompt: `{enhanced_prompt}`\nUser ID: {user_id}\nError: {str(e_generate)}"
-            )
-        except Exception as log_err:
-            logger.error(f"Failed to log image gen error to channel: {str(log_err)}")
-        # Return a generic error for the user
-        return None, "There's some issue, please try in a moment or change your prompt."
+                logger.warning(f"Image object {i} from primary model {user_image_model} has no valid HTTPS URL. Skipping.")
+                
+        if image_urls_list:
+            logger.info(f"Primary model {user_image_model} generated {len(image_urls_list)} images successfully")
+            return image_urls_list, None
+        else:
+            raise Exception(f"Primary model {user_image_model} generated no valid image URLs")
+            
+    except Exception as e_primary:
+        logger.error(f"Primary model {user_image_model} failed: {str(e_primary)}")
+        
+        # Try fallback to flux-pro if primary model failed
+        if user_image_model != "flux-pro":
+            try:
+                logger.info("Attempting fallback to flux-pro model")
+                
+                # Show fallback progress if client and message info are available
+                if client and chat_id and message_id:
+                    try:
+                        await show_fallback_progress(client, chat_id, message_id, prompt, style, user_image_model, max_images)
+                        # Give a moment for the progress message to be sent
+                        await asyncio.sleep(1)
+                    except Exception as progress_err:
+                        logger.error(f"Failed to show fallback progress: {str(progress_err)}")
+                
+                async_client = AsyncClient(image_provider=PollinationsImage, api_key=POLLINATIONS_KEY)
+                response = await async_client.images.generate(
+                    prompt=enhanced_prompt,
+                    model="flux-pro",
+                    n=max_images,
+                    response_format="url",
+                    width=1024,
+                    height=1024,
+                    quality="standard"
+                )
+                if not response or not response.data:
+                    logger.warning(f"Flux-pro fallback returned no image data (empty/None response.data).")
+                    raise Exception("Flux-pro fallback returned no image data")
+                
+                for i, image_object in enumerate(response.data):
+                    if hasattr(image_object, 'url') and image_object.url and image_object.url.startswith("https://"):
+                        image_urls_list.append(image_object.url)
+                    else:
+                        logger.warning(f"Image object {i} from flux-pro fallback has no valid HTTPS URL. Skipping.")
+                        
+                if image_urls_list:
+                    logger.info(f"Flux-pro fallback generated {len(image_urls_list)} images successfully")
+                    return image_urls_list, None
+                else:
+                    raise Exception("Flux-pro fallback generated no valid image URLs")
+                    
+            except Exception as e_fallback:
+                logger.error(f"Flux-pro fallback also failed: {str(e_fallback)}")
+                
+                # Log both errors to the log channel
+                try:
+                    # Get the current client instance (this is a simplified approach)
+                    # In a real scenario, you might need to pass the client as a parameter
+                    error_msg = (
+                        f"#ImgGenError #FallbackFailed\n"
+                        f"Prompt: `{enhanced_prompt}`\n"
+                        f"User ID: {user_id}\n"
+                        f"Primary model ({user_image_model}) error: {str(e_primary)}\n"
+                        f"Fallback (flux-pro) error: {str(e_fallback)}"
+                    )
+                    # Note: We can't send to log channel here without client instance
+                    logger.error(f"Both primary and fallback models failed: {error_msg}")
+                except Exception as log_err:
+                    logger.error(f"Failed to log comprehensive error: {str(log_err)}")
+                
+                # Return error message indicating both attempts failed
+                return None, f"Image generation failed with both {user_image_model} and flux-pro fallback. Please try again later or contact support."
+        else:
+            # If flux-pro was the primary model and it failed, no fallback needed
+            logger.error(f"Flux-pro (primary model) failed: {str(e_primary)}")
+            try:
+                error_msg = (
+                    f"#ImgGenError\n"
+                    f"Prompt: `{enhanced_prompt}`\n"
+                    f"User ID: {user_id}\n"
+                    f"Model: flux-pro\n"
+                    f"Error: {str(e_primary)}"
+                )
+                logger.error(f"Flux-pro primary model failed: {error_msg}")
+            except Exception as log_err:
+                logger.error(f"Failed to log flux-pro error: {str(log_err)}")
+            
+            return None, "Image generation failed. Please try again later or contact support."
 
+    # This should never be reached, but just in case
     if not image_urls_list:
         logger.warning("No image URLs were collected after all attempts.")
         return None, "Failed to generate images. No images were returned by the provider. Please try a different prompt or try again later."
@@ -248,6 +328,9 @@ async def update_generation_progress(client: Client, chat_id: int, message_id: i
         "✨ Refining details & adding highlights...",
         "📷 Rendering final image(s)..."
     ]
+    
+    # Add fallback stage if needed
+    fallback_stage = "🔄 Switching to backup model (flux-pro)..."
     
     style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
     num_images_note = f" (for {num_images} images)" if num_images > 1 else ""
@@ -278,6 +361,26 @@ async def update_generation_progress(client: Client, chat_id: int, message_id: i
         logger.info("Progress updater cancelled as generation completed")
     except Exception as e:
         logger.error(f"Error updating generation progress: {str(e)}")
+
+async def show_fallback_progress(client: Client, chat_id: int, message_id: int, prompt: str, style: str, user_model: str, num_images: int = 1) -> None:
+    """Show fallback progress when switching to flux-pro"""
+    style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
+    num_images_note = f" (for {num_images} images)" if num_images > 1 else ""
+    
+    try:
+        await client.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=f"🎭 **Generating Images**\n\n"
+            f"Your prompt: `{prompt}`\n\n"
+            f"Style: `{style_info['name']}`{num_images_note}\n"
+            f"Primary model: `{user_model}` (failed)\n"
+            f"Fallback model: `flux-pro`\n\n"
+            f"🔄 Switching to backup model (flux-pro)...\n"
+            f"⏳ This may take a moment longer..."
+        )
+    except Exception as e:
+        logger.error(f"Error showing fallback progress: {str(e)}")
 
 # ====== HANDLERS ======
 
@@ -750,7 +853,7 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
     
     try:
         # Generate the images
-        urls, error = await generate_images(prompt, style, max_images=num_images, user_id=user_id)
+        urls, error = await generate_images(prompt, style, max_images=num_images, user_id=user_id, client=client, chat_id=chat_id, message_id=message.id)
         
         # Cancel progress updater if it exists
         if progress_task and not progress_task.done():
