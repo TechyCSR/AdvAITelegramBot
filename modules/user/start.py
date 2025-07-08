@@ -11,6 +11,18 @@ from config import ADMIN_CONTACT_MENTION, OWNER_ID
 from modules.user.premium_management import get_premium_benefits_message, get_premium_status_message
 from modules.user.ai_model import TEXT_MODELS, IMAGE_MODELS
 
+# Helper function to get bot username consistently
+async def get_bot_username(client):
+    """Get bot username from cache or API call with fallback"""
+    if hasattr(client, '_bot_cache') and client._bot_cache.get('username'):
+        return client._bot_cache['username']
+    try:
+        bot_me = await client.get_me()
+        return bot_me.username
+    except Exception as e:
+        print(f"Error getting bot username: {e}")
+        return "AdvChatGptBot"  # Fallback
+
 # Import for benefits display
 # Define button texts with emojis - NO premium button here
 button_list = [
@@ -74,8 +86,11 @@ async def start(client, message: Message):
     translated_tip = translated_texts[0]
     translated_buttons = translated_texts[1:]
 
+    # Get bot username from cache (for multi-bot support) or fallback to API call
+    bot_username = await get_bot_username(client)
+
     keyboard_layout = [
-        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{client.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot_username}?startgroup=true")],
         [InlineKeyboardButton(translated_buttons[1], callback_data="commands_start"),
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
@@ -98,8 +113,11 @@ async def start_inline(bot, callback: CallbackQuery):
     translated_welcome = await format_with_mention(welcome_text.replace("{user_mention}", "{mention}"), mention, user_id, user_lang)
     translated_buttons = await batch_translate(button_list, user_id)
 
+    # Get bot username from cache (for multi-bot support) or fallback to API call
+    bot_username = await get_bot_username(bot)
+
     keyboard_layout = [
-        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot.me.username}?startgroup=true")],
+        [InlineKeyboardButton(translated_buttons[0], url=f"https://t.me/{bot_username}?startgroup=true")],
         [InlineKeyboardButton(translated_buttons[1], callback_data="commands_start"),
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),

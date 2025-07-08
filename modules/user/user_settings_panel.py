@@ -11,6 +11,18 @@ from modules.admin.statistics import get_bot_statistics
 from modules.user.premium_management import is_user_premium
 from modules.user.ai_model import get_user_ai_models, TEXT_MODELS, IMAGE_MODELS
 
+# Helper function to get bot username consistently
+async def get_bot_username(client):
+    """Get bot username from cache or API call with fallback"""
+    if hasattr(client, '_bot_cache') and client._bot_cache.get('username'):
+        return client._bot_cache['username']
+    try:
+        bot_me = await client.get_me()
+        return bot_me.username
+    except Exception as e:
+        print(f"Error getting bot username: {e}")
+        return "AdvChatGptBot"  # Fallback
+
 settings_text = """
 **Setting Menu for User {mention}**
 
@@ -79,7 +91,9 @@ async def user_settings_panel_command(client, message, edit=False, callback_quer
         ai_image_model=ai_image_model_name,
     )
 
-    bot_username = (await client.get_me()).username
+    # Get bot username from cache (for multi-bot support) or fallback to API call
+    bot_username = await get_bot_username(client)
+    
     button_labels = ["⚙️ Open Settings Panel", "🔄 Reset Conversation", "📊 System Status", "❌ Close"]
     translated_labels = await batch_translate(button_labels, user_id)
     keyboard = InlineKeyboardMarkup([

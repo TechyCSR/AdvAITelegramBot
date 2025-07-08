@@ -82,12 +82,24 @@ def create_bot_instance(bot_token, bot_index=1):
         api_hash=config.API_HASH,
         workdir=session_dir
     )
-    # Track bot statistics
+    
+    # Make bot stats instance-specific instead of global
     bot_stats = {
         "messages_processed": 0,
         "images_generated": 0,
         "voice_messages_processed": 0,
-        "active_users": set()
+        "active_users": set(),
+        "bot_index": bot_index,
+        "bot_token": bot_token[:10] + "..." + bot_token[-10:]  # Partial token for identification
+    }
+    
+    # Make scheduler tasks instance-specific to avoid conflicts between bots
+    scheduler_tasks = {
+        "cleanup_scheduler_task": None,
+        "ongoing_generations_cleanup_task": None,
+        "ai_ongoing_generations_cleanup_task": None,
+        "premium_scheduler_task": None,
+        "request_queue_cleanup_task": None
     }
 
     # Get the image cleanup scheduler function to run later
@@ -95,6 +107,27 @@ def create_bot_instance(bot_token, bot_index=1):
 
     # Add a global in-memory dict to store pending group image contexts
     pending_group_images = {}
+    
+    # Cache bot information for this instance
+    bot_cache = {
+        "username": None,
+        "id": None,
+        "name": None
+    }
+    
+    async def get_bot_info():
+        """Get and cache bot information for this instance"""
+        if bot_cache["username"] is None:
+            try:
+                bot_me = await advAiBot.get_me()
+                bot_cache["username"] = bot_me.username
+                bot_cache["id"] = bot_me.id
+                bot_cache["name"] = bot_me.first_name
+                logger.info(f"Cached bot info for instance {bot_index}: @{bot_cache['username']} (ID: {bot_cache['id']})")
+            except Exception as e:
+                logger.error(f"Failed to get bot info for instance {bot_index}: {e}")
+                bot_cache["username"] = f"bot_{bot_index}"
+        return bot_cache
 
     # --- SHARE IMAGE COMMAND (ADMIN ONLY) ---
 
@@ -392,33 +425,38 @@ def create_bot_instance(bot_token, bot_index=1):
     # --- START COMMAND ---
     @advAiBot.on_message(filters.command("start"))
     async def start_command(bot, update):
-        set_last_interaction(update.from_user.id, "command_start", get_user_interactions_collection())
+        # set_last_interaction(update.from_user.id, "command_start", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, update): # BAN CHECK
             return
 
-        # Start schedulers on first command if not already running
-        global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task, premium_scheduler_task, request_queue_cleanup_task
-        if not globals().get('cleanup_scheduler_task') or cleanup_scheduler_task.done():
-            cleanup_scheduler_task = asyncio.create_task(cleanup_scheduler())
-            logger.info("Started image generation cleanup scheduler task")
-        if not globals().get('ongoing_generations_cleanup_task') or ongoing_generations_cleanup_task.done():
-            ongoing_generations_cleanup_task = asyncio.create_task(cleanup_ongoing_generations())
-            logger.info("Started inline generations cleanup scheduler task")
-        if not globals().get('ai_ongoing_generations_cleanup_task') or ai_ongoing_generations_cleanup_task.done():
-            ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
-            logger.info("Started inline AI generations cleanup scheduler task")
-        if not globals().get('request_queue_cleanup_task'):
-            globals()['request_queue_cleanup_task'] = asyncio.create_task(start_request_queue_cleanup_scheduler())
-            logger.info("Started request queue cleanup scheduler task")
-        if not globals().get('premium_scheduler_task') or premium_scheduler_task.done():
-            premium_scheduler_task = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
-            logger.info("Started daily premium check scheduler task")
+        # Start schedulers on first command if not already running (instance-specific)
+        if not scheduler_tasks.get('cleanup_scheduler_task') or scheduler_tasks['cleanup_scheduler_task'].done():
+            scheduler_tasks['cleanup_scheduler_task'] = asyncio.create_task(cleanup_scheduler())
+            logger.info(f"Bot {bot_index}: Started image generation cleanup scheduler task")
+        if not scheduler_tasks.get('ongoing_generations_cleanup_task') or scheduler_tasks['ongoing_generations_cleanup_task'].done():
+            scheduler_tasks['ongoing_generations_cleanup_task'] = asyncio.create_task(cleanup_ongoing_generations())
+            logger.info(f"Bot {bot_index}: Started inline generations cleanup scheduler task")
+        if not scheduler_tasks.get('ai_ongoing_generations_cleanup_task') or scheduler_tasks['ai_ongoing_generations_cleanup_task'].done():
+            scheduler_tasks['ai_ongoing_generations_cleanup_task'] = asyncio.create_task(ai_cleanup_ongoing_generations())
+            logger.info(f"Bot {bot_index}: Started inline AI generations cleanup scheduler task")
+        if not scheduler_tasks.get('request_queue_cleanup_task'):
+            scheduler_tasks['request_queue_cleanup_task'] = asyncio.create_task(start_request_queue_cleanup_scheduler())
+            logger.info(f"Bot {bot_index}: Started request queue cleanup scheduler task")
+        if not scheduler_tasks.get('premium_scheduler_task') or scheduler_tasks['premium_scheduler_task'].done():
+            scheduler_tasks['premium_scheduler_task'] = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
+            logger.info(f"Bot {bot_index}: Started daily premium check scheduler task")
 
         if not hasattr(advAiBot, "_restart_checked"):
-            logger.info("Checking for restart and update markers on first command")
+            logger.info(f"Bot {bot_index}: Checking for restart and update markers on first command")
             await check_restart_marker(bot)
             await check_update_marker(bot)
             setattr(advAiBot, "_restart_checked", True)
+            
+        # Cache bot info on first use and store in client for easy access
+        await get_bot_info()
+        # Attach bot cache to client for modules to access
+        bot._bot_cache = bot_cache
+        bot._bot_index = bot_index
             
         bot_stats["active_users"].add(update.from_user.id)
         
@@ -429,6 +467,7 @@ def create_bot_instance(bot_token, bot_index=1):
             if len(parts) > 1:
                 start_param = parts[1].strip().lower()
         if start_param == "settings":
+            logger.info(f"Bot {bot_index}: User {update.from_user.id} accessed settings via deep link")
             from modules.user.settings import send_settings_menu_as_message
             await send_settings_menu_as_message(bot, update)
             await channel_log(bot, update, "/start?settings")
@@ -1040,16 +1079,21 @@ def create_bot_instance(bot_token, bot_index=1):
     # --- STATS COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command("stats") & filters.user(config.ADMINS))
     async def stats_command(bot, update):
-        logger.info(f"Admin {update.from_user.id} requested stats")
+        logger.info(f"Bot {bot_index}: Admin {update.from_user.id} requested stats")
+        bot_username = await get_bot_info()
+        bot_username = bot_cache.get('username', f'Bot{bot_index}')
+        
         stats_text = (
-            "📊 **Bot Statistics**\n\n"
+            f"📊 **Bot Statistics - @{bot_username}**\n\n"
+            f"🤖 Bot Instance: {bot_index}\n"
             f"💬 Messages Processed: {bot_stats['messages_processed']}\n"
             f"🖼️ Images Generated: {bot_stats['images_generated']}\n"
-            f"️ Voice Messages: {bot_stats['voice_messages_processed']}\n"
+            f"🎙️ Voice Messages: {bot_stats['voice_messages_processed']}\n"
             f"👥 Active Users: {len(bot_stats['active_users'])}\n"
+            f"🔑 Token ID: {bot_stats['bot_token']}\n"
         )
         await update.reply_text(stats_text)
-        await channel_log(bot, update, "/stats", "Admin requested bot statistics")
+        await channel_log(bot, update, "/stats", f"Admin requested bot statistics for instance {bot_index}")
 
     # --- ANNOUNCE COMMAND (ADMIN ONLY) ---
     @advAiBot.on_message(filters.command(["announce", "broadcast", "acc"]))
