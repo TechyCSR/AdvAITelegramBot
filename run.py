@@ -26,10 +26,10 @@ from modules.group.group_settings import leave_group, invite_command
 from modules.feedback_nd_rating import rate_command, handle_rate_callback
 from modules.group.group_info import info_command, uinfo_settings_callback, uinfo_history_callback
 from modules.models.ai_res import aires, new_chat
-from modules.image.image_generation import generate_command, handle_image_feedback, start_cleanup_scheduler, handle_generate_command
+from modules.image.image_generation import generate_command, handle_image_feedback, start_cleanup_scheduler as start_image_cleanup_scheduler, handle_generate_command
 from modules.image.inline_image_generation import handle_inline_query, cleanup_ongoing_generations
 from modules.models.inline_ai_response import cleanup_ongoing_generations as ai_cleanup_ongoing_generations
-from modules.core.request_queue import start_cleanup_scheduler
+from modules.core.request_queue import start_cleanup_scheduler as start_request_queue_cleanup_scheduler
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.user_settings_panel import user_settings_panel_command, handle_user_settings_callback
 from modules.speech.voice_to_text import handle_voice_message, handle_voice_toggle
@@ -90,8 +90,8 @@ def create_bot_instance(bot_token, bot_index=1):
         "active_users": set()
     }
 
-    # Get the cleanup scheduler function to run later
-    cleanup_scheduler = start_cleanup_scheduler()
+    # Get the image cleanup scheduler function to run later
+    cleanup_scheduler = start_image_cleanup_scheduler()
 
     # Add a global in-memory dict to store pending group image contexts
     pending_group_images = {}
@@ -408,7 +408,7 @@ def create_bot_instance(bot_token, bot_index=1):
             ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
             logger.info("Started inline AI generations cleanup scheduler task")
         if not globals().get('request_queue_cleanup_task'):
-            globals()['request_queue_cleanup_task'] = asyncio.create_task(start_cleanup_scheduler())
+            globals()['request_queue_cleanup_task'] = asyncio.create_task(start_request_queue_cleanup_scheduler())
             logger.info("Started request queue cleanup scheduler task")
         if not globals().get('premium_scheduler_task') or premium_scheduler_task.done():
             premium_scheduler_task = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
