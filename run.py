@@ -1,4 +1,5 @@
 import os
+import sys
 import config
 import pyrogram
 import time
@@ -1462,16 +1463,48 @@ if __name__ == "__main__":
     logger.info("🤖 Advanced AI Telegram Bot starting...")
     print("🤖 Advanced AI Telegram Bot starting...")
     print("✨ Optimized for performance and modern UI")
+    print(f"🔧 Multi-bot mode: {'✅ ENABLED' if config.MULTIPLE_BOTS else '❌ DISABLED'}")
+    print(f"📊 Number of bots configured: {config.NUM_OF_BOTS}")
 
     if config.MULTIPLE_BOTS:
-        bot_tokens = config.get_bot_tokens()
-        processes = []
-        for idx, token in enumerate(bot_tokens, 1):
-            p = multiprocessing.Process(target=run_bot, args=(token, idx), daemon=False)
-            p.start()
-            processes.append(p)
-        for p in processes:
-            p.join()
+        print("\n" + "="*50)
+        print("🚀 STARTING MULTI-BOT MODE")
+        print("="*50)
+        
+        try:
+            bot_tokens = config.get_bot_tokens()
+            processes = []
+            
+            print(f"\n📋 Starting {len(bot_tokens)} bot instances...")
+            for idx, token in enumerate(bot_tokens, 1):
+                print(f"🤖 Starting Bot Instance #{idx}...")
+                p = multiprocessing.Process(target=run_bot, args=(token, idx), daemon=False)
+                p.start()
+                processes.append(p)
+                print(f"✅ Bot Instance #{idx} started with PID: {p.pid}")
+            
+            print(f"\n🎯 All {len(processes)} bot instances started successfully!")
+            print("⏳ Waiting for all processes to complete...")
+            
+            for idx, p in enumerate(processes, 1):
+                print(f"⏳ Waiting for Bot Instance #{idx} (PID: {p.pid})...")
+                p.join()
+                print(f"🔴 Bot Instance #{idx} has stopped")
+                
+        except Exception as e:
+            logger.error(f"Error in multi-bot startup: {e}")
+            print(f"❌ Error starting multi-bot mode: {e}")
+            sys.exit(1)
     else:
-        advAiBot = create_bot_instance(config.BOT_TOKEN)
-        advAiBot.run()
+        print("\n" + "="*50)
+        print("🤖 STARTING SINGLE BOT MODE")
+        print("="*50)
+        try:
+            advAiBot = create_bot_instance(config.BOT_TOKEN)
+            print("✅ Single bot instance created successfully")
+            print("🚀 Starting bot...")
+            advAiBot.run()
+        except Exception as e:
+            logger.error(f"Error in single bot startup: {e}")
+            print(f"❌ Error starting single bot: {e}")
+            sys.exit(1)
