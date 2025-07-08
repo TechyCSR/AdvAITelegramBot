@@ -9,6 +9,11 @@ from modules.core.database import get_history_collection
 from modules.user.premium_management import is_user_premium
 from config import ADMINS
 from pyrogram.enums import ParseMode
+from modules.core.request_queue import (
+    can_start_text_request, 
+    start_text_request, 
+    finish_text_request
+)
 
 SUPPORTED_TEXT_EXTENSIONS = [
     ".txt", ".md", ".json", ".csv", ".xml", ".html", ".css", ".js", ".py", ".sh", ".log", ".yaml", ".sql"
@@ -106,48 +111,62 @@ async def handle_file_upload(client, message: Message):
 
 async def handle_file_question(client, message: Message):
     user_id = message.from_user.id
-    # Find the most recent file text from user history
-    history_collection = get_history_collection()
-    user_history = history_collection.find_one({"user_id": user_id})
-    file_text = None
-    if user_history and 'history' in user_history:
-        for entry in reversed(user_history['history']):
-            if isinstance(entry.get("content"), str) and len(entry["content"]) > 20:
-                file_text = entry["content"]
-                break
-    if not file_text:
-        await message.reply_text("No uploaded file found in your recent history. Please upload a file first.")
+    
+    # Check if user can start a new text request
+    can_start, queue_message = await can_start_text_request(user_id)
+    if not can_start:
+        await message.reply_text(queue_message)
         return
-    # Compose the message for AI
-    user_question = message.text
-    from g4f.client import Client
-    import g4f.debug
-    g4f.debug.logging = True
-    client_g4f = Client()
-    g4f_messages = [
-        {"role": "user", "content": [
-            {"type": "text", "text": f"{user_question}\n\n[file content follows]\n{file_text[:4000]}"}
-        ]}
-    ]
+    
     try:
-        response = client_g4f.chat.completions.create(g4f_messages)
-        ai_response = response.choices[0].message.content
-    except Exception as e:
-        await message.reply_text(f"Error processing file with AI: {e}")
-        return
-    # Save to history
-    user_history = history_collection.find_one({"user_id": user_id})
-    if user_history and 'history' in user_history:
-        history = user_history['history']
-        if not isinstance(history, list):
-            history = [history]
-    else:
-        history = DEFAULT_SYSTEM_MESSAGE.copy()
-    history.append({"role": "user", "content": user_question})
-    history.append({"role": "assistant", "content": ai_response})
-    history_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"history": history}},
-        upsert=True
-    )
-    await message.reply_text(ai_response) 
+        # Start the text request in queue system
+        start_text_request(user_id, f"File question: {message.text[:30]}...")
+        
+        # Find the most recent file text from user history
+        history_collection = get_history_collection()
+        user_history = history_collection.find_one({"user_id": user_id})
+        file_text = None
+        if user_history and 'history' in user_history:
+            for entry in reversed(user_history['history']):
+                if isinstance(entry.get("content"), str) and len(entry["content"]) > 20:
+                    file_text = entry["content"]
+                    break
+        if not file_text:
+            await message.reply_text("No uploaded file found in your recent history. Please upload a file first.")
+            return
+        # Compose the message for AI
+        user_question = message.text
+        from g4f.client import Client
+        import g4f.debug
+        g4f.debug.logging = True
+        client_g4f = Client()
+        g4f_messages = [
+            {"role": "user", "content": [
+                {"type": "text", "text": f"{user_question}\n\n[file content follows]\n{file_text[:4000]}"}
+            ]}
+        ]
+        try:
+            response = client_g4f.chat.completions.create(g4f_messages)
+            ai_response = response.choices[0].message.content
+        except Exception as e:
+            await message.reply_text(f"Error processing file with AI: {e}")
+            return
+        # Save to history
+        user_history = history_collection.find_one({"user_id": user_id})
+        if user_history and 'history' in user_history:
+            history = user_history['history']
+            if not isinstance(history, list):
+                history = [history]
+        else:
+            history = DEFAULT_SYSTEM_MESSAGE.copy()
+        history.append({"role": "user", "content": user_question})
+        history.append({"role": "assistant", "content": ai_response})
+        history_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"history": history}},
+            upsert=True
+        )
+        await message.reply_text(ai_response)
+    finally:
+        # Always finish the text request in queue system
+        finish_text_request(user_id) 

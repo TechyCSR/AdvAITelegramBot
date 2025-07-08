@@ -17,6 +17,12 @@ from config import ADMINS, POLLINATIONS_KEY
 from pyrogram.errors import MessageTooLong
 from modules.image.image_generation import generate_images
 from pyrogram.types import InputMediaPhoto
+from modules.core.request_queue import (
+    can_start_text_request, 
+    start_text_request, 
+    finish_text_request,
+    get_user_request_status
+)
 import uuid
 
 # --- Provider mapping ---
@@ -1392,10 +1398,20 @@ async def aires(client: Client, message: Message) -> None:
         await message.reply(maint_msg)
         return
 
+    user_id = message.from_user.id
+    
+    # Check if user can start a new text request
+    can_start, queue_message = await can_start_text_request(user_id)
+    if not can_start:
+        await message.reply_text(queue_message)
+        return
+
     try:
+        # Start the text request in queue system
+        start_text_request(user_id, f"Processing message: {(message.text or 'media')[:30]}...")
+        
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
         temp = await message.reply_text("⏳")
-        user_id = message.from_user.id
         
         # Safely extract the message text
         ask = ""
@@ -1600,6 +1616,9 @@ async def aires(client: Client, message: Message) -> None:
         await error_log(client, "AIRES_FUNCTION", str(e), f"User query: {ask[:100]}..." if 'ask' in locals() else "Unknown query", user_id)
         print(f"Error in aires function: {e}")
         await message.reply_text("I'm experiencing technical difficulties. Please try again in a moment or use /new to start a new conversation.")
+    finally:
+        # Always finish the text request in queue system
+        finish_text_request(user_id)
 
 async def new_chat(client: Client, message: Message) -> None:
     """

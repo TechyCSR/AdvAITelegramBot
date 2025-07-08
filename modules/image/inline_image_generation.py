@@ -25,6 +25,11 @@ from pyrogram.errors import QueryIdInvalid, MessageNotModified
 from g4f.client import AsyncClient 
 from g4f.Provider import PollinationsAI
 from config import LOG_CHANNEL
+from modules.core.request_queue import (
+    can_start_image_request, 
+    start_image_request, 
+    finish_image_request
+)
 
 # Get the logger
 logger = logging.getLogger(__name__)
@@ -528,7 +533,26 @@ async def handle_image_generation_query(client: Client, inline_query: InlineQuer
             logger.error(f"Error answering with cached image: {str(e)}")
             # Continue to generate new image if cached image failed
     
-    # Check if there's an ongoing generation in progress for this user
+    # Check if user can start a new image request (queue system)
+    can_start, queue_message = await can_start_image_request(user_id)
+    if not can_start:
+        try:
+            await inline_query.answer(
+                results=[
+                    InlineQueryResultArticle(
+                        title="Image request in progress...",
+                        description="Please wait for previous request to complete",
+                        input_message_content=InputTextMessageContent(queue_message),
+                        thumb_url="https://img.icons8.com/color/452/hourglass.png"
+                    )
+                ],
+                cache_time=1
+            )
+        except Exception as e:
+            logger.error(f"Error showing queue message: {str(e)}")
+        return
+    
+    # Check if there's an ongoing generation in progress for this user (legacy check)
     for task_id, data in ongoing_generations.items():
         if data["user_id"] == user_id and time.time() - data["start_time"] < 30:
             # Show waiting message
@@ -561,6 +585,9 @@ async def handle_image_generation_query(client: Client, inline_query: InlineQuer
     
     # Start the immediate generation
     try:
+        # Start image request in queue system
+        start_image_request(user_id, f"Inline image: {prompt[:30]}...")
+        
         # Store this query in ongoing generations
         ongoing_generations[task_id] = {
             "user_id": user_id,
@@ -779,6 +806,9 @@ async def handle_image_generation_query(client: Client, inline_query: InlineQuer
             except Exception as e3:
                 logger.error(f"Error cleaning up file {path}: {str(e3)}")
     finally:
+        # Finish image request in queue system
+        finish_image_request(user_id)
+        
         # Clean up
         if task_id in ongoing_generations:
             del ongoing_generations[task_id]

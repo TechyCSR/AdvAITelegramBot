@@ -19,6 +19,12 @@ from modules.user.ai_model import get_user_ai_models, DEFAULT_IMAGE_MODEL, IMAGE
 from g4f.client import AsyncClient
 from g4f.Provider import PollinationsImage
 from modules.core.database import db_service
+from modules.core.request_queue import (
+    can_start_image_request, 
+    start_image_request, 
+    finish_image_request,
+    get_user_request_status
+)
 from pyrogram.enums import ParseMode
 
 # Get the logger
@@ -416,40 +422,41 @@ async def handle_generate_command(client: Client, message: Message) -> None:
                 "You'll be able to choose from several artistic styles after entering your prompt."
             )
             return
-            
-        # FORCE Reset ALL processing states for this user
-        # This is more aggressive than before and should fix stuck states
-        for state_user_id, state in list(user_states.items()):
-            if str(state_user_id) == str(user_id):
-                logger.info(f"Force resetting processing state for user {state_user_id}")
-                state.set_processing(False)
-                
-                # If state is older than 2 minutes, remove it completely
-                if time.time() - state.created_at > 120:
-                    del user_states[state_user_id]
-                    logger.info(f"Removed stale state for user {state_user_id}")
         
-        # Now check if user still has an active generation
-        # This should never happen now with our aggressive reset
-        if user_id in user_states and user_states[user_id].is_processing:
-            # Check if the state is really old (more than 5 minutes) and just ignore it
-            if time.time() - user_states[user_id].created_at > 300:
-                logger.warning(f"Ignoring extremely stale processing state for user {user_id}")
-                # Create a fresh state
-                user_states[user_id] = UserGenerationState(user_id, prompt)
-            else:
-                await message.reply_text(
-                    "⏳ I'm already working on your previous image request. Please wait for it to complete."
-                )
-                return
+        # Check if user can start a new image request
+        can_start, queue_message = await can_start_image_request(user_id)
+        if not can_start:
+            await message.reply_text(queue_message)
+            return
+        
+        # Start the image request in queue system
+        start_image_request(user_id, f"Style selection for: {prompt[:30]}...")
+        
+        try:
+            # FORCE Reset ALL processing states for this user (legacy system cleanup)
+            for state_user_id, state in list(user_states.items()):
+                if str(state_user_id) == str(user_id):
+                    logger.info(f"Force resetting legacy processing state for user {state_user_id}")
+                    state.set_processing(False)
+                    
+                    # If state is older than 2 minutes, remove it completely
+                    if time.time() - state.created_at > 120:
+                        del user_states[state_user_id]
+                        logger.info(f"Removed stale legacy state for user {state_user_id}")
             
-        # Show style selection to start the process
-        await show_style_selection(client, message, prompt)
+            # Show style selection to start the process
+            await show_style_selection(client, message, prompt)
+        
+        except Exception as e:
+            # If any error occurs, finish the request in queue system
+            finish_image_request(user_id)
+            raise e
         
     except Exception as e:
         logger.error(f"Error in image generation command handler: {str(e)}")
         await message.reply_text(f"❌ **Error**\n\nFailed to process image generation request: {str(e)}")
         # Reset user state in case of error
+        finish_image_request(user_id)
         if user_id in user_states:
             user_states[user_id].set_processing(False)
 
@@ -751,6 +758,9 @@ async def process_style_selection(client: Client, callback_query: CallbackQuery)
         state.set_processing(True)
         state.set_style(style)
         
+        # Update queue system task info
+        start_image_request(clicked_user_id, f"Generating {style} style image: {state.prompt[:30]}...")
+        
         # Get style info
         style_info = STYLE_DEFINITIONS.get(style, STYLE_DEFINITIONS["realistic"])
         
@@ -1003,6 +1013,9 @@ async def generate_and_send_images(client: Client, message: Message, prompt: str
             text="❌ **Image Generation Failed**\n\nThere's some issue, please try in a moment or change your prompt."
         )
     finally:
+        # Finish the request in queue system
+        finish_image_request(user_id)
+        
         # ALWAYS reset ALL user states for this user, no matter what
         for state_user_id, state in list(user_states.items()):
             if str(state_user_id) == str(user_id):

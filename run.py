@@ -29,6 +29,7 @@ from modules.models.ai_res import aires, new_chat
 from modules.image.image_generation import generate_command, handle_image_feedback, start_cleanup_scheduler, handle_generate_command
 from modules.image.inline_image_generation import handle_inline_query, cleanup_ongoing_generations
 from modules.models.inline_ai_response import cleanup_ongoing_generations as ai_cleanup_ongoing_generations
+from modules.core.request_queue import start_cleanup_scheduler
 from modules.chatlogs import channel_log, user_log, error_log
 from modules.user.user_settings_panel import user_settings_panel_command, handle_user_settings_callback
 from modules.speech.voice_to_text import handle_voice_message, handle_voice_toggle
@@ -396,7 +397,7 @@ def create_bot_instance(bot_token, bot_index=1):
             return
 
         # Start schedulers on first command if not already running
-        global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task, premium_scheduler_task
+        global cleanup_scheduler_task, ongoing_generations_cleanup_task, ai_ongoing_generations_cleanup_task, premium_scheduler_task, request_queue_cleanup_task
         if not globals().get('cleanup_scheduler_task') or cleanup_scheduler_task.done():
             cleanup_scheduler_task = asyncio.create_task(cleanup_scheduler())
             logger.info("Started image generation cleanup scheduler task")
@@ -406,6 +407,9 @@ def create_bot_instance(bot_token, bot_index=1):
         if not globals().get('ai_ongoing_generations_cleanup_task') or ai_ongoing_generations_cleanup_task.done():
             ai_ongoing_generations_cleanup_task = asyncio.create_task(ai_cleanup_ongoing_generations())
             logger.info("Started inline AI generations cleanup scheduler task")
+        if not globals().get('request_queue_cleanup_task'):
+            globals()['request_queue_cleanup_task'] = asyncio.create_task(start_cleanup_scheduler())
+            logger.info("Started request queue cleanup scheduler task")
         if not globals().get('premium_scheduler_task') or premium_scheduler_task.done():
             premium_scheduler_task = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
             logger.info("Started daily premium check scheduler task")

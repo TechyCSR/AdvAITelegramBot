@@ -16,6 +16,11 @@ from pyrogram.errors import QueryIdInvalid
 
 from modules.models.ai_res import get_response
 from config import LOG_CHANNEL
+from modules.core.request_queue import (
+    can_start_text_request, 
+    start_text_request, 
+    finish_text_request
+)
 
 # Get the logger
 logger = logging.getLogger(__name__)
@@ -385,7 +390,26 @@ async def handle_inline_ai_query(client: Client, inline_query: InlineQuery, prom
             logger.error(f"Error answering with cached AI responses: {str(e)}")
             # Continue to generate new response if cached response failed
     
-    # Check if there's an ongoing generation in progress for this user
+    # Check if user can start a new text request (queue system)
+    can_start, queue_message = await can_start_text_request(user_id)
+    if not can_start:
+        try:
+            await inline_query.answer(
+                results=[
+                    InlineQueryResultArticle(
+                        title="Request in progress...",
+                        description="Please wait for previous request to complete",
+                        input_message_content=InputTextMessageContent(queue_message),
+                        thumb_url="https://img.icons8.com/color/452/artificial-intelligence.png"
+                    )
+                ],
+                cache_time=1
+            )
+        except Exception as e:
+            logger.error(f"Error showing queue message: {str(e)}")
+        return
+    
+    # Check if there's an ongoing generation in progress for this user (legacy check)
     for task_id, data in ongoing_generations.items():
         if data["user_id"] == user_id and time.time() - data["start_time"] < 30:
             # Show waiting message with instruction to add space
@@ -414,6 +438,9 @@ async def handle_inline_ai_query(client: Client, inline_query: InlineQuery, prom
     
     # Start the generation
     try:
+        # Start text request in queue system
+        start_text_request(user_id, f"Inline AI: {prompt[:30]}...")
+        
         # Store this query in ongoing generations
         ongoing_generations[task_id] = {
             "user_id": user_id,
@@ -513,6 +540,9 @@ async def handle_inline_ai_query(client: Client, inline_query: InlineQuery, prom
         except Exception as e2:
             logger.error(f"Error answering with error message: {str(e2)}")
     finally:
+        # Finish text request in queue system
+        finish_text_request(user_id)
+        
         # Clean up
         if task_id in ongoing_generations:
             del ongoing_generations[task_id]
