@@ -360,6 +360,16 @@ async def change_image_count_callback(client, callback: CallbackQuery):
         await callback.answer("Invalid selection.", show_alert=True)
         return
 
+    # Get current image count setting
+    user_gen_settings = user_image_gen_settings_collection.find_one({"user_id": user_id})
+    current_count = user_gen_settings.get("generation_count", 1) if user_gen_settings else 1
+
+    # Check if user clicked on already selected number
+    if chosen_count == current_count:
+        already_selected_alert = await async_translate_to_lang("This number is already selected", current_lang)
+        await callback.answer(already_selected_alert, show_alert=True)
+        return
+
     is_premium_user, _, _ = await is_user_premium(user_id)
     is_admin_user = user_id in ADMINS
 
