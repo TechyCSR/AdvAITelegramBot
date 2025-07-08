@@ -479,10 +479,11 @@ def create_bot_instance(bot_token, bot_index=1):
                 return message.reply_to_message.from_user.id == advAiBot.me.id
             return False
         return filters.create(func)
+    
 
 
     # --- MESSAGE HANDLER ---
-    @advAiBot.on_message(is_chat_text_filter() & filters.text & (filters.private | filters.group))
+    @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
     async def handle_message(client, message):
         set_last_interaction(message.from_user.id, "text", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, message): # BAN CHECK
