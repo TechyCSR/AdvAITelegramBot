@@ -547,15 +547,19 @@ body {
 
 .textarea-wrapper textarea {
     width: 100%;
+    min-height: 120px;
+    max-height: 300px;
     padding: 1rem 1rem 3rem 1rem;
     border: 2px solid var(--border);
     border-radius: var(--radius-lg);
     font-family: inherit;
     font-size: 1rem;
-    resize: vertical;
-    transition: var(--transition);
+    line-height: 1.5;
+    resize: none;
+    transition: height 0.2s ease-in-out, border-color 0.2s ease-in-out;
     background: var(--background);
     box-shadow: var(--shadow-sm);
+    overflow-y: auto;
 }
 
 .textarea-wrapper textarea:focus {
@@ -585,6 +589,47 @@ body {
     gap: 1rem;
 }
 
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.clear-btn {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--danger-color), #dc2626);
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 0.875rem 1.5rem;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.clear-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.clear-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.clear-btn i {
+    font-size: 0.875rem;
+}
+
 .enhance-btn.premium {
     position: relative;
     overflow: hidden;
@@ -597,7 +642,9 @@ body {
     cursor: pointer;
     transition: var(--transition);
     box-shadow: var(--shadow-md);
-    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .enhance-btn.premium:hover {
@@ -1065,6 +1112,66 @@ body {
     color: white;
 }
 
+/* Dark Theme - Clear Button */
+[data-theme="dark"] .clear-btn {
+    background: linear-gradient(135deg, var(--danger-color), #dc2626);
+    color: white;
+}
+
+[data-theme="dark"] .clear-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+/* Floating Navigation Button */
+.floating-nav-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    transition: var(--transition);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: floating 2s ease-in-out infinite;
+}
+
+.floating-nav-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+}
+
+.floating-nav-btn.visible {
+    display: flex;
+}
+
+@keyframes floating {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .floating-nav-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .floating-nav-btn:hover {
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+}
+
 /* History Section */
 .history-section {
     background: var(--surface);
@@ -1258,6 +1365,12 @@ body {
         padding: 1.5rem;
     }
 
+    /* Mobile textarea adjustments */
+    .textarea-wrapper textarea {
+        max-height: 250px;
+        font-size: 0.95rem;
+    }
+
     .settings-grid {
         grid-template-columns: 1fr;
         gap: 1rem;
@@ -1339,6 +1452,60 @@ body {
     .nav-btn {
         padding: 0.5rem 0.75rem;
         font-size: 0.875rem;
+    }
+
+    /* Action buttons mobile */
+    .action-buttons {
+        flex-direction: row;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .clear-btn,
+    .enhance-btn.premium {
+        padding: 0.625rem 1rem;
+        font-size: 0.8rem;
+        width: auto;
+        min-width: auto;
+        justify-content: center;
+    }
+
+    .clear-btn span,
+    .enhance-btn.premium span {
+        font-size: 0.8rem;
+    }
+
+    /* Extra small screens - even more compact buttons */
+    @media (max-width: 400px) {
+        .clear-btn,
+        .enhance-btn.premium {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .clear-btn span,
+        .enhance-btn.premium span {
+            font-size: 0.75rem;
+        }
+
+        .clear-btn i,
+        .enhance-btn.premium i {
+            font-size: 0.75rem;
+        }
+
+        /* Extra small textarea adjustments */
+        .textarea-wrapper textarea {
+            max-height: 200px;
+            font-size: 0.9rem;
+            min-height: 100px;
+        }
+    }
+
+    /* Show floating button on mobile when visible */
+    .floating-nav-btn.visible {
+        display: flex;
     }
 }
 
@@ -1489,7 +1656,7 @@ body {
     left: 15px;
     display: flex;
     gap: 0.5rem;
-    z-index: 1001;
+    z-index: 1002;
 }
 
 .modal-action-btn {
@@ -1678,15 +1845,18 @@ body {
     .modal-content {
         max-width: 95vw;
         max-height: 95vh;
+        display: flex;
+        flex-direction: column;
     }
     
     .modal-image {
         max-width: 90vw;
-        max-height: 80vh;
+        max-height: 70vh;
+        flex-shrink: 0;
     }
     
     .modal-info {
-        padding: 1.5rem 1rem 1rem;
+        display: none;
     }
     
     .modal-details {
@@ -1695,10 +1865,19 @@ body {
     }
     
     .modal-actions {
-        position: static;
-        justify-content: center;
-        padding: 1rem;
-        background: rgba(0, 0, 0, 0.8);
+        top: 15px;
+        left: 10px;
+        position: absolute;
+        background: transparent;
+        padding: 0;
+        gap: 8px;
+        z-index: 1002;
+    }
+    
+    .modal-action-btn {
+        width: 35px;
+        height: 35px;
+        font-size: 0.875rem;
     }
     
     .modal-close {
@@ -1706,5 +1885,26 @@ body {
         right: 10px;
         width: 35px;
         height: 35px;
+        z-index: 1002;
+    }
+
+    .modal-nav {
+        width: 45px;
+        height: 45px;
+        font-size: 1.25rem;
+    }
+
+    .modal-nav.prev {
+        left: 10px;
+    }
+
+    .modal-nav.next {
+        right: 10px;
+    }
+
+    .modal-counter {
+        top: 10px;
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
     }
 } 

@@ -286,6 +286,10 @@ class ImageGeneratorApp {
             if (descriptionEl && appState.description) {
                 descriptionEl.value = appState.description;
                 console.log('✅ Restored description:', appState.description);
+                // Resize textarea to fit the restored content
+                setTimeout(() => {
+                    this.autoResizeTextarea();
+                }, 50);
             }
 
             // Restore settings
@@ -451,6 +455,7 @@ class ImageGeneratorApp {
             if (historyGrid) historyGrid.innerHTML = '';
             
             this.updateCharCount();
+            this.resetTextareaHeight();
             this.toggleCustomSizeInputs();
             this.loadHistoryGrid();
             
@@ -500,8 +505,12 @@ class ImageGeneratorApp {
         if (description) {
             description.addEventListener('input', () => {
                 this.updateCharCount();
+                this.autoResizeTextarea();
                 this.autoSave();
             });
+            
+            // Initial resize setup
+            this.setupAutoResize();
         }
 
         // Settings - save immediately on change
@@ -563,6 +572,11 @@ class ImageGeneratorApp {
         // Enhance prompt button
         document.getElementById('enhanceBtn')?.addEventListener('click', () => {
             this.enhancePrompt();
+        });
+
+        // Clear prompt button
+        document.getElementById('clearPromptBtn')?.addEventListener('click', () => {
+            this.clearPrompt();
         });
 
         // Results actions
@@ -644,6 +658,9 @@ class ImageGeneratorApp {
         // Mobile menu functionality
         this.initMobileMenu();
 
+        // Floating navigation button
+        this.initFloatingNavButton();
+
         console.log('✅ All events bound');
     }
 
@@ -665,6 +682,10 @@ class ImageGeneratorApp {
         
         // Save immediately
         this.autoSave();
+        
+        // Trigger custom event for floating button
+        document.dispatchEvent(new CustomEvent('tabChanged'));
+        
         console.log('Tab switched to:', tab);
     }
 
@@ -683,15 +704,110 @@ class ImageGeneratorApp {
         
         if (description && charCount) {
             const count = description.value.length;
-            charCount.textContent = `${count}/500`;
+            charCount.textContent = `${count}/1000`;
             
-            if (count > 450) {
+            if (count > 900) {
                 charCount.style.color = 'var(--warning-color)';
-            } else if (count > 500) {
+            } else if (count > 1000) {
                 charCount.style.color = 'var(--danger-color)';
             } else {
                 charCount.style.color = 'var(--text-muted)';
             }
+        }
+
+        // Update clear button state
+        this.updateClearButtonState();
+    }
+
+    updateClearButtonState() {
+        const description = document.getElementById('description');
+        const clearBtn = document.getElementById('clearPromptBtn');
+        
+        if (description && clearBtn) {
+            clearBtn.disabled = description.value.trim().length === 0;
+        }
+    }
+
+    clearPrompt() {
+        const description = document.getElementById('description');
+        if (description) {
+            description.value = '';
+            this.updateCharCount();
+            this.resetTextareaHeight();
+            this.autoSave();
+            description.focus();
+            this.showNotification('Prompt cleared!', 'success');
+        }
+    }
+
+    setupAutoResize() {
+        const description = document.getElementById('description');
+        if (description) {
+            // Set initial height
+            this.resetTextareaHeight();
+            
+            // Also resize on paste
+            description.addEventListener('paste', () => {
+                setTimeout(() => {
+                    this.autoResizeTextarea();
+                }, 10);
+            });
+
+            // Resize on window resize for responsive behavior
+            window.addEventListener('resize', () => {
+                this.autoResizeTextarea();
+            });
+        }
+    }
+
+    autoResizeTextarea() {
+        const description = document.getElementById('description');
+        if (!description) return;
+
+        // Reset height to auto to get proper scrollHeight
+        description.style.height = 'auto';
+        
+        // Calculate responsive height limits based on screen size
+        let minHeight = 120; // Default desktop min-height
+        let maxHeight = 300; // Default desktop max-height
+        
+        if (window.innerWidth <= 400) {
+            // Extra small screens
+            minHeight = 100;
+            maxHeight = 200;
+        } else if (window.innerWidth <= 768) {
+            // Mobile screens
+            minHeight = 120;
+            maxHeight = 250;
+        }
+        
+        const scrollHeight = description.scrollHeight;
+        
+        // Set new height within bounds
+        let newHeight = Math.max(minHeight, Math.min(maxHeight, scrollHeight));
+        
+        // Apply the new height
+        description.style.height = newHeight + 'px';
+        
+        // Show scrollbar if content exceeds max height
+        if (scrollHeight > maxHeight) {
+            description.style.overflowY = 'auto';
+        } else {
+            description.style.overflowY = 'hidden';
+        }
+    }
+
+    resetTextareaHeight() {
+        const description = document.getElementById('description');
+        if (description) {
+            // Use responsive minimum height
+            let minHeight = 120;
+            if (window.innerWidth <= 400) {
+                minHeight = 100;
+            }
+            
+            description.style.height = minHeight + 'px';
+            description.style.overflowY = 'hidden';
         }
     }
 
@@ -805,6 +921,74 @@ class ImageGeneratorApp {
         mobileDropdown?.classList.remove('active');
     }
 
+    initFloatingNavButton() {
+        const floatingBtn = document.getElementById('floatingNavBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        
+        if (!floatingBtn || !generateBtn) return;
+
+        // Handle floating button click
+        floatingBtn.addEventListener('click', () => {
+            generateBtn.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        });
+
+        // Show/hide button based on scroll position and tab
+        this.updateFloatingButtonVisibility();
+        
+        // Update visibility on scroll
+        window.addEventListener('scroll', () => {
+            this.updateFloatingButtonVisibility();
+        });
+
+        // Update visibility on tab change
+        document.addEventListener('tabChanged', () => {
+            this.updateFloatingButtonVisibility();
+        });
+
+        // Update visibility on window resize
+        window.addEventListener('resize', () => {
+            this.updateFloatingButtonVisibility();
+        });
+    }
+
+    updateFloatingButtonVisibility() {
+        const floatingBtn = document.getElementById('floatingNavBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        
+        if (!floatingBtn || !generateBtn || window.innerWidth > 768) {
+            floatingBtn?.classList.remove('visible');
+            return;
+        }
+
+        // Only show on generate tab
+        if (this.currentTab !== 'generate') {
+            floatingBtn.classList.remove('visible');
+            return;
+        }
+
+        // Get generate button position relative to document
+        const generateBtnRect = generateBtn.getBoundingClientRect();
+        const generateBtnTop = generateBtnRect.top + window.scrollY;
+        
+        // Check if user has scrolled to or past the generate button area
+        // Add some buffer (100px) so it disappears slightly before reaching the button
+        const hasReachedGenerateBtn = window.scrollY >= (generateBtnTop - window.innerHeight + 100);
+        
+        // Show floating button only if:
+        // 1. User has scrolled down (>200px)
+        // 2. User hasn't reached the generate button area yet
+        const shouldShow = window.scrollY > 200 && !hasReachedGenerateBtn;
+        
+        if (shouldShow) {
+            floatingBtn.classList.add('visible');
+        } else {
+            floatingBtn.classList.remove('visible');
+        }
+    }
+
     selectVariants(variants) {
         this.settings.variants = parseInt(variants);
         document.querySelectorAll('.variant-btn').forEach(btn => {
@@ -844,6 +1028,7 @@ class ImageGeneratorApp {
             if (response.ok) {
                 description.value = data.enhanced_prompt;
                 this.updateCharCount();
+                this.autoResizeTextarea();
                 this.autoSave();
                 this.showNotification('Prompt enhanced successfully!', 'success');
             } else {
@@ -869,8 +1054,8 @@ class ImageGeneratorApp {
             return;
         }
 
-        if (descriptionValue.length > 500) {
-            this.showNotification('Description is too long (max 500 characters)', 'error');
+        if (descriptionValue.length > 1000) {
+            this.showNotification('Description is too long (max 1000 characters)', 'error');
             return;
         }
 

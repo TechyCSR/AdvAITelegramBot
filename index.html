@@ -91,17 +91,24 @@
                                     id="description" 
                                     placeholder="e.g., A futuristic city at sunset with flying cars and neon lights, vibrant colors, cinematic lighting"
                                     rows="4"
+                                    maxlength="1000"
                                 ></textarea>
                                 <div class="textarea-overlay">
-                                    <div class="char-count">0/500</div>
+                                    <div class="char-count">0/1000</div>
                                 </div>
                             </div>
                             <div class="input-actions enhanced">
-                                <button class="enhance-btn premium" id="enhanceBtn">
-                                    <i class="fas fa-sparkles"></i>
-                                    <span>Enhance Prompt</span>
-                                    <div class="btn-shine"></div>
-                                </button>
+                                <div class="action-buttons">
+                                    <button class="clear-btn" id="clearPromptBtn" title="Clear prompt">
+                                        <i class="fas fa-eraser"></i>
+                                        <span>Clear Prompt</span>
+                                    </button>
+                                    <button class="enhance-btn premium" id="enhanceBtn">
+                                        <i class="fas fa-sparkles"></i>
+                                        <span>Enhance Prompt</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
                                 <div class="input-tips">
                                     <i class="fas fa-lightbulb"></i>
                                     <span>Tip: Be specific about style, lighting, and mood for better results</span>
@@ -254,6 +261,11 @@
             </div>
         </footer>
     </div>
+
+    <!-- Floating Navigate Button for Mobile -->
+    <button class="floating-nav-btn" id="floatingNavBtn" title="Go to Generate Button">
+        <i class="fas fa-arrow-down"></i>
+    </button>
 
     <!-- Image Modal -->
     <div class="image-modal" id="imageModal">
