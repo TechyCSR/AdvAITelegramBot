@@ -13,7 +13,8 @@ from typing import Optional
 
 # Pollinations AI API Key for image generation
 # Get your API key from: https://pollinations.ai/
-POLLINATIONS_KEY: Optional[str] = "your_pollinations_api_key_here"
+POLLINATIONS_KEY: Optional[str] ="amL9EhK5lonFIcBh"
+
 
 # Alternative: Load from environment variable (recommended for production)
 if os.environ.get('POLLINATIONS_KEY'):
