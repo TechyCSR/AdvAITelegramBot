@@ -15,6 +15,7 @@ class ImageGeneratorApp {
 
     init() {
         this.bindEvents();
+        this.loadAppState(); // Load saved app state
         this.updateCharCount();
         this.loadHistoryGrid();
         this.updateActiveTab();
@@ -29,6 +30,13 @@ class ImageGeneratorApp {
             this.toggleTheme();
         });
 
+        // Clear data button
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all saved data? This will reset the form, settings, and generated images.')) {
+                this.clearAppState();
+            }
+        });
+
         // Tab navigation
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -40,6 +48,7 @@ class ImageGeneratorApp {
         const description = document.getElementById('description');
         description.addEventListener('input', () => {
             this.updateCharCount();
+            this.saveAppState();
         });
 
 
@@ -48,20 +57,33 @@ class ImageGeneratorApp {
         document.getElementById('sizeSelect').addEventListener('change', (e) => {
             this.settings.size = e.target.value;
             this.toggleCustomSizeInputs();
+            this.saveAppState();
+        });
+
+        // Custom size inputs
+        document.getElementById('customWidth').addEventListener('input', () => {
+            this.saveAppState();
+        });
+
+        document.getElementById('customHeight').addEventListener('input', () => {
+            this.saveAppState();
         });
 
         document.querySelectorAll('.variant-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.selectVariants(btn.dataset.variants);
+                this.saveAppState();
             });
         });
 
         document.getElementById('styleSelect').addEventListener('change', (e) => {
             this.settings.style = e.target.value;
+            this.saveAppState();
         });
 
         document.getElementById('modelSelect').addEventListener('change', (e) => {
             this.settings.model = e.target.value;
+            this.saveAppState();
         });
 
         // Generate button
@@ -108,6 +130,9 @@ class ImageGeneratorApp {
 
         // Update URL without refresh
         history.pushState({tab}, '', `#${tab}`);
+        
+        // Save app state
+        this.saveAppState();
     }
 
     updateActiveTab() {
@@ -172,6 +197,105 @@ class ImageGeneratorApp {
         }
     }
 
+    saveAppState() {
+        try {
+            const appState = {
+                description: document.getElementById('description').value,
+                settings: { ...this.settings },
+                generatedImages: this.generatedImages,
+                customSize: {
+                    width: document.getElementById('customWidth').value,
+                    height: document.getElementById('customHeight').value
+                },
+                currentTab: this.currentTab
+            };
+            localStorage.setItem('advai_app_state', JSON.stringify(appState));
+        } catch (error) {
+            console.error('Error saving app state:', error);
+        }
+    }
+
+    loadAppState() {
+        try {
+            const saved = localStorage.getItem('advai_app_state');
+            if (!saved) return;
+
+            const appState = JSON.parse(saved);
+
+            // Restore description
+            if (appState.description) {
+                document.getElementById('description').value = appState.description;
+            }
+
+            // Restore settings
+            if (appState.settings) {
+                this.settings = { ...this.settings, ...appState.settings };
+                
+                // Update UI elements
+                document.getElementById('sizeSelect').value = this.settings.size;
+                document.getElementById('styleSelect').value = this.settings.style;
+                document.getElementById('modelSelect').value = this.settings.model;
+                this.selectVariants(this.settings.variants);
+            }
+
+            // Restore custom size inputs
+            if (appState.customSize) {
+                document.getElementById('customWidth').value = appState.customSize.width || '';
+                document.getElementById('customHeight').value = appState.customSize.height || '';
+            }
+
+            // Restore generated images
+            if (appState.generatedImages && appState.generatedImages.length > 0) {
+                this.generatedImages = appState.generatedImages;
+                this.displayResults();
+            }
+
+            // Restore current tab
+            if (appState.currentTab) {
+                this.currentTab = appState.currentTab;
+            }
+
+        } catch (error) {
+            console.error('Error loading app state:', error);
+        }
+    }
+
+    clearAppState() {
+        try {
+            localStorage.removeItem('advai_app_state');
+            
+            // Reset form
+            document.getElementById('description').value = '';
+            document.getElementById('customWidth').value = '';
+            document.getElementById('customHeight').value = '';
+            
+            // Reset settings
+            this.settings = {
+                size: '1024x1024',
+                variants: 1,
+                style: 'default',
+                model: 'flux'
+            };
+            
+            // Update UI
+            document.getElementById('sizeSelect').value = this.settings.size;
+            document.getElementById('styleSelect').value = this.settings.style;
+            document.getElementById('modelSelect').value = this.settings.model;
+            this.selectVariants(this.settings.variants);
+            
+            // Clear generated images
+            this.generatedImages = [];
+            document.getElementById('resultsSection').classList.remove('active');
+            
+            this.updateCharCount();
+            this.toggleCustomSizeInputs();
+            
+            this.showNotification('App state cleared!', 'success');
+        } catch (error) {
+            console.error('Error clearing app state:', error);
+        }
+    }
+
 
 
 
@@ -212,6 +336,7 @@ class ImageGeneratorApp {
             if (response.ok) {
                 description.value = data.enhanced_prompt;
                 this.updateCharCount();
+                this.saveAppState();
                 this.showNotification('Prompt enhanced successfully!', 'success');
             } else {
                 throw new Error(data.error || 'Failed to enhance prompt');
@@ -316,6 +441,9 @@ class ImageGeneratorApp {
 
         resultsSection.classList.add('active');
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+        
+        // Save app state after displaying results
+        this.saveAppState();
     }
 
     showLoading(show) {

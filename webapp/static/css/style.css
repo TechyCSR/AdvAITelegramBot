@@ -110,7 +110,8 @@ body {
 /* Navigation Controls */
 
 .theme-toggle,
-.telegram-link {
+.telegram-link,
+.clear-data-btn {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -148,8 +149,20 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+.clear-data-btn {
+    background: #ff4757;
+    color: white;
+}
+
+.clear-data-btn:hover {
+    background: #ff3838;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
 .theme-toggle i,
-.telegram-link i {
+.telegram-link i,
+.clear-data-btn i {
     font-size: 1rem;
 }
 
