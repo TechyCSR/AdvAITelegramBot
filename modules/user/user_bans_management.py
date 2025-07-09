@@ -20,7 +20,7 @@ async def ban_user(user_id: int, admin_id: int, reason: str = "No reason provide
         "user_id": user_id,
         "is_banned": True,
         "reason": reason,
-        "banned_at": datetime.datetime.utcnow(),
+        "banned_at": datetime.datetime.now(datetime.timezone.utc),
         "banned_by": admin_id
     }
     user_bans_collection.update_one({"user_id": user_id}, {"$set": ban_record}, upsert=True)
@@ -31,7 +31,7 @@ async def unban_user(user_id: int) -> bool:
     if not isinstance(user_id, int):
         return False
     user_bans_collection = db_service.get_collection('user_bans')
-    result = user_bans_collection.update_one({"user_id": user_id}, {"$set": {"is_banned": False, "unbanned_at": datetime.datetime.utcnow()}})
+    result = user_bans_collection.update_one({"user_id": user_id}, {"$set": {"is_banned": False, "unbanned_at": datetime.datetime.now(datetime.timezone.utc)}})
     return result.modified_count > 0
 
 async def is_user_banned(user_id: int) -> Tuple[bool, Optional[str]]:

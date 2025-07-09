@@ -1466,6 +1466,7 @@ if __name__ == "__main__":
     print(f"🔧 Multi-bot mode: {'✅ ENABLED' if config.MULTIPLE_BOTS else '❌ DISABLED'}")
     print(f"📊 Number of bots configured: {config.NUM_OF_BOTS}")
 
+
     if config.MULTIPLE_BOTS:
         print("\n" + "="*50)
         print("🚀 STARTING MULTI-BOT MODE")

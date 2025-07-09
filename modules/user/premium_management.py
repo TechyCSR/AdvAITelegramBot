@@ -20,7 +20,7 @@ async def add_premium_status(user_id: int, admin_id: int, days: int) -> bool:
     if days <= 0: # Use to revoke premium manually if needed by setting days to 0 or less
         return await remove_premium_status(user_id, revoked_by_admin=True)
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     expires_at = now + datetime.timedelta(days=days)
     
     premium_record = {
@@ -43,7 +43,7 @@ async def remove_premium_status(user_id: int, revoked_by_admin: bool = False) ->
         
     update_fields = {
         "is_premium": False,
-        "premium_expires_at": datetime.datetime.utcnow() # Mark as expired now
+        "premium_expires_at": datetime.datetime.now(datetime.timezone.utc) # Mark as expired now
     }
     if revoked_by_admin:
         update_fields["reason_for_removal"] = "Revoked by admin"
@@ -71,7 +71,7 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
         print(f"Error: User {user_id} has invalid premium_expires_at: {expires_at}")
         return False, 0, None
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if expires_at > now:
         remaining_time = expires_at - now
         # Calculate remaining_days, ensuring it's at least 1 if there's any positive time left.
@@ -100,7 +100,7 @@ async def get_premium_status_message(user_id: int) -> Optional[str]:
 async def daily_premium_check(client_for_notification=None):
     """Daily check for expired premium statuses."""
     print("Running daily premium check...")
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     
     # Find users whose premium has expired but are still marked as premium
     expired_users_docs = list(get_premium_users_collection().find({

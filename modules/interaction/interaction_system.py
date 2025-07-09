@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pyrogram import Client
 from pymongo.collection import Collection
 from modules.core.database import get_user_interactions_collection, get_history_collection, get_creative_prompts_collection
@@ -27,7 +27,7 @@ def get_last_interaction(user_id: int, interactions_col: Collection):
 def set_last_interaction(user_id: int, interaction_type: str, interactions_col: Collection):
     interactions_col.update_one(
         {"user_id": user_id},
-        {"$set": {"last_interaction_time": datetime.utcnow(), "last_type": interaction_type}},
+        {"$set": {"last_interaction_time": datetime.now(timezone.utc), "last_type": interaction_type}},
         upsert=True
     )
 
@@ -95,7 +95,7 @@ async def interaction_worker(client: Client):
     interactions_col = get_user_interactions_collection()
     history_col = get_history_collection()
     while True:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # Only users with last_interaction_time older than threshold
         users = interactions_col.find({
             "last_interaction_time": {"$exists": True, "$lt": now - timedelta(minutes=INTERACTION_INTERVAL_MINUTES)}
@@ -151,7 +151,7 @@ async def generate_unique_image_prompt(existing_prompts=None):
 #     creative_prompts_col = get_creative_prompts_collection()
 #     interactions_col = get_user_interactions_collection()
 #     while True:
-#         now = datetime.utcnow()
+#         now = datetime.now(timezone.utc)
 #         # Only users who have interacted in the last N days
 #         active_since = now - timedelta(days=IMAGE_PROMPT_ACTIVE_DAYS)
 #         users = interactions_col.find({
@@ -169,7 +169,7 @@ async def generate_unique_image_prompt(existing_prompts=None):
 #                 new_prompt = await generate_unique_image_prompt(set(prompt_texts))
 #                 tries += 1
 #             if new_prompt:
-#                 creative_prompts_col.insert_one({"prompt": new_prompt, "created_at": datetime.utcnow()})
+#                 creative_prompts_col.insert_one({"prompt": new_prompt, "created_at": datetime.now(timezone.utc)})
 #                 prompt_texts.append(new_prompt)
 #         # Re-fetch users (cursor was exhausted)
 #         users = interactions_col.find({
