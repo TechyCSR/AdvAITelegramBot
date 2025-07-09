@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import config for API keys
 from config import POLLINATIONS_KEY
 
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, send_from_directory, render_template, Response
 from flask_cors import CORS
 
 # Import g4f directly
@@ -35,8 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__, 
-           static_folder='static', 
-           template_folder='.')
+           static_folder='static')
 CORS(app)
 
 # Configuration  
@@ -152,7 +151,17 @@ def clean_prompt(prompt: str, style: str = 'default') -> str:
 @app.route('/')
 def index():
     """Serve the main page"""
-    return send_from_directory('.', 'index.html')
+    try:
+        with open('index.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+            return Response(content, mimetype='text/html')
+    except FileNotFoundError:
+        return "Index file not found", 404
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    return send_from_directory('static', filename)
 
 @app.route('/api/enhance-prompt', methods=['POST'])
 def enhance_prompt():
