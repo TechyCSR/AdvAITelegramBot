@@ -878,6 +878,21 @@ body {
     100% { width: 100%; }
 }
 
+/* Dark theme support for loading overlay */
+[data-theme="dark"] .loading-overlay {
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .spinner {
+    border-color: rgba(255, 255, 255, 0.2);
+    border-top-color: var(--primary-color);
+}
+
+[data-theme="dark"] .progress-bar {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 /* History Section */
 .history-section {
     background: var(--surface);
@@ -1412,16 +1427,48 @@ body {
 }
 
 [data-theme="dark"] .modal-close,
-[data-theme="dark"] .modal-action-btn,
 [data-theme="dark"] .modal-nav,
 [data-theme="dark"] .modal-counter {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
+    color: white;
+}
+
+[data-theme="dark"] .modal-action-btn {
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+[data-theme="dark"] .modal-action-btn.download {
+    background: var(--accent-color);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .modal-action-btn.share {
+    background: var(--warning-color);
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 [data-theme="dark"] .modal-close:hover,
 [data-theme="dark"] .modal-nav:hover {
     background: var(--primary-color);
+}
+
+[data-theme="dark"] .modal-action-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+[data-theme="dark"] .modal-action-btn.download:hover {
+    background: #059669;
+    border-color: #059669;
+}
+
+[data-theme="dark"] .modal-action-btn.share:hover {
+    background: #d97706;
+    border-color: #d97706;
 }
 
 /* Responsive modal */
