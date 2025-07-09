@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdvAI Image Generator</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>AdvAI Image Generator</h1>
+                        <span class="logo-subtitle">Powered by Advanced AI</span>
+                    </div>
+                </div>
+                <nav class="nav">
+                    <div class="nav-buttons">
+                        <button class="nav-btn active" data-tab="generate">
+                            <i class="fas fa-magic"></i>
+                            Generate
+                        </button>
+                        <button class="nav-btn" data-tab="history">
+                            <i class="fas fa-history"></i>
+                            History
+                        </button>
+                    </div>
+                    <div class="nav-controls">
+                        <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link" title="Open Telegram Bot">
+                            <i class="fab fa-telegram"></i>
+                        </a>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Generate Tab -->
+            <div class="tab-content active" id="generate">
+                <div class="generate-section">
+                    <div class="input-section">
+                        <h2>Create Amazing Images with AI</h2>
+                        <p class="subtitle">Describe what you want to see and let AI bring it to life</p>
+                        
+                        <!-- Image Description Input -->
+                        <div class="input-group enhanced">
+                            <label for="description">
+                                <i class="fas fa-pen-fancy"></i>
+                                Image Description
+                            </label>
+                            <div class="textarea-wrapper">
+                                <textarea 
+                                    id="description" 
+                                    placeholder="e.g., A futuristic city at sunset with flying cars and neon lights, vibrant colors, cinematic lighting"
+                                    rows="4"
+                                ></textarea>
+                                <div class="textarea-overlay">
+                                    <div class="char-count">0/500</div>
+                                </div>
+                            </div>
+                            <div class="input-actions enhanced">
+                                <button class="enhance-btn premium" id="enhanceBtn">
+                                    <i class="fas fa-sparkles"></i>
+                                    <span>Enhance Prompt</span>
+                                    <div class="btn-shine"></div>
+                                </button>
+                                <div class="input-tips">
+                                    <i class="fas fa-lightbulb"></i>
+                                    <span>Tip: Be specific about style, lighting, and mood for better results</span>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                        <!-- Generation Settings -->
+                        <div class="settings-grid">
+                            <!-- Style Options -->
+                            <div class="setting-group">
+                                <label><i class="fas fa-palette"></i> Style</label>
+                                <select id="styleSelect">
+                                    <option value="default">Default</option>
+                                    <option value="photorealistic">Photorealistic</option>
+                                    <option value="artistic">Artistic</option>
+                                    <option value="anime">Anime</option>
+                                    <option value="cartoon">Cartoon</option>
+                                    <option value="digital-art">Digital Art</option>
+                                    <option value="painting">Painting</option>
+                                    <option value="sketch">Sketch</option>
+                                </select>
+                            </div>
+
+                            <!-- AI Model -->
+                            <div class="setting-group">
+                                <label><i class="fas fa-brain"></i> AI Model</label>
+                                <select id="modelSelect">
+                                    <option value="flux">Flux</option>
+                                    <option value="flux-pro">Flux Pro</option>
+                                    <option value="dall-e-3">DALL-E 3</option>
+                                </select>
+                            </div>
+
+                            <!-- Image Size -->
+                            <div class="setting-group">
+                                <label><i class="fas fa-expand-arrows-alt"></i> Image Size</label>
+                                <select id="sizeSelect">
+                                    <option value="1024x1024">Square (1024×1024)</option>
+                                    <option value="1536x1024">Wide (1536×1024)</option>
+                                    <option value="1024x1536">Tall (1024×1536)</option>
+                                    <option value="512x512">Small (512×512)</option>
+                                    <option value="custom">Custom Size</option>
+                                </select>
+                                <div class="custom-size-inputs" id="customSizeInputs" style="display: none;">
+                                    <div class="size-input-group">
+                                        <label for="customWidth">Width</label>
+                                        <input type="number" id="customWidth" placeholder="640" min="256" max="2048" value="1024">
+                                    </div>
+                                    <div class="size-input-group">
+                                        <label for="customHeight">Height</label>
+                                        <input type="number" id="customHeight" placeholder="360" min="256" max="2048" value="1024">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Number of Variants -->
+                            <div class="setting-group">
+                                <label><i class="fas fa-images"></i> Number of Images</label>
+                                <div class="variant-options">
+                                    <button class="variant-btn active" data-variants="1">1</button>
+                                    <button class="variant-btn" data-variants="2">2</button>
+                                    <button class="variant-btn" data-variants="4">4</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Generate Button -->
+                        <button class="generate-btn" id="generateBtn">
+                            <i class="fas fa-magic"></i>
+                            Generate Images
+                        </button>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div class="results-section" id="resultsSection">
+                        <div class="results-header">
+                            <h3>Generated Images</h3>
+                            <div class="results-actions">
+                                <button class="action-btn" id="downloadAllBtn">
+                                    <i class="fas fa-download"></i>
+                                    Download All
+                                </button>
+                                <button class="action-btn" id="saveToHistoryBtn">
+                                    <i class="fas fa-save"></i>
+                                    Save to History
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-grid" id="resultsGrid">
+                            <!-- Generated images will appear here -->
+                        </div>
+                    </div>
+
+                    <!-- Loading Overlay -->
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <h3>Generating your images...</h3>
+                            <p>This may take a few moments</p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div class="tab-content" id="history">
+                <div class="history-section">
+                    <div class="history-header">
+                        <h2>Generation History</h2>
+                        <div class="history-actions">
+                            <button class="action-btn" id="clearHistoryBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear History
+                            </button>
+                            <button class="action-btn" id="exportHistoryBtn">
+                                <i class="fas fa-file-export"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="history-grid" id="historyGrid">
+                        <!-- History items will appear here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>Made with <i class="fas fa-heart heart-icon"></i> by <a href="https://t.me/TechyCSR" target="_blank">@TechyCSR</a></p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://t.me/AdvChatGptBot" target="_blank" class="footer-link">
+                        <i class="fab fa-telegram"></i>
+                        Telegram Bot
+                    </a>
+                    <a href="https://github.com/TechyCSR" target="_blank" class="footer-link">
+                        <i class="fab fa-github"></i>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="static/js/app.js"></script>
+</body>
+</html> 
