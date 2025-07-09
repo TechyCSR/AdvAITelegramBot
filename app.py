@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 AdvAI Image Generator Web Application
-Flask backend server for Vercel deployment
+Flask backend server with g4f integration - Serverless Compatible
 """
 
 import os
@@ -18,38 +18,27 @@ except ImportError:
     # Fallback for Vercel deployment - get from environment variables
     POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY', '')
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 
 # Import g4f directly
-try:
-    import g4f
-    from g4f.client import Client as GPTClient, AsyncClient
-    from g4f.Provider import PollinationsImage
-    G4F_AVAILABLE = True
-except ImportError:
-    G4F_AVAILABLE = False
+import g4f
+from g4f.client import Client as GPTClient, AsyncClient
+from g4f.Provider import PollinationsImage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
-# Configuration for Vercel
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-
+# Serverless-friendly configuration
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 def generate_ai_response(prompt: str, model: str = "gpt-4o") -> str:
     """Generate AI response using g4f GPTClient"""
-    if not G4F_AVAILABLE:
-        raise Exception("g4f library not available")
-    
-    if not POLLINATIONS_KEY:
-        raise Exception("POLLINATIONS_KEY not configured")
-    
     try:
         gpt_client = GPTClient()
         history = [{"role": "user", "content": prompt}]
@@ -67,12 +56,6 @@ def generate_ai_response(prompt: str, model: str = "gpt-4o") -> str:
 
 async def generate_images_standalone(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux") -> tuple:
     """Generate images using g4f directly"""
-    if not G4F_AVAILABLE:
-        return [], "g4f library not available"
-    
-    if not POLLINATIONS_KEY:
-        return [], "API key not configured"
-    
     try:
         # Style definitions
         style_definitions = {
@@ -155,157 +138,225 @@ def clean_prompt(prompt: str, style: str = 'default') -> str:
     
     return prompt
 
-# HTML content as string to avoid file reading issues in serverless
-INDEX_HTML = '''<!DOCTYPE html>
+@app.route('/')
+def index():
+    """Serve the main page - serverless compatible"""
+    try:
+        # Use a simple HTML template instead of file reading
+        html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AdvAI Image Generator</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }
-        .status { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .form-group { margin: 20px 0; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        textarea, select, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 5px 10px 0; }
-        button:hover { background: #0056b3; }
-        .generated-image { margin: 20px 0; text-align: center; }
-        .generated-image img { max-width: 100%; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .loading { display: none; text-align: center; margin: 20px 0; }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h1>🎨 AdvAI Image Generator</h1>
-        <div class="status">
-            ✅ Serverless deployment working!
-        </div>
-        
-        <div class="form-group">
-            <label for="prompt">Image Description:</label>
-            <textarea id="prompt" placeholder="Describe the image you want to generate..." rows="3"></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="style">Style:</label>
-            <select id="style">
-                <option value="default">Default</option>
-                <option value="photorealistic">Photorealistic</option>
-                <option value="artistic">Artistic</option>
-                <option value="anime">Anime</option>
-                <option value="cartoon">Cartoon</option>
-                <option value="digital-art">Digital Art</option>
-                <option value="painting">Painting</option>
-                <option value="sketch">Sketch</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="size">Image Size:</label>
-            <select id="size">
-                <option value="1024x1024">Square (1024×1024)</option>
-                <option value="1536x1024">Wide (1536×1024)</option>
-                <option value="1024x1536">Tall (1024×1536)</option>
-                <option value="512x512">Small (512×512)</option>
-            </select>
-        </div>
-        
-        <button onclick="generateImage()">🎨 Generate Image</button>
-        <button onclick="enhancePrompt()">✨ Enhance Prompt</button>
-        
-        <div id="loading" class="loading">
-            <p>🔄 Generating your image...</p>
-        </div>
-        
-        <div id="result"></div>
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
-            <p>Powered by AdvAI • <a href="/api/health">API Status</a></p>
-        </div>
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>AdvAI Image Generator</h1>
+                        <span class="logo-subtitle">Powered by Advanced AI</span>
+                    </div>
+                </div>
+                <nav class="nav">
+                    <div class="nav-buttons">
+                        <button class="nav-btn active" data-tab="generate">
+                            <i class="fas fa-magic"></i>
+                            Generate
+                        </button>
+                        <button class="nav-btn" data-tab="history">
+                            <i class="fas fa-history"></i>
+                            History
+                        </button>
+                    </div>
+                    <div class="nav-controls">
+                        <button class="clear-data-btn" id="clearDataBtn" title="Clear all saved data">
+                            <i class="fas fa-broom"></i>
+                        </button>
+                        <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link" title="Open Telegram Bot">
+                            <i class="fab fa-telegram"></i>
+                        </a>
+                    </div>
+                </nav>
+            </div>
+        </header>
+        <main class="main">
+            <div class="tab-content active" id="generate">
+                <div class="generate-section">
+                    <div class="input-section">
+                        <h2>Create Amazing Images with AI</h2>
+                        <p class="subtitle">Describe what you want to see and let AI bring it to life</p>
+                        
+                        <div class="input-group enhanced">
+                            <label for="description">
+                                <i class="fas fa-pen-fancy"></i>
+                                Image Description
+                            </label>
+                            <div class="textarea-wrapper">
+                                <textarea 
+                                    id="description" 
+                                    placeholder="e.g., A futuristic city at sunset with flying cars and neon lights, vibrant colors, cinematic lighting"
+                                    rows="4"
+                                ></textarea>
+                                <div class="textarea-overlay">
+                                    <div class="char-count">0/500</div>
+                                </div>
+                            </div>
+                            <div class="input-actions enhanced">
+                                <button class="enhance-btn premium" id="enhanceBtn">
+                                    <i class="fas fa-sparkles"></i>
+                                    <span>Enhance Prompt</span>
+                                    <div class="btn-shine"></div>
+                                </button>
+                                <div class="input-tips">
+                                    <i class="fas fa-lightbulb"></i>
+                                    <span>Tip: Be specific about style, lighting, and mood for better results</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-grid">
+                            <div class="setting-group">
+                                <label><i class="fas fa-palette"></i> Style</label>
+                                <select id="styleSelect">
+                                    <option value="default">Default</option>
+                                    <option value="photorealistic">Photorealistic</option>
+                                    <option value="artistic">Artistic</option>
+                                    <option value="anime">Anime</option>
+                                    <option value="cartoon">Cartoon</option>
+                                    <option value="digital-art">Digital Art</option>
+                                    <option value="painting">Painting</option>
+                                    <option value="sketch">Sketch</option>
+                                </select>
+                            </div>
+
+                            <div class="setting-group">
+                                <label><i class="fas fa-brain"></i> AI Model</label>
+                                <select id="modelSelect">
+                                    <option value="flux">Flux</option>
+                                    <option value="flux-pro">Flux Pro</option>
+                                    <option value="dall-e-3">DALL-E 3</option>
+                                </select>
+                            </div>
+
+                            <div class="setting-group">
+                                <label><i class="fas fa-expand-arrows-alt"></i> Image Size</label>
+                                <select id="sizeSelect">
+                                    <option value="1024x1024">Square (1024×1024)</option>
+                                    <option value="1536x1024">Wide (1536×1024)</option>
+                                    <option value="1024x1536">Tall (1024×1536)</option>
+                                    <option value="512x512">Small (512×512)</option>
+                                    <option value="custom">Custom Size</option>
+                                </select>
+                                <div class="custom-size-inputs" id="customSizeInputs" style="display: none;">
+                                    <div class="size-input-group">
+                                        <label for="customWidth">Width</label>
+                                        <input type="number" id="customWidth" placeholder="640" min="256" max="2048" value="1024">
+                                    </div>
+                                    <div class="size-input-group">
+                                        <label for="customHeight">Height</label>
+                                        <input type="number" id="customHeight" placeholder="360" min="256" max="2048" value="1024">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="setting-group">
+                                <label><i class="fas fa-images"></i> Number of Images</label>
+                                <div class="variant-options">
+                                    <button class="variant-btn active" data-variants="1">1</button>
+                                    <button class="variant-btn" data-variants="2">2</button>
+                                    <button class="variant-btn" data-variants="4">4</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="generate-btn" id="generateBtn">
+                            <i class="fas fa-magic"></i>
+                            Generate Images
+                        </button>
+                    </div>
+
+                    <div class="results-section" id="resultsSection">
+                        <div class="results-header">
+                            <h3>Generated Images</h3>
+                            <div class="results-actions">
+                                <button class="action-btn" id="downloadAllBtn">
+                                    <i class="fas fa-download"></i>
+                                    Download All
+                                </button>
+                                <button class="action-btn" id="saveToHistoryBtn">
+                                    <i class="fas fa-save"></i>
+                                    Save to History
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-grid" id="resultsGrid">
+                        </div>
+                    </div>
+
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <h3>Generating your images...</h3>
+                            <p>This may take a few moments</p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="history">
+                <div class="history-section">
+                    <div class="history-header">
+                        <h2>Generation History</h2>
+                        <div class="history-actions">
+                            <button class="action-btn" id="clearHistoryBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear History
+                            </button>
+                        </div>
+                    </div>
+                    <div class="history-grid" id="historyGrid">
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <h3>No history yet</h3>
+                            <p>Generated images will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <script>
-        async function generateImage() {
-            const prompt = document.getElementById('prompt').value.trim();
-            const style = document.getElementById('style').value;
-            const size = document.getElementById('size').value;
-            
-            if (!prompt) {
-                alert('Please enter an image description');
-                return;
-            }
-            
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('result').innerHTML = '';
-            
-            try {
-                const formData = new FormData();
-                formData.append('description', prompt);
-                formData.append('style', style);
-                formData.append('size', size);
-                formData.append('variants', '1');
-                formData.append('model', 'flux');
-                
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.images && data.images.length > 0) {
-                    const imageUrl = data.images[0].url;
-                    document.getElementById('result').innerHTML = 
-                        '<div class="generated-image"><img src="' + imageUrl + '" alt="Generated Image"><br><a href="' + imageUrl + '" target="_blank">Open Full Size</a></div>';
-                } else {
-                    document.getElementById('result').innerHTML = 
-                        '<div class="error">Error: ' + (data.error || 'Failed to generate image') + '</div>';
-                }
-            } catch (error) {
-                document.getElementById('result').innerHTML = 
-                    '<div class="error">Error: ' + error.message + '</div>';
-            }
-            
-            document.getElementById('loading').style.display = 'none';
-        }
-        
-        async function enhancePrompt() {
-            const prompt = document.getElementById('prompt').value.trim();
-            
-            if (!prompt) {
-                alert('Please enter a prompt to enhance');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/enhance-prompt', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
-                });
-                
-                const data = await response.json();
-                
-                if (data.enhanced_prompt) {
-                    document.getElementById('prompt').value = data.enhanced_prompt;
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to enhance prompt'));
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
-</html>'''
+</html>"""
+        return Response(html_content, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Error serving index: {e}")
+        return f"<h1>AdvAI Image Generator</h1><p>Service starting...</p><p>Error: {str(e)}</p>", 500
 
-@app.route('/')
-def index():
-    """Serve the main page"""
-    return Response(INDEX_HTML, mimetype='text/html')
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    try:
+        return send_from_directory('static', filename)
+    except Exception as e:
+        logger.error(f"Error serving static file {filename}: {e}")
+        return "File not found", 404
 
 @app.route('/api/enhance-prompt', methods=['POST'])
 def enhance_prompt():
@@ -322,9 +373,18 @@ def enhance_prompt():
         
         # AI prompt enhancement
         enhancement_prompt = f"""
-        Enhance this image prompt to be more detailed and vivid: "{original_prompt}"
+        You are an expert at creating detailed, creative image generation prompts. 
+        Enhance the following prompt to be more detailed, vivid, and likely to produce a stunning AI-generated image.
         
-        Make it more descriptive with artistic details, lighting, and mood. Keep it under 400 characters.
+        Original prompt: "{original_prompt}"
+        
+        Please provide an enhanced version that:
+        - Adds more visual details and descriptions
+        - Includes artistic style suggestions
+        - Adds lighting, mood, and atmosphere details
+        - Keeps the core concept intact
+        - Is suitable for AI image generation
+        - Is no more than 400 characters
         
         Enhanced prompt:"""
         
@@ -379,6 +439,9 @@ def generate_images_api():
         if variants not in [1, 2, 4]:
             return jsonify({'error': 'Invalid number of variants'}), 400
         
+        if model not in ['flux', 'flux-pro', 'dall-e-3']:
+            return jsonify({'error': 'Invalid model selection'}), 400
+        
         # Parse width and height from size string
         try:
             width, height = map(int, size.split('x'))
@@ -394,6 +457,7 @@ def generate_images_api():
         
         # Generate images using standalone function
         try:
+            # Use asyncio.run for serverless compatibility
             generated_urls, error = asyncio.run(generate_images_standalone(
                 prompt=enhanced_prompt,
                 style=style if style != 'default' else None,
@@ -452,8 +516,19 @@ def health_check():
         'status': 'healthy',
         'service': 'AdvAI Image Generator',
         'timestamp': datetime.now().isoformat(),
-        'g4f_available': G4F_AVAILABLE,
-        'api_key_configured': bool(POLLINATIONS_KEY)
+        'api_configured': bool(POLLINATIONS_KEY)
+    })
+
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """Get service statistics"""
+    return jsonify({
+        'total_generations': 0,
+        'active_users': 0,
+        'available_models': ['Flux', 'Flux Pro', 'DALL-E 3'],
+        'supported_sizes': ['1024x1024', '1536x1024', '1024x1536', '512x512'],
+        'max_variants': 4,
+        'service_status': 'operational'
     })
 
 @app.errorhandler(404)
@@ -467,7 +542,22 @@ def internal_error(error):
     logger.error(f"Internal server error: {error}")
     return jsonify({'error': 'Internal server error'}), 500
 
-# For Vercel serverless deployment
+# Serverless entry point
+def run_app():
+    """Run the Flask application"""
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    
+    logger.info(f"Starting AdvAI Image Generator Web App on port {port}")
+    logger.info(f"Debug mode: {debug}")
+    logger.info(f"API Key configured: {bool(POLLINATIONS_KEY)}")
+    
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=debug,
+        threaded=True
+    )
+
 if __name__ == '__main__':
-    # Local development
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 
+    run_app() 
