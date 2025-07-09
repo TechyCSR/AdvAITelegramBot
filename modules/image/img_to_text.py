@@ -9,6 +9,11 @@ from pyrogram.errors import MediaCaptionTooLong
 from config import LOG_CHANNEL
 from modules.models.ai_res import get_history_collection
 from modules.chatlogs import user_log
+from modules.core.request_queue import (
+    can_start_image_request, 
+    start_image_request, 
+    finish_image_request
+)
 import g4f
 import g4f.Provider
 import base64
@@ -102,6 +107,14 @@ async def clear_previous_image_context(bot, user_id, chat_id):
 
 async def extract_text_res(bot, update):
     try:
+        user_id = update.from_user.id
+        
+        # Check if user can start a new image request (rate limiting)
+        can_start, queue_message = await can_start_image_request(user_id)
+        if not can_start:
+            await update.reply_text(queue_message)
+            return
+        
         is_group_chat = update.chat.type in ["group", "supergroup"]
         # For group chats, require caption with AI or /ai
         if is_group_chat:
@@ -123,6 +136,9 @@ async def extract_text_res(bot, update):
         #     # Only show expiry info if not already shown in previous_cleared message
         #     await update.reply_text(expiry_info)
 
+        # Start the image request in queue system
+        start_image_request(user_id, f"Image-to-text analysis: {update.caption[:30] if update.caption else 'Image uploaded'}...")
+        
         processing_msg = await update.reply_text(
             "🖼️ **Image received!**\n\n⏳ Analyzing with AI Vision..."
         )
@@ -289,13 +305,25 @@ async def extract_text_res(bot, update):
             await user_log(bot, update, f"#VisionAI\nPrompt: {user_question}", ai_response)
         except Exception as e:
             logger.error(f"Error logging activity: {str(e)}")
+        
+        # Finish the image request in queue system
+        finish_image_request(user_id)
         # Do NOT delete the temp file here; only delete after 3 follow-ups or /endimage
     except Exception as e:
         logger.exception(f"Error in extract_text_res: {str(e)}")
+        # Finish the image request in queue system even on error
+        finish_image_request(user_id)
         await update.reply_text(f"please try again later , we are facing some issues use /endimage to clear the context")
 
 async def handle_vision_followup(client, message):
     user_id = message.from_user.id
+    
+    # Check if user can start a new image request (rate limiting for follow-ups)
+    can_start, queue_message = await can_start_image_request(user_id)
+    if not can_start:
+        await message.reply_text(queue_message)
+        return True  # Return True to indicate this was handled as a vision followup
+    
     history_collection = get_history_collection()
     user_history = history_collection.find_one({"user_id": user_id})
     image_context = user_history.get(IMAGE_CONTEXT_KEY) if user_history else None
@@ -364,6 +392,9 @@ async def handle_vision_followup(client, message):
         )
         await message.reply_text("⚠️ The image file for your last context is no longer available. Please send a new image to continue vision analysis.")
         return True
+    # Start the image request in queue system for followup
+    start_image_request(user_id, f"Image follow-up analysis: {prompt[:30]}...")
+    
     # Add the latest user prompt to history before sending to g4f
     wat = await message.reply_text(f"🔍 **Analyzing Image with AI...**\n\nThis may take a few seconds.")
     history.append({"role": "user", "content": prompt})
@@ -383,6 +414,8 @@ async def handle_vision_followup(client, message):
         ai_response = response.choices[0].message.content
     except Exception as e:
         logger.exception(f"Error in g4f vision followup: {str(e)}")
+        # Finish the image request in queue system even on error
+        finish_image_request(user_id)
         await message.reply_text(f"❌ **AI Vision Error**\n\n{str(e)}")
         return True
     # Update uses_left
@@ -434,6 +467,9 @@ async def handle_vision_followup(client, message):
         await user_log(client, message, f"#VisionAI-Followup\nPrompt: {prompt}", ai_response)
     except Exception as e:
         logger.error(f"Error logging followup: {str(e)}")
+    
+    # Finish the image request in queue system
+    finish_image_request(user_id)
     return True
 
 
