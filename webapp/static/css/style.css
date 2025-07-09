@@ -93,6 +93,18 @@
     border-color: var(--primary-color);
 }
 
+/* Dark theme result buttons */
+[data-theme="dark"] .result-btn {
+    color: white;
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .result-btn:hover {
+    background: var(--background);
+    color: white;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.6;

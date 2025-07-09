@@ -25,7 +25,7 @@ from flask_cors import CORS
 
 # Import g4f directly
 import g4f
-from g4f.client import AsyncClient
+from g4f.client import Client as GPTClient, AsyncClient
 from g4f.Provider import PollinationsImage
 
 
@@ -47,15 +47,20 @@ os.makedirs(app.config['GENERATED_FOLDER'], exist_ok=True)
 
 
 
-async def generate_ai_response(prompt: str, model: str = "gpt-4o") -> str:
-    """Generate AI response using g4f directly"""
+def generate_ai_response(prompt: str, model: str = "gpt-4o") -> str:
+    """Generate AI response using g4f GPTClient - same method as bot"""
     try:
-        # Use simple g4f call for text generation
-        response = await g4f.ChatCompletion.acreate(
+        # Use the exact same method as the bot
+        gpt_client = GPTClient()
+        history = [{"role": "user", "content": prompt}]
+        
+        response = gpt_client.chat.completions.create(
+            api_key=POLLINATIONS_KEY,  # Add API key to the request
             model=model,
-            messages=[{"role": "user", "content": prompt}]
+            messages=history,
+            provider="PollinationsAI"
         )
-        return response
+        return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error generating AI response: {e}")
         raise
@@ -180,8 +185,8 @@ def enhance_prompt():
         Enhanced prompt:"""
         
         try:
-            # Use standalone AI response function
-            enhanced = asyncio.run(generate_ai_response(enhancement_prompt))
+            # Use standalone AI response function (now synchronous)
+            enhanced = generate_ai_response(enhancement_prompt)
             
             # Clean up the response
             enhanced = enhanced.strip()
