@@ -641,6 +641,9 @@ class ImageGeneratorApp {
             }
         });
 
+        // Mobile menu functionality
+        this.initMobileMenu();
+
         console.log('✅ All events bound');
     }
 
@@ -722,18 +725,84 @@ class ImageGeneratorApp {
 
         // Update theme toggle icon
         const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            const icon = themeToggle.querySelector('i');
-            if (icon) {
-                if (theme === 'dark') {
-                    icon.className = 'fas fa-sun';
-                    themeToggle.title = 'Switch to light mode';
-                } else {
-                    icon.className = 'fas fa-moon';
-                    themeToggle.title = 'Switch to dark mode';
+        const mobileThemeToggle = document.getElementById('mobileThemeToggle');
+        
+        [themeToggle, mobileThemeToggle].forEach(toggle => {
+            if (toggle) {
+                const icon = toggle.querySelector('i');
+                if (icon) {
+                    if (theme === 'dark') {
+                        icon.className = 'fas fa-sun';
+                        toggle.title = 'Switch to light mode';
+                    } else {
+                        icon.className = 'fas fa-moon';
+                        toggle.title = 'Switch to dark mode';
+                    }
                 }
             }
-        }
+        });
+    }
+
+    initMobileMenu() {
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const mobileDropdown = document.getElementById('mobileDropdown');
+        
+        if (!hamburgerBtn || !mobileDropdown) return;
+
+        // Toggle mobile menu
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = mobileDropdown.classList.contains('active');
+            
+            if (isActive) {
+                this.closeMobileMenu();
+            } else {
+                this.openMobileMenu();
+            }
+        });
+
+        // Mobile menu items
+        document.getElementById('mobileCleanDataBtn')?.addEventListener('click', () => {
+            this.closeMobileMenu();
+            if (confirm('Are you sure you want to clear all saved data? This will reset the form, settings, and generated images.')) {
+                this.clearAppState();
+            }
+        });
+
+        document.getElementById('mobileThemeToggle')?.addEventListener('click', () => {
+            this.closeMobileMenu();
+            this.toggleTheme();
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.mobile-menu')) {
+                this.closeMobileMenu();
+            }
+        });
+
+        // Close mobile menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeMobileMenu();
+            }
+        });
+    }
+
+    openMobileMenu() {
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const mobileDropdown = document.getElementById('mobileDropdown');
+        
+        hamburgerBtn?.classList.add('active');
+        mobileDropdown?.classList.add('active');
+    }
+
+    closeMobileMenu() {
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const mobileDropdown = document.getElementById('mobileDropdown');
+        
+        hamburgerBtn?.classList.remove('active');
+        mobileDropdown?.classList.remove('active');
     }
 
     selectVariants(variants) {
