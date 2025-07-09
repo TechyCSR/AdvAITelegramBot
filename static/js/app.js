@@ -9,6 +9,10 @@ class ImageGeneratorApp {
             style: 'default',
             model: 'flux'
         };
+        
+        // Modal state
+        this.modalImages = [];
+        this.currentModalIndex = 0;
 
         this.init();
     }
@@ -112,6 +116,51 @@ class ImageGeneratorApp {
 
         document.getElementById('exportHistoryBtn').addEventListener('click', () => {
             this.exportHistory();
+        });
+
+        // Image modal events
+        document.getElementById('modalClose').addEventListener('click', () => {
+            this.closeImageModal();
+        });
+
+        document.getElementById('modalPrev').addEventListener('click', () => {
+            this.showPreviousImage();
+        });
+
+        document.getElementById('modalNext').addEventListener('click', () => {
+            this.showNextImage();
+        });
+
+        document.getElementById('modalDownload').addEventListener('click', () => {
+            this.downloadModalImage();
+        });
+
+        document.getElementById('modalShare').addEventListener('click', () => {
+            this.shareModalImage();
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('imageModal').addEventListener('click', (e) => {
+            if (e.target.id === 'imageModal') {
+                this.closeImageModal();
+            }
+        });
+
+        // Keyboard navigation for modal
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('imageModal').classList.contains('active')) {
+                switch(e.key) {
+                    case 'Escape':
+                        this.closeImageModal();
+                        break;
+                    case 'ArrowLeft':
+                        this.showPreviousImage();
+                        break;
+                    case 'ArrowRight':
+                        this.showNextImage();
+                        break;
+                }
+            }
         });
     }
 
@@ -423,7 +472,7 @@ class ImageGeneratorApp {
             const resultItem = document.createElement('div');
             resultItem.className = 'result-item fadeIn';
             resultItem.innerHTML = `
-                <img src="${image.url}" alt="Generated image ${index + 1}" class="result-image">
+                <img src="${image.url}" alt="Generated image ${index + 1}" class="result-image" data-index="${index}">
                 <div class="result-actions">
                     <button class="result-btn primary" onclick="app.downloadImage('${image.url}', ${index})">
                         <i class="fas fa-download"></i> Download
@@ -436,6 +485,13 @@ class ImageGeneratorApp {
                     </button>
                 </div>
             `;
+            
+            // Add click event to image for modal
+            const imageElement = resultItem.querySelector('.result-image');
+            imageElement.addEventListener('click', () => {
+                this.openImageModal(this.generatedImages, index);
+            });
+            
             resultsGrid.appendChild(resultItem);
         });
 
@@ -596,8 +652,18 @@ class ImageGeneratorApp {
                 </div>
             `;
 
-            historyItem.addEventListener('click', () => {
-                this.viewHistoryItem(item);
+            // Add click event to image for modal
+            const imageElement = historyItem.querySelector('.history-image');
+            imageElement.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent triggering the viewHistoryItem event
+                this.openImageModal(item.images, 0);
+            });
+
+            // Click on the rest of the item loads it
+            historyItem.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('history-image')) {
+                    this.viewHistoryItem(item);
+                }
             });
 
             historyGrid.appendChild(historyItem);
@@ -733,6 +799,101 @@ class ImageGeneratorApp {
                 notification.remove();
             }
         }, 5000);
+    }
+
+    // Image Modal Methods
+    openImageModal(images, startIndex = 0) {
+        this.modalImages = images;
+        this.currentModalIndex = startIndex;
+        
+        this.updateModalDisplay();
+        
+        const modal = document.getElementById('imageModal');
+        modal.classList.add('active');
+        
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeImageModal() {
+        const modal = document.getElementById('imageModal');
+        modal.classList.remove('active');
+        
+        // Restore body scroll
+        document.body.style.overflow = 'auto';
+    }
+
+    updateModalDisplay() {
+        if (this.modalImages.length === 0) return;
+        
+        const currentImage = this.modalImages[this.currentModalIndex];
+        
+        // Update image
+        document.getElementById('modalImage').src = currentImage.url;
+        document.getElementById('modalImage').alt = `Generated image ${this.currentModalIndex + 1}`;
+        
+        // Update counter
+        document.getElementById('modalCounter').textContent = 
+            `${this.currentModalIndex + 1} / ${this.modalImages.length}`;
+        
+        // Update info
+        document.getElementById('modalPrompt').textContent = currentImage.prompt || '';
+        document.getElementById('modalSize').textContent = currentImage.size || '';
+        document.getElementById('modalStyle').textContent = this.capitalizeFirstLetter(currentImage.style || 'default');
+        document.getElementById('modalModel').textContent = this.capitalizeFirstLetter(currentImage.model || 'flux');
+        
+        // Update navigation buttons
+        const prevBtn = document.getElementById('modalPrev');
+        const nextBtn = document.getElementById('modalNext');
+        
+        prevBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === 0;
+        nextBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === this.modalImages.length - 1;
+        
+        // Hide navigation if only one image
+        if (this.modalImages.length <= 1) {
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+        } else {
+            prevBtn.style.display = 'flex';
+            nextBtn.style.display = 'flex';
+        }
+        
+        // Update download link
+        const downloadLink = document.getElementById('modalDownload');
+        downloadLink.href = currentImage.url;
+        downloadLink.download = `generated-image-${this.currentModalIndex + 1}.png`;
+    }
+
+    showPreviousImage() {
+        if (this.currentModalIndex > 0) {
+            this.currentModalIndex--;
+            this.updateModalDisplay();
+        }
+    }
+
+    showNextImage() {
+        if (this.currentModalIndex < this.modalImages.length - 1) {
+            this.currentModalIndex++;
+            this.updateModalDisplay();
+        }
+    }
+
+    async downloadModalImage() {
+        if (this.modalImages.length === 0) return;
+        
+        const currentImage = this.modalImages[this.currentModalIndex];
+        await this.downloadImage(currentImage.url, this.currentModalIndex);
+    }
+
+    shareModalImage() {
+        if (this.modalImages.length === 0) return;
+        
+        const currentImage = this.modalImages[this.currentModalIndex];
+        this.shareImage(currentImage.url);
+    }
+
+    capitalizeFirstLetter(string) {
+        return string.charAt(0).toUpperCase() + string.slice(1);
     }
 }
 

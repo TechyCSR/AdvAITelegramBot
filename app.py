@@ -341,6 +341,53 @@ def index():
         </main>
     </div>
 
+    <!-- Image Modal/Popup -->
+    <div class="image-modal" id="imageModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="modal-actions">
+                <a class="modal-action-btn download" id="modalDownload" title="Download">
+                    <i class="fas fa-download"></i>
+                </a>
+                <button class="modal-action-btn share" id="modalShare" title="Share">
+                    <i class="fas fa-share"></i>
+                </button>
+            </div>
+            
+            <div class="modal-counter" id="modalCounter">1 / 1</div>
+            
+            <img class="modal-image" id="modalImage" src="" alt="Generated image">
+            
+            <button class="modal-nav prev" id="modalPrev" title="Previous image">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="modal-nav next" id="modalNext" title="Next image">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            
+            <div class="modal-info">
+                <div class="modal-prompt" id="modalPrompt"></div>
+                <div class="modal-details">
+                    <div class="modal-detail">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                        <span id="modalSize"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <i class="fas fa-palette"></i>
+                        <span id="modalStyle"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <i class="fas fa-brain"></i>
+                        <span id="modalModel"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js"></script>
 </body>
 </html>"""
