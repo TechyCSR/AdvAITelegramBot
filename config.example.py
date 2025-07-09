@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""
+AdvAI Image Generator - Configuration Template
+Copy this file to config.py and set your actual API keys
+"""
+
+import os
+from typing import Optional
+
+# =============================================================================
+# API KEYS CONFIGURATION
+# =============================================================================
+
+# Pollinations AI API Key for image generation
+# Get your API key from: https://pollinations.ai/
+# Replace "your_pollinations_api_key_here" with your actual API key
+POLLINATIONS_KEY: Optional[str] = "your_pollinations_api_key_here"
+
+# Alternative: Load from environment variable (recommended for production)
+if os.environ.get('POLLINATIONS_KEY'):
+    POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY')
+
+# =============================================================================
+# WEBAPP CONFIGURATION
+# =============================================================================
+
+# Flask Configuration
+FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
+FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+
+# Image Generation Settings
+MAX_IMAGES_PER_REQUEST = 4
+MAX_PROMPT_LENGTH = 500
+SUPPORTED_IMAGE_FORMATS = ['jpg', 'jpeg', 'png', 'webp']
+
+# File Upload Settings
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+UPLOAD_FOLDER = 'static/uploads'
+GENERATED_FOLDER = 'static/generated'
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+def validate_config():
+    """Validate configuration settings"""
+    if not POLLINATIONS_KEY or POLLINATIONS_KEY == "your_pollinations_api_key_here":
+        print("⚠️  WARNING: POLLINATIONS_KEY not configured!")
+        print("   Please set your API key in config.py or as environment variable")
+        print("   Get your key from: https://pollinations.ai/")
+        return False
+    return True
+
+# Auto-validate on import
+if __name__ != "__main__":
+    validate_config() 
