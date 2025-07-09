@@ -1,8 +1,179 @@
+// Local Storage Manager
+class LocalStorageManager {
+    constructor() {
+        this.keys = {
+            APP_STATE: 'advai_app_state_v2',
+            HISTORY: 'advai_history_v2',
+            THEME: 'advai_theme'
+        };
+        this.isAvailable = this.checkAvailability();
+    }
+
+    checkAvailability() {
+        try {
+            const test = 'localStorage_test';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            console.log('✅ localStorage is available');
+            return true;
+        } catch (error) {
+            console.warn('❌ localStorage is not available:', error);
+            return false;
+        }
+    }
+
+    save(key, data) {
+        if (!this.isAvailable) {
+            console.warn('Cannot save data - localStorage not available');
+            return false;
+        }
+
+        try {
+            const serialized = JSON.stringify({
+                data: data,
+                timestamp: Date.now(),
+                version: '2.0'
+            });
+            
+            localStorage.setItem(this.keys[key] || key, serialized);
+            console.log(`💾 Saved ${key}:`, data);
+            return true;
+        } catch (error) {
+            console.error(`Failed to save ${key}:`, error);
+            
+            if (error.name === 'QuotaExceededError') {
+                this.cleanup();
+                // Try again after cleanup
+                try {
+                    localStorage.setItem(this.keys[key] || key, serialized);
+                    return true;
+                } catch (retryError) {
+                    console.error('Failed to save even after cleanup:', retryError);
+                }
+            }
+            return false;
+        }
+    }
+
+    load(key, defaultValue = null) {
+        if (!this.isAvailable) {
+            console.warn('Cannot load data - localStorage not available');
+            return defaultValue;
+        }
+
+        try {
+            const stored = localStorage.getItem(this.keys[key] || key);
+            if (!stored) {
+                console.log(`📂 No data found for ${key}`);
+                return defaultValue;
+            }
+
+            const parsed = JSON.parse(stored);
+            console.log(`📖 Loaded ${key}:`, parsed.data);
+            return parsed.data;
+        } catch (error) {
+            console.error(`Failed to load ${key}:`, error);
+            // Remove corrupted data
+            this.remove(key);
+            return defaultValue;
+        }
+    }
+
+    remove(key) {
+        if (!this.isAvailable) return false;
+        
+        try {
+            localStorage.removeItem(this.keys[key] || key);
+            console.log(`🗑️ Removed ${key}`);
+            return true;
+        } catch (error) {
+            console.error(`Failed to remove ${key}:`, error);
+            return false;
+        }
+    }
+
+    clear() {
+        if (!this.isAvailable) return false;
+
+        try {
+            Object.values(this.keys).forEach(key => {
+                localStorage.removeItem(key);
+            });
+            console.log('🧹 Cleared all app data');
+            return true;
+        } catch (error) {
+            console.error('Failed to clear data:', error);
+            return false;
+        }
+    }
+
+    cleanup() {
+        console.log('🧽 Running storage cleanup...');
+        
+        try {
+            // Remove old version keys
+            const oldKeys = ['advai_app_state', 'advai_image_history'];
+            oldKeys.forEach(key => {
+                if (localStorage.getItem(key)) {
+                    localStorage.removeItem(key);
+                    console.log(`Removed old key: ${key}`);
+                }
+            });
+
+            // Limit history size
+            const history = this.load('HISTORY', []);
+            if (history.length > 20) {
+                const trimmed = history.slice(0, 20);
+                this.save('HISTORY', trimmed);
+                console.log(`Trimmed history from ${history.length} to ${trimmed.length} items`);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Cleanup failed:', error);
+            return false;
+        }
+    }
+
+    getStorageInfo() {
+        if (!this.isAvailable) return null;
+
+        try {
+            let totalSize = 0;
+            let appSize = 0;
+            let itemCount = 0;
+
+            for (let key in localStorage) {
+                if (localStorage.hasOwnProperty(key)) {
+                    const size = localStorage[key].length + key.length;
+                    totalSize += size;
+                    
+                    if (key.startsWith('advai_')) {
+                        appSize += size;
+                        itemCount++;
+                    }
+                }
+            }
+
+            return {
+                totalSize: totalSize,
+                appSize: appSize,
+                itemCount: itemCount,
+                totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
+                appSizeMB: (appSize / 1024 / 1024).toFixed(2)
+            };
+        } catch (error) {
+            console.error('Failed to get storage info:', error);
+            return null;
+        }
+    }
+}
+
 class ImageGeneratorApp {
     constructor() {
         this.currentTab = 'generate';
         this.generatedImages = [];
-        this.history = this.loadHistory();
+        this.history = [];
         this.settings = {
             size: '1024x1024',
             variants: 1,
@@ -14,28 +185,304 @@ class ImageGeneratorApp {
         this.modalImages = [];
         this.currentModalIndex = 0;
 
+        // Storage keys
+        this.storageKeys = {
+            APP_STATE: 'advai_app_state',
+            HISTORY: 'advai_image_history', 
+            THEME: 'advai_theme'
+        };
+
         this.init();
     }
 
     init() {
+        console.log('🚀 Initializing AdvAI Image Generator...');
+        
+        // Check localStorage first
+        this.checkLocalStorage();
+        
+        // Load saved data BEFORE binding events
+        this.loadTheme();
+        this.loadHistory();
+        this.loadAppState();
+        
+        // Bind events
         this.bindEvents();
-        this.loadAppState(); // Load saved app state
+        
+        // Update UI
         this.updateCharCount();
         this.loadHistoryGrid();
         this.updateActiveTab();
-        this.toggleCustomSizeInputs(); // Initialize custom size inputs visibility
-        this.initTheme(); // Initialize theme
-        this.showLoading(false); // Ensure loading overlay is hidden on init
+        this.toggleCustomSizeInputs();
+        this.showLoading(false);
+        
+        // Save initial state
+        this.saveAppState();
+        
+        console.log('✅ App initialized with localStorage');
+        this.debugStorage();
+    }
+
+    checkLocalStorage() {
+        try {
+            const test = 'test';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            console.log('✅ localStorage is available');
+            return true;
+        } catch (error) {
+            console.error('❌ localStorage not available:', error);
+            alert('Warning: Local storage is not available. Your data will not be saved.');
+            return false;
+        }
+    }
+
+    debugStorage() {
+        console.log('📊 Storage Debug Info:');
+        console.log('App State:', localStorage.getItem(this.storageKeys.APP_STATE));
+        console.log('History:', localStorage.getItem(this.storageKeys.HISTORY));
+        console.log('Theme:', localStorage.getItem(this.storageKeys.THEME));
+        console.log('Current Settings:', this.settings);
+        console.log('Generated Images:', this.generatedImages.length);
+        console.log('History Items:', this.history.length);
+    }
+
+    saveAppState() {
+        try {
+            const appState = {
+                timestamp: Date.now(),
+                description: document.getElementById('description')?.value || '',
+                settings: { ...this.settings },
+                generatedImages: this.generatedImages || [],
+                customSize: {
+                    width: document.getElementById('customWidth')?.value || '1024',
+                    height: document.getElementById('customHeight')?.value || '1024'
+                },
+                currentTab: this.currentTab
+            };
+            
+            localStorage.setItem(this.storageKeys.APP_STATE, JSON.stringify(appState));
+            console.log('💾 App state saved:', appState);
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to save app state:', error);
+            return false;
+        }
+    }
+
+    loadAppState() {
+        try {
+            const saved = localStorage.getItem(this.storageKeys.APP_STATE);
+            if (!saved) {
+                console.log('📂 No saved app state found');
+                return false;
+            }
+
+            const appState = JSON.parse(saved);
+            console.log('📖 Loading app state:', appState);
+
+            // Restore description
+            const descriptionEl = document.getElementById('description');
+            if (descriptionEl && appState.description) {
+                descriptionEl.value = appState.description;
+                console.log('✅ Restored description:', appState.description);
+            }
+
+            // Restore settings
+            if (appState.settings) {
+                this.settings = { ...this.settings, ...appState.settings };
+                
+                // Update UI elements
+                const sizeSelect = document.getElementById('sizeSelect');
+                const styleSelect = document.getElementById('styleSelect');
+                const modelSelect = document.getElementById('modelSelect');
+                
+                if (sizeSelect) {
+                    sizeSelect.value = this.settings.size;
+                    console.log('✅ Restored size:', this.settings.size);
+                }
+                if (styleSelect) {
+                    styleSelect.value = this.settings.style;
+                    console.log('✅ Restored style:', this.settings.style);
+                }
+                if (modelSelect) {
+                    modelSelect.value = this.settings.model;
+                    console.log('✅ Restored model:', this.settings.model);
+                }
+                
+                this.selectVariants(this.settings.variants.toString());
+                console.log('✅ Restored variants:', this.settings.variants);
+            }
+
+            // Restore custom size inputs
+            if (appState.customSize) {
+                const customWidth = document.getElementById('customWidth');
+                const customHeight = document.getElementById('customHeight');
+                
+                if (customWidth) customWidth.value = appState.customSize.width;
+                if (customHeight) customHeight.value = appState.customSize.height;
+                console.log('✅ Restored custom size:', appState.customSize);
+            }
+
+            // Restore generated images
+            if (appState.generatedImages && appState.generatedImages.length > 0) {
+                this.generatedImages = appState.generatedImages;
+                setTimeout(() => {
+                    this.displayResults();
+                    console.log('✅ Restored generated images:', this.generatedImages.length);
+                }, 100);
+            }
+
+            // Restore current tab
+            if (appState.currentTab) {
+                this.currentTab = appState.currentTab;
+                console.log('✅ Restored tab:', this.currentTab);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to load app state:', error);
+            // Clear corrupted data
+            localStorage.removeItem(this.storageKeys.APP_STATE);
+            return false;
+        }
+    }
+
+    saveHistory() {
+        try {
+            localStorage.setItem(this.storageKeys.HISTORY, JSON.stringify(this.history));
+            console.log('💾 History saved:', this.history.length, 'items');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to save history:', error);
+            return false;
+        }
+    }
+
+    loadHistory() {
+        try {
+            const saved = localStorage.getItem(this.storageKeys.HISTORY);
+            if (saved) {
+                this.history = JSON.parse(saved);
+                console.log('📖 History loaded:', this.history.length, 'items');
+            } else {
+                this.history = [];
+                console.log('📂 No history found, starting fresh');
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to load history:', error);
+            this.history = [];
+            localStorage.removeItem(this.storageKeys.HISTORY);
+            return false;
+        }
+    }
+
+    saveTheme(theme) {
+        try {
+            localStorage.setItem(this.storageKeys.THEME, theme);
+            console.log('💾 Theme saved:', theme);
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to save theme:', error);
+            return false;
+        }
+    }
+
+    loadTheme() {
+        try {
+            const savedTheme = localStorage.getItem(this.storageKeys.THEME) || 'light';
+            this.setTheme(savedTheme);
+            console.log('📖 Theme loaded:', savedTheme);
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to load theme:', error);
+            this.setTheme('light');
+            return false;
+        }
+    }
+
+    clearAppState() {
+        try {
+            // Clear all storage
+            Object.values(this.storageKeys).forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            // Reset form
+            const descriptionEl = document.getElementById('description');
+            const customWidth = document.getElementById('customWidth');
+            const customHeight = document.getElementById('customHeight');
+            
+            if (descriptionEl) descriptionEl.value = '';
+            if (customWidth) customWidth.value = '1024';
+            if (customHeight) customHeight.value = '1024';
+            
+            // Reset settings
+            this.settings = {
+                size: '1024x1024',
+                variants: 1,
+                style: 'default',
+                model: 'flux'
+            };
+            
+            // Update UI
+            const sizeSelect = document.getElementById('sizeSelect');
+            const styleSelect = document.getElementById('styleSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            
+            if (sizeSelect) sizeSelect.value = this.settings.size;
+            if (styleSelect) styleSelect.value = this.settings.style;
+            if (modelSelect) modelSelect.value = this.settings.model;
+            
+            this.selectVariants(this.settings.variants.toString());
+            
+            // Clear images and history
+            this.generatedImages = [];
+            this.history = [];
+            
+            // Reset UI
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsGrid = document.getElementById('resultsGrid');
+            const historyGrid = document.getElementById('historyGrid');
+            
+            if (resultsSection) resultsSection.classList.remove('active');
+            if (resultsGrid) resultsGrid.innerHTML = '';
+            if (historyGrid) historyGrid.innerHTML = '';
+            
+            this.updateCharCount();
+            this.toggleCustomSizeInputs();
+            this.loadHistoryGrid();
+            
+            // Switch to generate tab
+            this.switchTab('generate');
+            
+            console.log('🧹 All data cleared');
+            this.showNotification('All data cleared successfully! 🧹', 'success');
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to clear app state:', error);
+            this.showNotification('Failed to clear data', 'error');
+            return false;
+        }
+    }
+
+    // Auto-save method with immediate execution
+    autoSave() {
+        console.log('🔄 Auto-saving...');
+        this.saveAppState();
+        this.saveHistory();
     }
 
     bindEvents() {
         // Theme toggle
-        document.getElementById('themeToggle').addEventListener('click', () => {
+        document.getElementById('themeToggle')?.addEventListener('click', () => {
             this.toggleTheme();
         });
 
         // Clear data button
-        document.getElementById('clearDataBtn').addEventListener('click', () => {
+        document.getElementById('clearDataBtn')?.addEventListener('click', () => {
             if (confirm('Are you sure you want to clear all saved data? This will reset the form, settings, and generated images.')) {
                 this.clearAppState();
             }
@@ -48,99 +495,117 @@ class ImageGeneratorApp {
             });
         });
 
-        // Description textarea
+        // Description textarea - save on every change
         const description = document.getElementById('description');
-        description.addEventListener('input', () => {
-            this.updateCharCount();
-            this.saveAppState();
-        });
+        if (description) {
+            description.addEventListener('input', () => {
+                this.updateCharCount();
+                this.autoSave();
+            });
+        }
 
+        // Settings - save immediately on change
+        const sizeSelect = document.getElementById('sizeSelect');
+        if (sizeSelect) {
+            sizeSelect.addEventListener('change', (e) => {
+                this.settings.size = e.target.value;
+                this.toggleCustomSizeInputs();
+                this.autoSave();
+                console.log('Size changed to:', e.target.value);
+            });
+        }
 
+        const customWidth = document.getElementById('customWidth');
+        if (customWidth) {
+            customWidth.addEventListener('input', () => {
+                this.autoSave();
+            });
+        }
 
-        // Settings
-        document.getElementById('sizeSelect').addEventListener('change', (e) => {
-            this.settings.size = e.target.value;
-            this.toggleCustomSizeInputs();
-            this.saveAppState();
-        });
-
-        // Custom size inputs
-        document.getElementById('customWidth').addEventListener('input', () => {
-            this.saveAppState();
-        });
-
-        document.getElementById('customHeight').addEventListener('input', () => {
-            this.saveAppState();
-        });
+        const customHeight = document.getElementById('customHeight');
+        if (customHeight) {
+            customHeight.addEventListener('input', () => {
+                this.autoSave();
+            });
+        }
 
         document.querySelectorAll('.variant-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.selectVariants(btn.dataset.variants);
-                this.saveAppState();
+                this.autoSave();
+                console.log('Variants changed to:', btn.dataset.variants);
             });
         });
 
-        document.getElementById('styleSelect').addEventListener('change', (e) => {
-            this.settings.style = e.target.value;
-            this.saveAppState();
-        });
+        const styleSelect = document.getElementById('styleSelect');
+        if (styleSelect) {
+            styleSelect.addEventListener('change', (e) => {
+                this.settings.style = e.target.value;
+                this.autoSave();
+                console.log('Style changed to:', e.target.value);
+            });
+        }
 
-        document.getElementById('modelSelect').addEventListener('change', (e) => {
-            this.settings.model = e.target.value;
-            this.saveAppState();
-        });
+        const modelSelect = document.getElementById('modelSelect');
+        if (modelSelect) {
+            modelSelect.addEventListener('change', (e) => {
+                this.settings.model = e.target.value;
+                this.autoSave();
+                console.log('Model changed to:', e.target.value);
+            });
+        }
 
         // Generate button
-        document.getElementById('generateBtn').addEventListener('click', () => {
+        document.getElementById('generateBtn')?.addEventListener('click', () => {
             this.generateImages();
         });
 
         // Enhance prompt button
-        document.getElementById('enhanceBtn').addEventListener('click', () => {
+        document.getElementById('enhanceBtn')?.addEventListener('click', () => {
             this.enhancePrompt();
         });
 
         // Results actions
-        document.getElementById('downloadAllBtn').addEventListener('click', () => {
+        document.getElementById('downloadAllBtn')?.addEventListener('click', () => {
             this.downloadAll();
         });
 
-        document.getElementById('saveToHistoryBtn').addEventListener('click', () => {
+        document.getElementById('saveToHistoryBtn')?.addEventListener('click', () => {
             this.saveToHistory();
         });
 
         // History actions
-        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+        document.getElementById('clearHistoryBtn')?.addEventListener('click', () => {
             this.clearHistory();
         });
 
-        document.getElementById('exportHistoryBtn').addEventListener('click', () => {
+        document.getElementById('exportHistoryBtn')?.addEventListener('click', () => {
             this.exportHistory();
         });
 
         // Image modal events
-        document.getElementById('modalClose').addEventListener('click', () => {
+        document.getElementById('modalClose')?.addEventListener('click', () => {
             this.closeImageModal();
         });
 
-        document.getElementById('modalPrev').addEventListener('click', () => {
+        document.getElementById('modalPrev')?.addEventListener('click', () => {
             this.showPreviousImage();
         });
 
-        document.getElementById('modalNext').addEventListener('click', () => {
+        document.getElementById('modalNext')?.addEventListener('click', () => {
             this.showNextImage();
         });
 
-        document.getElementById('modalDownload').addEventListener('click', () => {
+        document.getElementById('modalDownload')?.addEventListener('click', () => {
             this.downloadModalImage();
         });
 
-        document.getElementById('modalShare').addEventListener('click', () => {
+        document.getElementById('modalShare')?.addEventListener('click', () => {
             this.shareModalImage();
         });
 
         // Close modal when clicking outside
-        document.getElementById('imageModal').addEventListener('click', (e) => {
+        document.getElementById('imageModal')?.addEventListener('click', (e) => {
             if (e.target.id === 'imageModal') {
                 this.closeImageModal();
             }
@@ -148,7 +613,8 @@ class ImageGeneratorApp {
 
         // Keyboard navigation for modal
         document.addEventListener('keydown', (e) => {
-            if (document.getElementById('imageModal').classList.contains('active')) {
+            const modal = document.getElementById('imageModal');
+            if (modal && modal.classList.contains('active')) {
                 switch(e.key) {
                     case 'Escape':
                         this.closeImageModal();
@@ -162,6 +628,20 @@ class ImageGeneratorApp {
                 }
             }
         });
+
+        // Auto-save on page unload
+        window.addEventListener('beforeunload', () => {
+            this.autoSave();
+        });
+
+        // Auto-save when page becomes hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                this.autoSave();
+            }
+        });
+
+        console.log('✅ All events bound');
     }
 
     switchTab(tab) {
@@ -180,29 +660,35 @@ class ImageGeneratorApp {
         // Update URL without refresh
         history.pushState({tab}, '', `#${tab}`);
         
-        // Save app state
-        this.saveAppState();
+        // Save immediately
+        this.autoSave();
+        console.log('Tab switched to:', tab);
     }
 
     updateActiveTab() {
         const hash = window.location.hash.slice(1);
         if (hash && ['generate', 'history'].includes(hash)) {
             this.switchTab(hash);
+        } else {
+            this.switchTab(this.currentTab);
         }
     }
 
     updateCharCount() {
         const description = document.getElementById('description');
         const charCount = document.querySelector('.textarea-overlay .char-count');
-        const count = description.value.length;
-        charCount.textContent = `${count}/500`;
         
-        if (count > 450) {
-            charCount.style.color = 'var(--warning-color)';
-        } else if (count > 500) {
-            charCount.style.color = 'var(--danger-color)';
-        } else {
-            charCount.style.color = 'var(--text-muted)';
+        if (description && charCount) {
+            const count = description.value.length;
+            charCount.textContent = `${count}/500`;
+            
+            if (count > 450) {
+                charCount.style.color = 'var(--warning-color)';
+            } else if (count > 500) {
+                charCount.style.color = 'var(--danger-color)';
+            } else {
+                charCount.style.color = 'var(--text-muted)';
+            }
         }
     }
 
@@ -210,17 +696,18 @@ class ImageGeneratorApp {
         const customInputs = document.getElementById('customSizeInputs');
         const sizeSelect = document.getElementById('sizeSelect');
         
-        if (sizeSelect.value === 'custom') {
-            customInputs.style.display = 'grid';
-        } else {
-            customInputs.style.display = 'none';
+        if (customInputs && sizeSelect) {
+            if (sizeSelect.value === 'custom') {
+                customInputs.style.display = 'grid';
+            } else {
+                customInputs.style.display = 'none';
+            }
         }
     }
 
     initTheme() {
-        // Get saved theme or default to light
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        this.setTheme(savedTheme);
+        // This is now handled in loadTheme() during init
+        console.log('Theme initialization handled in loadTheme()');
     }
 
     toggleTheme() {
@@ -231,123 +718,23 @@ class ImageGeneratorApp {
 
     setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        
+        this.saveTheme(theme);
+
         // Update theme toggle icon
         const themeToggle = document.getElementById('themeToggle');
-        const icon = themeToggle.querySelector('i');
-        
-        if (theme === 'dark') {
-            icon.className = 'fas fa-sun';
-            themeToggle.title = 'Switch to light mode';
-        } else {
-            icon.className = 'fas fa-moon';
-            themeToggle.title = 'Switch to dark mode';
+        if (themeToggle) {
+            const icon = themeToggle.querySelector('i');
+            if (icon) {
+                if (theme === 'dark') {
+                    icon.className = 'fas fa-sun';
+                    themeToggle.title = 'Switch to light mode';
+                } else {
+                    icon.className = 'fas fa-moon';
+                    themeToggle.title = 'Switch to dark mode';
+                }
+            }
         }
     }
-
-    saveAppState() {
-        try {
-            const appState = {
-                description: document.getElementById('description').value,
-                settings: { ...this.settings },
-                generatedImages: this.generatedImages,
-                customSize: {
-                    width: document.getElementById('customWidth').value,
-                    height: document.getElementById('customHeight').value
-                },
-                currentTab: this.currentTab
-            };
-            localStorage.setItem('advai_app_state', JSON.stringify(appState));
-        } catch (error) {
-            console.error('Error saving app state:', error);
-        }
-    }
-
-    loadAppState() {
-        try {
-            const saved = localStorage.getItem('advai_app_state');
-            if (!saved) return;
-
-            const appState = JSON.parse(saved);
-
-            // Restore description
-            if (appState.description) {
-                document.getElementById('description').value = appState.description;
-            }
-
-            // Restore settings
-            if (appState.settings) {
-                this.settings = { ...this.settings, ...appState.settings };
-                
-                // Update UI elements
-                document.getElementById('sizeSelect').value = this.settings.size;
-                document.getElementById('styleSelect').value = this.settings.style;
-                document.getElementById('modelSelect').value = this.settings.model;
-                this.selectVariants(this.settings.variants);
-            }
-
-            // Restore custom size inputs
-            if (appState.customSize) {
-                document.getElementById('customWidth').value = appState.customSize.width || '';
-                document.getElementById('customHeight').value = appState.customSize.height || '';
-            }
-
-            // Restore generated images
-            if (appState.generatedImages && appState.generatedImages.length > 0) {
-                this.generatedImages = appState.generatedImages;
-                this.displayResults();
-            }
-
-            // Restore current tab
-            if (appState.currentTab) {
-                this.currentTab = appState.currentTab;
-            }
-
-        } catch (error) {
-            console.error('Error loading app state:', error);
-        }
-    }
-
-    clearAppState() {
-        try {
-            localStorage.removeItem('advai_app_state');
-            
-            // Reset form
-            document.getElementById('description').value = '';
-            document.getElementById('customWidth').value = '';
-            document.getElementById('customHeight').value = '';
-            
-            // Reset settings
-            this.settings = {
-                size: '1024x1024',
-                variants: 1,
-                style: 'default',
-                model: 'flux'
-            };
-            
-            // Update UI
-            document.getElementById('sizeSelect').value = this.settings.size;
-            document.getElementById('styleSelect').value = this.settings.style;
-            document.getElementById('modelSelect').value = this.settings.model;
-            this.selectVariants(this.settings.variants);
-            
-            // Clear generated images
-            this.generatedImages = [];
-            document.getElementById('resultsSection').classList.remove('active');
-            
-            this.updateCharCount();
-            this.toggleCustomSizeInputs();
-            
-            this.showNotification('App state cleared!', 'success');
-        } catch (error) {
-            console.error('Error clearing app state:', error);
-        }
-    }
-
-
-
-
 
     selectVariants(variants) {
         this.settings.variants = parseInt(variants);
@@ -359,6 +746,9 @@ class ImageGeneratorApp {
     async enhancePrompt() {
         const description = document.getElementById('description');
         const enhanceBtn = document.getElementById('enhanceBtn');
+        
+        if (!description || !enhanceBtn) return;
+        
         const originalText = description.value.trim();
 
         if (!originalText) {
@@ -385,7 +775,7 @@ class ImageGeneratorApp {
             if (response.ok) {
                 description.value = data.enhanced_prompt;
                 this.updateCharCount();
-                this.saveAppState();
+                this.autoSave();
                 this.showNotification('Prompt enhanced successfully!', 'success');
             } else {
                 throw new Error(data.error || 'Failed to enhance prompt');
@@ -400,14 +790,17 @@ class ImageGeneratorApp {
     }
 
     async generateImages() {
-        const description = document.getElementById('description').value.trim();
+        const description = document.getElementById('description');
+        if (!description) return;
         
-        if (!description) {
+        const descriptionValue = description.value.trim();
+        
+        if (!descriptionValue) {
             this.showNotification('Please enter an image description', 'warning');
             return;
         }
 
-        if (description.length > 500) {
+        if (descriptionValue.length > 500) {
             this.showNotification('Description is too long (max 500 characters)', 'error');
             return;
         }
@@ -415,8 +808,8 @@ class ImageGeneratorApp {
         // Get size value (handle custom sizes)
         let sizeValue = this.settings.size;
         if (this.settings.size === 'custom') {
-            const width = parseInt(document.getElementById('customWidth').value);
-            const height = parseInt(document.getElementById('customHeight').value);
+            const width = parseInt(document.getElementById('customWidth')?.value || '1024');
+            const height = parseInt(document.getElementById('customHeight')?.value || '1024');
             
             if (!width || !height || width < 256 || height < 256 || width > 2048 || height > 2048) {
                 this.showNotification('Please enter valid dimensions (256-2048 pixels)', 'error');
@@ -431,13 +824,11 @@ class ImageGeneratorApp {
 
         // Prepare form data
         const formData = new FormData();
-        formData.append('description', description);
+        formData.append('description', descriptionValue);
         formData.append('size', sizeValue);
-        formData.append('variants', this.settings.variants);
+        formData.append('variants', this.settings.variants.toString());
         formData.append('style', this.settings.style);
         formData.append('model', this.settings.model);
-
-
 
         try {
             const response = await fetch('/api/generate', {
@@ -448,8 +839,16 @@ class ImageGeneratorApp {
             const data = await response.json();
 
             if (response.ok) {
-                this.generatedImages = data.images;
+                this.generatedImages = data.images.map(img => ({
+                    url: img.url,
+                    prompt: descriptionValue,
+                    size: sizeValue,
+                    style: this.settings.style,
+                    model: this.settings.model
+                }));
+                
                 this.displayResults();
+                this.autoSave(); // Save after generation
                 this.showNotification('Images generated successfully!', 'success');
             } else {
                 throw new Error(data.error || 'Failed to generate images');
@@ -466,6 +865,8 @@ class ImageGeneratorApp {
         const resultsSection = document.getElementById('resultsSection');
         const resultsGrid = document.getElementById('resultsGrid');
 
+        if (!resultsSection || !resultsGrid) return;
+
         resultsGrid.innerHTML = '';
 
         this.generatedImages.forEach((image, index) => {
@@ -474,13 +875,13 @@ class ImageGeneratorApp {
             resultItem.innerHTML = `
                 <img src="${image.url}" alt="Generated image ${index + 1}" class="result-image" data-index="${index}">
                 <div class="result-actions">
-                    <button class="result-btn primary" onclick="app.downloadImage('${image.url}', ${index})">
+                    <button class="result-btn primary" data-action="download" data-index="${index}">
                         <i class="fas fa-download"></i> Download
                     </button>
-                    <button class="result-btn" onclick="app.shareImage('${image.url}')">
+                    <button class="result-btn" data-action="share" data-index="${index}">
                         <i class="fas fa-share"></i> Share
                     </button>
-                    <button class="result-btn" onclick="app.regenerateVariation('${image.url}')">
+                    <button class="result-btn" data-action="variation" data-index="${index}">
                         <i class="fas fa-magic"></i> Variation
                     </button>
                 </div>
@@ -488,9 +889,42 @@ class ImageGeneratorApp {
             
             // Add click event to image for modal
             const imageElement = resultItem.querySelector('.result-image');
-            imageElement.addEventListener('click', () => {
-                this.openImageModal(this.generatedImages, index);
-            });
+            if (imageElement) {
+                imageElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.openImageModal(this.generatedImages, index);
+                });
+            }
+            
+            // Add click events to buttons
+            const downloadBtn = resultItem.querySelector('[data-action="download"]');
+            const shareBtn = resultItem.querySelector('[data-action="share"]');
+            const variationBtn = resultItem.querySelector('[data-action="variation"]');
+            
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.downloadImage(image.url, index);
+                });
+            }
+            
+            if (shareBtn) {
+                shareBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.shareImage(image.url);
+                });
+            }
+            
+            if (variationBtn) {
+                variationBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.regenerateVariation(image.url);
+                });
+            }
             
             resultsGrid.appendChild(resultItem);
         });
@@ -498,29 +932,34 @@ class ImageGeneratorApp {
         resultsSection.classList.add('active');
         resultsSection.scrollIntoView({ behavior: 'smooth' });
         
-        // Save app state after displaying results
-        this.saveAppState();
+        // Save after displaying results
+        this.autoSave();
+        console.log('Results displayed and saved');
     }
 
     showLoading(show) {
         const loadingOverlay = document.getElementById('loadingOverlay');
+        if (!loadingOverlay) return;
+        
         loadingOverlay.style.display = show ? 'flex' : 'none';
 
         if (show) {
             // Animate progress bar
             const progressFill = document.getElementById('progressFill');
-            progressFill.style.width = '0%';
-            
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 10;
-                if (progress > 100) progress = 100;
-                progressFill.style.width = `${progress}%`;
+            if (progressFill) {
+                progressFill.style.width = '0%';
                 
-                if (progress >= 100) {
-                    clearInterval(interval);
-                }
-            }, 200);
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress > 100) progress = 100;
+                    progressFill.style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                    }
+                }, 200);
+            }
         }
     }
 
@@ -576,8 +1015,8 @@ class ImageGeneratorApp {
     }
 
     async regenerateVariation(imageUrl) {
-        // This would regenerate a variation of the selected image
-        this.showNotification('Variation generation coming soon!', 'info');
+        // Show coming soon notification with more details
+        this.showNotification('🎨 Image Variation feature coming soon! This will allow you to create variations of existing images.', 'info');
     }
 
     saveToHistory() {
@@ -586,10 +1025,13 @@ class ImageGeneratorApp {
             return;
         }
 
-        const description = document.getElementById('description').value.trim();
+        const description = document.getElementById('description');
+        if (!description) return;
+        
+        const descriptionValue = description.value.trim();
         const historyItem = {
             id: Date.now(),
-            description: description,
+            description: descriptionValue,
             images: this.generatedImages,
             settings: { ...this.settings },
             timestamp: new Date().toISOString(),
@@ -606,28 +1048,13 @@ class ImageGeneratorApp {
         this.saveHistory();
         this.loadHistoryGrid();
         this.showNotification('Images saved to history!', 'success');
-    }
-
-    loadHistory() {
-        try {
-            const saved = localStorage.getItem('advai_image_history');
-            return saved ? JSON.parse(saved) : [];
-        } catch (error) {
-            console.error('Error loading history:', error);
-            return [];
-        }
-    }
-
-    saveHistory() {
-        try {
-            localStorage.setItem('advai_image_history', JSON.stringify(this.history));
-        } catch (error) {
-            console.error('Error saving history:', error);
-        }
+        console.log('Images saved to history, total items:', this.history.length);
     }
 
     loadHistoryGrid() {
         const historyGrid = document.getElementById('historyGrid');
+        if (!historyGrid) return;
+        
         historyGrid.innerHTML = '';
 
         if (this.history.length === 0) {
@@ -638,6 +1065,7 @@ class ImageGeneratorApp {
                     <p>Generate some images to see them here!</p>
                 </div>
             `;
+            console.log('History grid shows empty state');
             return;
         }
 
@@ -654,10 +1082,12 @@ class ImageGeneratorApp {
 
             // Add click event to image for modal
             const imageElement = historyItem.querySelector('.history-image');
-            imageElement.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent triggering the viewHistoryItem event
-                this.openImageModal(item.images, 0);
-            });
+            if (imageElement) {
+                imageElement.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering the viewHistoryItem event
+                    this.openImageModal(item.images, 0);
+                });
+            }
 
             // Click on the rest of the item loads it
             historyItem.addEventListener('click', (e) => {
@@ -668,40 +1098,51 @@ class ImageGeneratorApp {
 
             historyGrid.appendChild(historyItem);
         });
+        
+        console.log('History grid loaded with', this.history.length, 'items');
     }
 
     viewHistoryItem(item) {
-        // Switch to generate tab and load the item
-        this.switchTab('generate');
+        // Load the history item back into the generator
+        const description = document.getElementById('description');
+        if (description) {
+            description.value = item.description;
+        }
         
-        // Load settings
-        document.getElementById('description').value = item.description;
-        document.getElementById('sizeSelect').value = item.settings.size;
-        this.settings.size = item.settings.size;
-        this.selectVariants(item.settings.variants);
-        document.getElementById('styleSelect').value = item.settings.style;
-        document.getElementById('modelSelect').value = item.settings.model || 'flux';
-        this.settings.model = item.settings.model || 'flux';
+        // Restore settings
+        this.settings = { ...item.settings };
         
-        // Load images as results
+        const sizeSelect = document.getElementById('sizeSelect');
+        const styleSelect = document.getElementById('styleSelect');
+        const modelSelect = document.getElementById('modelSelect');
+        
+        if (sizeSelect) sizeSelect.value = this.settings.size;
+        if (styleSelect) styleSelect.value = this.settings.style;
+        if (modelSelect) modelSelect.value = this.settings.model;
+        
+        this.selectVariants(this.settings.variants.toString());
+        
+        // Set generated images
         this.generatedImages = item.images;
         this.displayResults();
         
-        this.updateCharCount();
-        this.showNotification('History item loaded!', 'info');
+        // Switch to generate tab
+        this.switchTab('generate');
+        
+        // Save the loaded state
+        this.autoSave();
+        
+        this.showNotification('History item loaded!', 'success');
+        console.log('History item loaded:', item.description);
     }
 
     clearHistory() {
-        if (this.history.length === 0) {
-            this.showNotification('History is already empty', 'info');
-            return;
-        }
-
-        if (confirm('Are you sure you want to clear all history? This action cannot be undone.')) {
+        if (confirm('Are you sure you want to clear all history?')) {
             this.history = [];
             this.saveHistory();
             this.loadHistoryGrid();
             this.showNotification('History cleared!', 'success');
+            console.log('History cleared');
         }
     }
 
@@ -809,18 +1250,22 @@ class ImageGeneratorApp {
         this.updateModalDisplay();
         
         const modal = document.getElementById('imageModal');
-        modal.classList.add('active');
-        
-        // Prevent body scroll when modal is open
-        document.body.style.overflow = 'hidden';
+        if (modal) {
+            modal.classList.add('active');
+            
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
     }
 
     closeImageModal() {
         const modal = document.getElementById('imageModal');
-        modal.classList.remove('active');
-        
-        // Restore body scroll
-        document.body.style.overflow = 'auto';
+        if (modal) {
+            modal.classList.remove('active');
+            
+            // Restore body scroll
+            document.body.style.overflow = 'auto';
+        }
     }
 
     updateModalDisplay() {
@@ -829,39 +1274,49 @@ class ImageGeneratorApp {
         const currentImage = this.modalImages[this.currentModalIndex];
         
         // Update image
-        document.getElementById('modalImage').src = currentImage.url;
-        document.getElementById('modalImage').alt = `Generated image ${this.currentModalIndex + 1}`;
+        const modalImage = document.getElementById('modalImage');
+        if (modalImage) {
+            modalImage.src = currentImage.url;
+            modalImage.alt = `Generated image ${this.currentModalIndex + 1}`;
+        }
         
         // Update counter
-        document.getElementById('modalCounter').textContent = 
-            `${this.currentModalIndex + 1} / ${this.modalImages.length}`;
+        const modalCounter = document.getElementById('modalCounter');
+        if (modalCounter) {
+            modalCounter.textContent = `${this.currentModalIndex + 1} / ${this.modalImages.length}`;
+        }
         
         // Update info
-        document.getElementById('modalPrompt').textContent = currentImage.prompt || '';
-        document.getElementById('modalSize').textContent = currentImage.size || '';
-        document.getElementById('modalStyle').textContent = this.capitalizeFirstLetter(currentImage.style || 'default');
-        document.getElementById('modalModel').textContent = this.capitalizeFirstLetter(currentImage.model || 'flux');
+        const modalPrompt = document.getElementById('modalPrompt');
+        const modalSize = document.getElementById('modalSize');
+        const modalStyle = document.getElementById('modalStyle');
+        const modalModel = document.getElementById('modalModel');
+        
+        if (modalPrompt) modalPrompt.textContent = currentImage.prompt || '';
+        if (modalSize) modalSize.textContent = currentImage.size || '';
+        if (modalStyle) modalStyle.textContent = this.capitalizeFirstLetter(currentImage.style || 'default');
+        if (modalModel) modalModel.textContent = this.capitalizeFirstLetter(currentImage.model || 'flux');
         
         // Update navigation buttons
         const prevBtn = document.getElementById('modalPrev');
         const nextBtn = document.getElementById('modalNext');
         
-        prevBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === 0;
-        nextBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === this.modalImages.length - 1;
+        if (prevBtn) {
+            prevBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === 0;
+            prevBtn.style.display = this.modalImages.length <= 1 ? 'none' : 'flex';
+        }
         
-        // Hide navigation if only one image
-        if (this.modalImages.length <= 1) {
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-        } else {
-            prevBtn.style.display = 'flex';
-            nextBtn.style.display = 'flex';
+        if (nextBtn) {
+            nextBtn.disabled = this.modalImages.length <= 1 || this.currentModalIndex === this.modalImages.length - 1;
+            nextBtn.style.display = this.modalImages.length <= 1 ? 'none' : 'flex';
         }
         
         // Update download link
         const downloadLink = document.getElementById('modalDownload');
-        downloadLink.href = currentImage.url;
-        downloadLink.download = `generated-image-${this.currentModalIndex + 1}.png`;
+        if (downloadLink) {
+            downloadLink.href = currentImage.url;
+            downloadLink.download = `generated-image-${this.currentModalIndex + 1}.png`;
+        }
     }
 
     showPreviousImage() {
@@ -899,12 +1354,13 @@ class ImageGeneratorApp {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🌟 DOM loaded, initializing app...');
     window.app = new ImageGeneratorApp();
 });
 
 // Handle browser back/forward
 window.addEventListener('popstate', (e) => {
-    if (e.state && e.state.tab) {
+    if (e.state && e.state.tab && window.app) {
         window.app.switchTab(e.state.tab);
     }
 }); 

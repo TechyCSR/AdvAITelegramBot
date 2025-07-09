@@ -232,6 +232,52 @@
         </footer>
     </div>
 
+    <!-- Image Modal -->
+    <div class="image-modal" id="imageModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <img id="modalImage" class="modal-image" src="" alt="">
+            
+            <div class="modal-info">
+                <div class="modal-prompt" id="modalPrompt"></div>
+                <div class="modal-details">
+                    <div class="modal-detail">
+                        <strong>Size:</strong> <span id="modalSize"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <strong>Style:</strong> <span id="modalStyle"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <strong>Model:</strong> <span id="modalModel"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-action-btn download" id="modalDownload">
+                    <i class="fas fa-download"></i>
+                    Download
+                </button>
+                <button class="modal-action-btn share" id="modalShare">
+                    <i class="fas fa-share"></i>
+                    Share
+                </button>
+            </div>
+            
+            <button class="modal-nav prev" id="modalPrev">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="modal-nav next" id="modalNext">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            
+            <div class="modal-counter" id="modalCounter">1 / 1</div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="static/js/app.js"></script>
 </body>
