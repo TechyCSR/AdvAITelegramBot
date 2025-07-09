@@ -1,31 +1,8 @@
-pyrogram>=2.0.106
-python-dotenv>=1.0.0
-tgcrypto>=1.2.5
+flask>=2.3.0
+flask-cors>=4.0.0
+werkzeug>=2.3.0
 g4f
-pytz>=2023.3
-# py3langid>=0.2.2
-soundfile>=0.12.1
-SpeechRecognition>=3.10.0
-gTTS>=2.3.2
-numpy>=1.24.0
-pymongo>=4.5.0
-pydub>=0.25.1
-asyncio>=3.4.3
-aiohttp>=3.8.5
 requests>=2.31.0
-pdfplumber>=0.10.0
-python-docx
-
-# Image and media processing
-Pillow>=10.0.0
-
-# Translation dependencies
-deep-translator>=1.11.4  # More reliable translations with placeholder support
-regex>=2023.10.3  # For regex pattern matching in placeholder detection
-
-# System monitoring
-psutil>=5.9.5  # System statistics for admin panel
-
-# Performance optimization
-uvloop>=0.17.0; platform_system != "Windows"  # High-performance event loop (non-Windows)
-orjson>=3.9.5  # Faster JSON serialization/deserialization
+pillow>=10.0.0
+python-dotenv>=1.0.0
+gunicorn>=21.0.0 
