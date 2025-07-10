@@ -112,13 +112,22 @@ class AuthSystem {
             authOverlay.style.display = 'flex';
         }
         
+        // Clear any existing auth status/error messages immediately
+        hideAuthStatus();
+        const authActions = document.getElementById('authActions');
+        if (authActions) {
+            authActions.style.display = 'none';
+        }
+        
         // Check if user is already authenticated
         const isAuthenticated = await this.checkAuthStatus();
         
         if (!isAuthenticated) {
             console.log('User not authenticated, showing authentication options...');
-            // Show authentication options immediately - don't try to authenticate with Telegram
-            this.showAuthenticationOptions();
+            // Show authentication options with a small delay to ensure DOM is ready
+            setTimeout(() => {
+                this.showAuthenticationOptions();
+            }, 200);
         } else {
             console.log('User already authenticated');
             // Hide auth overlay if user is authenticated
@@ -327,6 +336,12 @@ class AuthSystem {
 
         // Hide the auth status while showing options
         hideAuthStatus();
+        
+        // Hide auth actions
+        const authActions = document.getElementById('authActions');
+        if (authActions) {
+            authActions.style.display = 'none';
+        }
 
         // Create the authentication options HTML
         let optionsHtml = `
@@ -396,13 +411,16 @@ class AuthSystem {
 
         const authContent = document.querySelector('.auth-content');
         if (authContent) {
+            console.log('Updating auth content with options HTML...');
             authContent.innerHTML = optionsHtml;
-            console.log('Auth content updated with options');
+            console.log('Auth content updated successfully with options');
         } else {
             console.error('Auth content container not found');
         }
 
+        // Ensure overlay is visible
         authOverlay.style.display = 'flex';
+        console.log('Auth overlay made visible');
 
         // Initialize Google Sign-In if enabled
         if (this.authConfig && this.authConfig.google_enabled) {
@@ -471,18 +489,14 @@ class AuthSystem {
     showAuthError(message) {
         console.error('Auth error:', message);
         
-        // If we're in browser mode and this is a Telegram-related error, 
-        // show authentication options instead
-        if (!this.isInTelegram && (
-            message.includes('initialization data') || 
-            message.includes('No initialization data') ||
-            message.includes('Telegram')
-        )) {
-            console.log('Browser mode detected, showing auth options instead of error');
+        // If we're in browser mode, always show authentication options instead of errors
+        if (!this.isInTelegram) {
+            console.log('Browser mode detected, showing auth options instead of error:', message);
             this.showAuthenticationOptions();
             return false;
         }
         
+        // Only show errors in Telegram mode
         showAuthStatus(message, true);
         showAuthActions();
         return false;
@@ -624,12 +638,6 @@ class AdvAIApp {
             // Initialize authentication system first
             console.log('Starting authentication system initialization...');
             await this.authSystem.initialize();
-            
-            // Check if already authenticated
-            if (!this.authSystem.authenticated) {
-                console.log('Not authenticated, checking auth status...');
-                await this.authSystem.checkAuthStatus();
-            }
             
             // Initialize UI components regardless of auth status
             console.log('Initializing UI components...');
@@ -1267,12 +1275,36 @@ class AdvAIApp {
 }
 
 // Initialize app when DOM is loaded
-let app;
-let authSystem;
 document.addEventListener('DOMContentLoaded', async () => {
-    app = new AdvAIApp();
-    authSystem = app.authSystem;
-    await app.initialize();
+    console.log('DOM Content Loaded, initializing app...');
+    
+    // Create global app instance
+    window.app = new AdvAIApp();
+    
+    // Make auth system globally accessible for debugging and fallbacks
+    window.authSystem = window.app.authSystem;
+    
+    try {
+        await window.app.initialize();
+        
+        // Add a fallback: if after 3 seconds the auth overlay is still showing
+        // the old error message in browser mode, force show auth options
+        setTimeout(() => {
+            if (!window.authSystem.isInTelegram && !window.authSystem.authenticated) {
+                const authOverlay = document.getElementById('authOverlay');
+                const authStatus = document.getElementById('authStatus');
+                
+                if (authOverlay && authOverlay.style.display !== 'none' && 
+                    authStatus && authStatus.style.display !== 'none') {
+                    console.log('Fallback: Forcing authentication options display');
+                    window.authSystem.showAuthenticationOptions();
+                }
+            }
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Failed to initialize app:', error);
+    }
 });
 
 // Make app and authSystem globally available for onclick handlers
