@@ -1134,25 +1134,29 @@ class AdvAIApp {
         }
 
         const data = this.currentGeneration;
+        const baseTimestamp = Date.now();
         
-        // Save as a single generation with multiple images
-        const historyItem = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            prompt: data.prompt,
-            style: data.style,
-            model: data.model || 'DALL-E 3',
-            size: data.size,
-            images: data.images,
-            imageCount: data.images.length,
-            type: 'generation' // Mark as a generation group
-        };
+        // Save each image as a separate history item
+        data.images.forEach((imageUrl, index) => {
+            const historyItem = {
+                id: baseTimestamp + index,
+                timestamp: new Date().toISOString(),
+                prompt: data.prompt,
+                style: data.style,
+                model: data.model || 'DALL-E 3',
+                size: data.size,
+                imageUrl: imageUrl,
+                imageIndex: index + 1,
+                totalImages: data.images.length,
+                type: 'individual' // Mark as individual image
+            };
 
-        AppState.history.unshift(historyItem);
+            AppState.history.unshift(historyItem);
+        });
         
-        // Keep only last 50 generations
-        if (AppState.history.length > 50) {
-            AppState.history = AppState.history.slice(0, 50);
+        // Keep only last 100 individual images
+        if (AppState.history.length > 100) {
+            AppState.history = AppState.history.slice(0, 100);
         }
 
         this.saveHistory();
@@ -1234,25 +1238,23 @@ class AdvAIApp {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
             
-            // Support both old format (single imageUrl) and new format (generation with multiple images)
-            const isGeneration = item.type === 'generation' || (item.images && Array.isArray(item.images));
-            const images = isGeneration ? item.images : [item.imageUrl || item.images[0]];
-            const imageCount = images.length;
-            const firstImage = images[0];
+            // Handle both old and new formats
+            const imageUrl = item.imageUrl || (item.images && item.images[0]) || '';
+            const isIndividual = item.type === 'individual' || item.imageUrl;
             
             historyItem.innerHTML = `
-                <img class="history-image" src="${firstImage}" alt="Generated image" loading="lazy" data-id="${item.id}">
+                <img class="history-image" src="${imageUrl}" alt="Generated image" loading="lazy" data-id="${item.id}">
                 <div class="history-content">
                     <div class="history-info">
                         <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
                         <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
-                        ${imageCount > 1 ? `<div class="image-count">${imageCount} images</div>` : ''}
+                        ${item.totalImages > 1 ? `<div class="image-count">${item.imageIndex} of ${item.totalImages}</div>` : ''}
                     </div>
                     <div class="history-actions">
-                        <button class="history-btn download" onclick="app.downloadAllFromHistory(${item.id})" title="${imageCount > 1 ? 'Download all images' : 'Download image'}">
+                        <button class="history-btn download" onclick="app.downloadSingleFromHistory(${item.id})" title="Download image">
                             <i class="fas fa-download"></i>
                         </button>
-                        <button class="history-btn share" onclick="app.shareImage('${firstImage}')" title="Share first image">
+                        <button class="history-btn share" onclick="app.shareImage('${imageUrl}')" title="Share image">
                             <i class="fas fa-share"></i>
                         </button>
                         <button class="history-btn delete" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
@@ -1293,7 +1295,17 @@ class AdvAIApp {
         this.toggleCustomSize();
     }
 
-    downloadAllFromHistory(id) {
+    downloadSingleFromHistory(id) {
+        const historyItem = AppState.history.find(item => item.id === id);
+        if (!historyItem) return;
+        
+        const imageUrl = historyItem.imageUrl || (historyItem.images && historyItem.images[0]);
+        if (imageUrl) {
+            this.downloadImage(imageUrl, 0);
+        }
+    }
+
+    async downloadAllFromHistory(id) {
         const historyItem = AppState.history.find(item => item.id === id);
         if (!historyItem) return;
         
@@ -1309,18 +1321,13 @@ class AdvAIApp {
             this.showNotification(`Opening ${images.length} image${images.length > 1 ? 's' : ''} in new tabs...`, 'success');
         } else {
             // In browser: Download all
-            images.forEach((imageUrl, index) => {
+            this.showNotification(`Starting download of ${images.length} image${images.length > 1 ? 's' : ''}...`, 'success');
+            
+            for (let i = 0; i < images.length; i++) {
                 setTimeout(() => {
-                    const link = document.createElement('a');
-                    link.href = imageUrl;
-                    link.download = `advai-history-${Date.now()}-${index + 1}.jpg`;
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }, index * 300);
-            });
-            this.showNotification(`Downloading ${images.length} image${images.length > 1 ? 's' : ''}...`, 'success');
+                    this.downloadImage(images[i], i);
+                }, i * 500);
+            }
         }
     }
 
@@ -1352,29 +1359,118 @@ class AdvAIApp {
     }
 
     isInTelegram() {
-        // Check if we're in Telegram environment
-        return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+        // Check if we're in Telegram environment more thoroughly
+        return !!(window.Telegram && 
+                 window.Telegram.WebApp && 
+                 window.Telegram.WebApp.initData &&
+                 window.Telegram.WebApp.initData.length > 0);
     }
 
-    downloadImage(imageUrl, index) {
-        if (this.isInTelegram()) {
+    forceDownload(url, filename) {
+        // Create a temporary anchor element for download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        
+        // Add to DOM
+        document.body.appendChild(a);
+        
+        // Trigger download
+        a.click();
+        
+        // Clean up
+        document.body.removeChild(a);
+    }
+
+    async downloadImage(imageUrl, index) {
+        const isInTelegram = this.isInTelegram();
+        console.log('Download Image - isInTelegram:', isInTelegram, 'URL:', imageUrl);
+        console.log('Telegram check - window.Telegram:', !!window.Telegram);
+        console.log('WebApp:', !!(window.Telegram && window.Telegram.WebApp));
+        console.log('InitData:', !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData));
+        
+        if (isInTelegram) {
             // In Telegram: Open in new tab
             window.open(imageUrl, '_blank');
             this.showNotification('Image opened in new tab!', 'success');
         } else {
-            // In browser: Direct download
-            const link = document.createElement('a');
-            link.href = imageUrl;
-            link.download = `advai-generated-${Date.now()}-${index + 1}.jpg`;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            this.showNotification('Image download started!', 'success');
+            // In browser: Force direct download
+            try {
+                // Method 1: Try fetch and blob download
+                const response = await fetch(imageUrl, {
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'image/*'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Fetch failed');
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                
+                // Force download with better filename
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = `advai-image-${Date.now()}-${index + 1}.jpg`;
+                link.style.display = 'none';
+                
+                // Add to DOM, click, and remove
+                document.body.appendChild(link);
+                
+                // Force click event
+                if (link.click) {
+                    link.click();
+                } else {
+                    // Fallback for older browsers
+                    const clickEvent = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: false
+                    });
+                    link.dispatchEvent(clickEvent);
+                }
+                
+                document.body.removeChild(link);
+                
+                // Clean up
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(downloadUrl);
+                }, 100);
+                
+                this.showNotification('Image download started!', 'success');
+                
+            } catch (error) {
+                console.error('Blob download failed, trying fallback:', error);
+                
+                // Method 2: Direct link approach with download attribute
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.download = `advai-image-${Date.now()}-${index + 1}.jpg`;
+                link.style.display = 'none';
+                link.setAttribute('download', `advai-image-${Date.now()}-${index + 1}.jpg`);
+                
+                document.body.appendChild(link);
+                
+                try {
+                    link.click();
+                    this.showNotification('Image download started!', 'success');
+                } catch (clickError) {
+                    console.error('Click download failed, opening in new tab:', clickError);
+                    // Method 3: Last resort - open in new tab
+                    window.open(imageUrl, '_blank');
+                    this.showNotification('Image opened in new tab (download failed)', 'warning');
+                }
+                
+                document.body.removeChild(link);
+            }
         }
     }
 
-    downloadAllImages() {
+    async downloadAllImages() {
         if (!this.currentGeneration || !this.currentGeneration.images) {
             this.showError('No images to download');
             return;
@@ -1392,18 +1488,13 @@ class AdvAIApp {
             this.showNotification(`Opening ${images.length} images in new tabs...`, 'success');
         } else {
             // In browser: Download all with delay
-            images.forEach((imageUrl, index) => {
+            this.showNotification(`Starting download of ${images.length} images...`, 'success');
+            
+            for (let i = 0; i < images.length; i++) {
                 setTimeout(() => {
-                    const link = document.createElement('a');
-                    link.href = imageUrl;
-                    link.download = `advai-generated-${Date.now()}-${index + 1}.jpg`;
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }, index * 300);
-            });
-            this.showNotification(`Downloading ${images.length} images...`, 'success');
+                    this.downloadImage(images[i], i);
+                }, i * 500); // Increased delay to 500ms for better handling
+            }
         }
     }
 
@@ -1515,8 +1606,8 @@ class AdvAIApp {
         const imageDetails = [];
         
         AppState.history.forEach(item => {
-            const images = item.images || [item.imageUrl];
-            images.forEach(imageUrl => {
+            const imageUrl = item.imageUrl || (item.images && item.images[0]);
+            if (imageUrl) {
                 allImages.push(imageUrl);
                 imageDetails.push({
                     prompt: item.prompt,
@@ -1526,7 +1617,7 @@ class AdvAIApp {
                     date: item.timestamp,
                     generationId: item.id
                 });
-            });
+            }
         });
         
         return { allImages, imageDetails };
@@ -1641,21 +1732,7 @@ class AdvAIApp {
     downloadCurrentImage() {
         const modalImage = document.getElementById('modalImage');
         if (modalImage && modalImage.src) {
-            if (this.isInTelegram()) {
-                // In Telegram: Open in new tab
-                window.open(modalImage.src, '_blank');
-                this.showNotification('Image opened in new tab!', 'success');
-            } else {
-                // In browser: Direct download
-                const link = document.createElement('a');
-                link.href = modalImage.src;
-                link.download = `advai-image-${Date.now()}.jpg`;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                this.showNotification('Image download started!', 'success');
-            }
+            this.downloadImage(modalImage.src, 0);
         }
     }
 
