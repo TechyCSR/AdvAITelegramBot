@@ -285,6 +285,13 @@ body {
     font-size: 14px;
     font-weight: 500;
     min-height: 44px;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.mobile-menu-item:focus {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .mobile-menu-item:first-child {
@@ -300,28 +307,84 @@ body {
     transform: translateX(2px);
 }
 
+.mobile-menu-item.clear-data-btn {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.mobile-menu-item.clear-data-btn:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
 .mobile-menu-item.clear-data-btn:hover {
     background: linear-gradient(135deg, #ff4757, #ff3838);
     color: white;
     transform: translateX(2px);
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.mobile-menu-item.theme-toggle {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.mobile-menu-item.theme-toggle:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .mobile-menu-item.theme-toggle:hover {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
     color: white;
     transform: translateX(2px);
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.mobile-menu-item.telegram-link {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.mobile-menu-item.telegram-link:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .mobile-menu-item.telegram-link:hover {
     background: linear-gradient(135deg, #0088cc, #006ba6);
     color: white;
     transform: translateX(2px);
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.mobile-menu-item.user-menu-btn {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.mobile-menu-item.user-menu-btn:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .mobile-menu-item.user-menu-btn:hover {
     background: linear-gradient(135deg, var(--accent-color), #059669);
     color: white;
     transform: translateX(2px);
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .mobile-menu-item i {

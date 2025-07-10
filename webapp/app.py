@@ -525,7 +525,7 @@ def enhance_prompt():
         except Exception as e:
             logger.error(f"Error enhancing prompt: {e}")
             return jsonify({'error': 'Failed to enhance prompt'}), 500
-            
+        
     except Exception as e:
         logger.error(f"Error in enhance_prompt: {e}")
         return jsonify({'error': 'Server error'}), 500
@@ -560,7 +560,7 @@ def generate_images_api():
         size = data.get('size', '1024x1024')
         try:
             if 'x' in size:
-                width, height = map(int, size.split('x'))
+            width, height = map(int, size.split('x'))
             else:
                 width = height = 1024
             
@@ -597,7 +597,7 @@ def generate_images_api():
                 'success': True,
                 'images': image_urls,
                 'prompt': prompt,
-                'style': style,
+                    'style': style,
                 'model': model,
                 'size': f"{width}x{height}",
                 'count': len(image_urls)
@@ -606,7 +606,7 @@ def generate_images_api():
         except Exception as e:
             logger.error(f"Error generating images: {e}")
             return jsonify({'error': 'Image generation failed'}), 500
-    
+        
     except Exception as e:
         logger.error(f"Error in generate_images_api: {e}")
         return jsonify({'error': 'Server error'}), 500
