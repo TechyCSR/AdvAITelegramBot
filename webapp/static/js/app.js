@@ -43,29 +43,43 @@ class AuthSystem {
     async initialize() {
         console.log('Initializing Authentication System...');
         
+        // Small delay to ensure Telegram WebApp script is fully loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Get authentication configuration from backend
         await this.loadAuthConfig();
         
-        // Check if running in Telegram - comprehensive detection
-        const hasInitData = typeof Telegram !== 'undefined' && 
-                            Telegram.WebApp && 
-                            Telegram.WebApp.initData && 
-                            Telegram.WebApp.initData.length > 0;
+        // Enhanced Telegram detection with better debugging
+        const hasTelegramScript = typeof Telegram !== 'undefined';
+        const hasWebApp = hasTelegramScript && Telegram.WebApp;
+        const hasInitData = hasWebApp && 
+                           Telegram.WebApp.initData && 
+                           Telegram.WebApp.initData.length > 0;
         
         const hasTelegramUA = navigator.userAgent.includes('Telegram');
         const hasTelegramParams = window.location.search.includes('tgWebAppData') || 
                                  window.location.hash.includes('tgWebAppData');
         
-        // Primary check: If we have valid Telegram init data, it's definitely Telegram
-        // Secondary check: If no init data but has Telegram indicators, might be Telegram
-        // Only consider it browser mode if no Telegram indicators at all
-        this.isInTelegram = hasInitData || (hasTelegramUA && !this.isDirectBrowserAccess());
+        // Primary indicators of Telegram environment
+        const strongTelegramIndicators = hasInitData || hasTelegramUA;
+        const weakTelegramIndicators = hasTelegramScript || hasTelegramParams;
         
-        console.log('Telegram Detection Debug:', {
+        // Consider it Telegram if we have strong indicators, or weak indicators without clear browser access
+        this.isInTelegram = strongTelegramIndicators || (weakTelegramIndicators && !this.isDirectBrowserAccess());
+        
+        console.log('🔍 Telegram Environment Detection:', {
+            isInTelegram: this.isInTelegram,
+            hasTelegramScript: hasTelegramScript,
+            hasWebApp: hasWebApp,
             hasInitData: hasInitData,
-            initDataValue: hasInitData ? 'Has data' : 'No data',
+            initDataLength: hasInitData ? Telegram.WebApp.initData.length : 0,
             hasTelegramUA: hasTelegramUA,
-            hasTelegramParams: hasTelegramParams
+            hasTelegramParams: hasTelegramParams,
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            strongIndicators: strongTelegramIndicators,
+            weakIndicators: weakTelegramIndicators,
+            isDirectBrowserAccess: this.isDirectBrowserAccess()
         });
         
         console.log('Environment check:', {
@@ -116,8 +130,25 @@ class AuthSystem {
     }
 
     async initializeTelegram() {
+        console.log('Initializing Telegram mode...');
+        
+        // Hide auth overlay immediately since we're in Telegram
+        const authOverlay = document.getElementById('authOverlay');
+        if (authOverlay) {
+            authOverlay.style.display = 'none';
+            console.log('Auth overlay hidden for Telegram mode');
+        }
+        
         this.webApp = Telegram.WebApp;
         this.initData = this.webApp.initData;
+        
+        console.log('Telegram Web App data:', {
+            hasWebApp: !!this.webApp,
+            hasInitData: !!this.initData,
+            initDataLength: this.initData ? this.initData.length : 0,
+            platform: this.webApp.platform,
+            version: this.webApp.version
+        });
         
         // Configure Telegram Web App
         this.webApp.ready();
@@ -135,13 +166,17 @@ class AuthSystem {
             this.webApp.close();
         });
 
-        console.log('Telegram Web App initialized:', {
-            platform: this.webApp.platform,
-            version: this.webApp.version,
-            colorScheme: this.webApp.colorScheme,
-            themeParams: this.webApp.themeParams
-        });
+        // Check if we already have a valid session first
+        console.log('Checking existing authentication status...');
+        const isAlreadyAuthenticated = await this.checkAuthStatus();
+        
+        if (isAlreadyAuthenticated) {
+            console.log('User already authenticated, skipping Telegram auth');
+            return true;
+        }
 
+        // If no existing session, proceed with Telegram authentication
+        console.log('No existing session, proceeding with Telegram authentication...');
         return this.authenticateTelegram();
     }
 
@@ -182,12 +217,23 @@ class AuthSystem {
     }
 
     async authenticateTelegram() {
-        if (!this.initData) {
-            return this.showAuthError('No initialization data available');
+        console.log('Starting Telegram authentication...');
+        
+        if (!this.initData || this.initData.length === 0) {
+            console.error('No Telegram initialization data available');
+            console.log('Falling back to manual authentication options...');
+            
+            // In Telegram but no init data - show auth overlay with options
+            const authOverlay = document.getElementById('authOverlay');
+            if (authOverlay) {
+                authOverlay.style.display = 'flex';
+            }
+            
+            return this.showAuthenticationOptions();
         }
 
         try {
-            showAuthStatus('Authenticating with Telegram...');
+            console.log('Sending Telegram auth request with init data length:', this.initData.length);
             
             const response = await fetch('/api/auth/telegram', {
                 method: 'POST',
@@ -201,6 +247,7 @@ class AuthSystem {
             });
 
             const data = await response.json();
+            console.log('Telegram auth response:', { status: response.status, success: data.success });
 
             if (response.ok && data.success) {
                 this.authenticated = true;
@@ -224,7 +271,14 @@ class AuthSystem {
             }
         } catch (error) {
             console.error('Telegram authentication error:', error);
-            return this.showAuthError(error.message);
+            
+            // Show auth overlay with options if Telegram auth fails
+            const authOverlay = document.getElementById('authOverlay');
+            if (authOverlay) {
+                authOverlay.style.display = 'flex';
+            }
+            
+            return this.showAuthenticationOptions();
         }
     }
 
@@ -375,6 +429,9 @@ class AuthSystem {
             console.error('Auth overlay not found');
             return;
         }
+
+        // Ensure the overlay is visible
+        authOverlay.style.display = 'flex';
 
         // Hide the auth status while showing options
         hideAuthStatus();
