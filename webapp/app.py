@@ -2,24 +2,38 @@
 """
 AdvAI Image Generator Web Application
 Flask backend server with g4f integration - Serverless Compatible
+Now with Telegram Mini App Authentication
 """
 
 import os
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 # Import config for API keys with fallback
 try:
-    from config import POLLINATIONS_KEY
+    from config import POLLINATIONS_KEY, FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED
 except ImportError:
     # Fallback for Vercel deployment - get from environment variables
     POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY', '')
+    FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
+    SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '86400'))
+    TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
 
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, session, redirect, url_for
 from flask_cors import CORS
+
+# Import Telegram authentication
+from telegram_auth import (
+    require_telegram_auth,
+    authenticate_telegram_user,
+    get_current_user,
+    clear_user_session,
+    get_user_permissions,
+    TelegramUser
+)
 
 # Import g4f directly
 import g4f
@@ -32,7 +46,14 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# Configure Flask session
+app.secret_key = FLASK_SECRET_KEY
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=SESSION_TIMEOUT)
+app.config['SESSION_COOKIE_SECURE'] = True  # Enable in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Required for Telegram Mini Apps
 
 # Serverless-friendly configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
@@ -138,6 +159,72 @@ def clean_prompt(prompt: str, style: str = 'default') -> str:
     
     return prompt
 
+# =============================================================================
+# AUTHENTICATION ROUTES
+# =============================================================================
+
+@app.route('/api/auth/telegram', methods=['POST'])
+def telegram_auth():
+    """Authenticate user with Telegram Web App data"""
+    try:
+        data = request.get_json()
+        init_data = data.get('initData', '').strip()
+        
+        if not init_data:
+            return jsonify({'error': 'No initialization data provided'}), 400
+        
+        # Authenticate user
+        success, user, error = authenticate_telegram_user(init_data)
+        
+        if not success:
+            logger.warning(f"Authentication failed: {error}")
+            return jsonify({'error': error}), 401
+        
+        # Get user permissions
+        permissions = get_user_permissions(user)
+        
+        logger.info(f"User authenticated: {user.display_name} (ID: {user.id})")
+        
+        return jsonify({
+            'success': True,
+            'user': user.to_dict(),
+            'permissions': permissions,
+            'message': f'Welcome, {user.display_name}!'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in Telegram authentication: {e}")
+        return jsonify({'error': 'Authentication failed'}), 500
+
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    """Check current authentication status"""
+    user = get_current_user()
+    
+    if not user:
+        return jsonify({
+            'authenticated': False,
+            'message': 'Not authenticated'
+        })
+    
+    permissions = get_user_permissions(user)
+    
+    return jsonify({
+        'authenticated': True,
+        'user': user.to_dict(),
+        'permissions': permissions
+    })
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Logout current user"""
+    clear_user_session()
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+# =============================================================================
+# PROTECTED ROUTES
+# =============================================================================
+
 @app.route('/')
 def index():
     """Serve the main page"""
@@ -157,9 +244,16 @@ def serve_static(filename):
         return "File not found", 404
 
 @app.route('/api/enhance-prompt', methods=['POST'])
+@require_telegram_auth
 def enhance_prompt():
     """Enhance a user prompt using AI"""
     try:
+        user = get_current_user()
+        permissions = get_user_permissions(user)
+        
+        if not permissions.get('can_enhance_prompts'):
+            return jsonify({'error': 'Permission denied'}), 403
+        
         data = request.get_json()
         original_prompt = data.get('prompt', '').strip()
         
@@ -198,164 +292,147 @@ def enhance_prompt():
             if len(enhanced) > 500:
                 enhanced = enhanced[:497] + "..."
             
+            logger.info(f"Enhanced prompt for user {user.id}: {original_prompt[:50]}... -> {enhanced[:50]}...")
+            
             return jsonify({
                 'original_prompt': original_prompt,
-                'enhanced_prompt': enhanced
+                'enhanced_prompt': enhanced,
+                'success': True
             })
             
         except Exception as e:
-            logger.error(f"Error enhancing prompt with AI: {e}")
-            # Fallback enhancement
-            enhanced = f"detailed, high quality, {original_prompt}, professional lighting, stunning composition"
-            return jsonify({
-                'original_prompt': original_prompt,
-                'enhanced_prompt': enhanced
-            })
-        
+            logger.error(f"Error enhancing prompt: {e}")
+            return jsonify({'error': 'Failed to enhance prompt'}), 500
+            
     except Exception as e:
         logger.error(f"Error in enhance_prompt: {e}")
-        return jsonify({'error': 'Failed to enhance prompt'}), 500
+        return jsonify({'error': 'Server error'}), 500
 
 @app.route('/api/generate', methods=['POST'])
-def generate_images_api():
-    """Generate images based on prompt and settings"""
+@require_telegram_auth
+async def generate_images_api():
+    """Generate images using AI"""
     try:
-        # Get form data
-        description = request.form.get('description', '').strip()
-        size = request.form.get('size', '1024x1024')
-        variants = int(request.form.get('variants', 1))
-        style = request.form.get('style', 'default')
-        model = request.form.get('model', 'flux')
+        user = get_current_user()
+        permissions = get_user_permissions(user)
+        
+        if not permissions.get('can_generate_images'):
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        data = request.get_json()
         
         # Validate input
-        if not description:
-            return jsonify({'error': 'Description is required'}), 400
+        prompt = data.get('prompt', '').strip()
+        if not prompt:
+            return jsonify({'error': 'Prompt is required'}), 400
         
-        if len(description) > 500:
-            return jsonify({'error': 'Description is too long (max 500 characters)'}), 400
+        if len(prompt) > 1000:
+            return jsonify({'error': 'Prompt is too long (max 1000 characters)'}), 400
         
-        if variants not in [1, 2, 4]:
-            return jsonify({'error': 'Invalid number of variants'}), 400
+        # Get generation parameters
+        style = data.get('style', 'default')
+        model = data.get('model', 'flux')
+        num_images = min(int(data.get('num_images', 1)), permissions.get('max_images_per_request', 2))
         
-        if model not in ['flux', 'flux-pro', 'dall-e-3']:
-            return jsonify({'error': 'Invalid model selection'}), 400
-        
-        # Parse width and height from size string
+        # Parse image size
+        size = data.get('size', '1024x1024')
         try:
-            width, height = map(int, size.split('x'))
-            if width < 256 or height < 256 or width > 2048 or height > 2048:
-                return jsonify({'error': 'Invalid image dimensions'}), 400
-        except ValueError:
-            return jsonify({'error': 'Invalid image size format'}), 400
+            if 'x' in size:
+                width, height = map(int, size.split('x'))
+            else:
+                width = height = 1024
+            
+            # Validate dimensions
+            width = max(256, min(2048, width))
+            height = max(256, min(2048, height))
+            
+        except (ValueError, TypeError):
+            width = height = 1024
         
-        # Clean and enhance the prompt
-        enhanced_prompt = clean_prompt(description, style)
+        logger.info(f"Generating {num_images} images for user {user.id}: {prompt[:50]}...")
         
-        logger.info(f"Generating {variants} image(s) with prompt: {enhanced_prompt}")
-        
-        # Generate images using standalone function
+        # Generate images
         try:
-            # Use asyncio.run for serverless compatibility
-            generated_urls, error = asyncio.run(generate_images_standalone(
-                prompt=enhanced_prompt,
-                style=style if style != 'default' else None,
-                max_images=variants,
+            image_urls, error = await generate_images_standalone(
+                prompt=prompt,
+                style=style,
+                max_images=num_images,
                 width=width,
                 height=height,
                 model=model
-            ))
+            )
             
-            if error:
-                logger.error(f"Image generation error: {error}")
-                return jsonify({'error': f'Image generation failed: {error}'}), 500
+            if error or not image_urls:
+                return jsonify({
+                    'error': error or 'Failed to generate images',
+                    'success': False
+                }), 500
             
-            if not generated_urls:
-                logger.error("No images generated")
-                return jsonify({'error': 'No images were generated'}), 500
-            
-            # Format response
-            images = []
-            for i, url in enumerate(generated_urls):
-                images.append({
-                    'url': url,
-                    'id': f"{uuid.uuid4().hex}",
-                    'prompt': enhanced_prompt,
-                    'size': size,
-                    'style': style,
-                    'model': model,
-                    'index': i
-                })
+            # Log successful generation
+            logger.info(f"Successfully generated {len(image_urls)} images for user {user.id}")
             
             return jsonify({
                 'success': True,
-                'images': images,
-                'prompt': enhanced_prompt,
-                'original_prompt': description,
-                'settings': {
-                    'size': size,
-                    'variants': variants,
-                    'style': style,
-                    'model': model
-                }
+                'images': image_urls,
+                'prompt': prompt,
+                'style': style,
+                'model': model,
+                'size': f"{width}x{height}",
+                'count': len(image_urls)
             })
             
         except Exception as e:
             logger.error(f"Error generating images: {e}")
-            return jsonify({'error': 'Image generation service temporarily unavailable'}), 500
-        
+            return jsonify({'error': 'Image generation failed'}), 500
+    
     except Exception as e:
-        logger.error(f"Unexpected error in generate_images_api: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        logger.error(f"Error in generate_images_api: {e}")
+        return jsonify({'error': 'Server error'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'service': 'AdvAI Image Generator',
         'timestamp': datetime.now().isoformat(),
-        'api_configured': bool(POLLINATIONS_KEY)
+        'telegram_auth_required': TELEGRAM_MINI_APP_REQUIRED
     })
 
 @app.route('/api/stats', methods=['GET'])
+@require_telegram_auth
 def get_stats():
-    """Get service statistics"""
+    """Get user statistics"""
+    user = get_current_user()
+    
     return jsonify({
-        'total_generations': 0,
-        'active_users': 0,
-        'available_models': ['Flux', 'Flux Pro', 'DALL-E 3'],
-        'supported_sizes': ['1024x1024', '1536x1024', '1024x1536', '512x512'],
-        'max_variants': 4,
-        'service_status': 'operational'
+        'user_id': user.id if user else None,
+        'display_name': user.display_name if user else None,
+        'is_premium': user.is_premium if user else False,
+        'permissions': get_user_permissions(user)
     })
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors"""
-    return jsonify({'error': 'Endpoint not found'}), 404
+    return jsonify({'error': 'Not found'}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    """Handle 500 errors"""
     logger.error(f"Internal server error: {error}")
     return jsonify({'error': 'Internal server error'}), 500
 
-# Serverless entry point
+# =============================================================================
+# APP STARTUP
+# =============================================================================
+
 def run_app():
     """Run the Flask application"""
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
-    logger.info(f"Starting AdvAI Image Generator Web App on port {port}")
-    logger.info(f"Debug mode: {debug}")
-    logger.info(f"API Key configured: {bool(POLLINATIONS_KEY)}")
+    logger.info(f"Starting AdvAI Image Generator WebApp on port {port}")
+    logger.info(f"Telegram Mini App authentication: {'Enabled' if TELEGRAM_MINI_APP_REQUIRED else 'Disabled'}")
     
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=debug,
-        threaded=True
-    )
+    app.run(host='0.0.0.0', port=port, debug=debug)
 
 if __name__ == '__main__':
     run_app() 

@@ -7,8 +7,38 @@
     <link rel="stylesheet" href="static/css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Telegram Mini App Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
+    <!-- Authentication Overlay -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-container">
+            <div class="auth-content">
+                <div class="auth-icon">
+                    <i class="fab fa-telegram"></i>
+                </div>
+                <h2>Telegram Authentication Required</h2>
+                <p>This app can only be opened through Telegram.</p>
+                <div class="auth-status" id="authStatus">
+                    <div class="loading-spinner"></div>
+                    <span>Authenticating...</span>
+                </div>
+                <div class="auth-actions" id="authActions" style="display: none;">
+                    <button class="retry-btn" id="retryAuth">
+                        <i class="fas fa-redo"></i>
+                        Retry Authentication
+                    </button>
+                    <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link-btn">
+                        <i class="fab fa-telegram"></i>
+                        Open in Telegram
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <header class="header">
@@ -22,6 +52,18 @@
                         <span class="logo-subtitle">Powered by @AdvChatGptBot</span>
                     </div>
                 </div>
+                
+                <!-- User Info Section -->
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <div class="user-avatar" id="userAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <span class="user-name" id="userName">User</span>
+                        <span class="user-status" id="userStatus">Standard</span>
+                    </div>
+                </div>
+                
                 <nav class="nav">
                     <div class="nav-buttons">
                         <button class="nav-btn active" data-tab="generate">
@@ -39,6 +81,9 @@
                         </button>
                         <button class="theme-toggle" id="themeToggle" title="Toggle theme">
                             <i class="fas fa-moon"></i>
+                        </button>
+                        <button class="user-menu-btn" id="userMenuBtn" title="User menu" style="display: none;">
+                            <i class="fas fa-user-cog"></i>
                         </button>
                         <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link" title="Open Telegram Bot">
                             <i class="fab fa-telegram"></i>
@@ -60,6 +105,10 @@
                             <button class="mobile-menu-item theme-toggle" id="mobileThemeToggle" title="Toggle theme">
                                 <i class="fas fa-moon"></i>
                                 <span>Theme</span>
+                            </button>
+                            <button class="mobile-menu-item user-menu-btn" id="mobileUserMenuBtn" title="User menu" style="display: none;">
+                                <i class="fas fa-user-cog"></i>
+                                <span>Account</span>
                             </button>
                             <a href="https://t.me/AdvChatGptBot" target="_blank" class="mobile-menu-item telegram-link" title="Open Telegram Bot">
                                 <i class="fab fa-telegram"></i>
@@ -115,8 +164,6 @@
                                 </div>
                             </div>
                         </div>
-
-
 
                         <!-- Generation Settings -->
                         <div class="settings-grid">
@@ -200,20 +247,8 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="results-grid" id="resultsGrid">
-                            <!-- Generated images will appear here -->
-                        </div>
-                    </div>
-
-                    <!-- Loading Overlay -->
-                    <div class="loading-overlay" id="loadingOverlay">
-                        <div class="loading-content">
-                            <div class="spinner"></div>
-                            <h3>Generating your images...</h3>
-                            <p>This may take a few moments</p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
+                        <div class="images-grid" id="imagesGrid">
+                            <!-- Generated images will be inserted here -->
                         </div>
                     </div>
                 </div>
@@ -236,82 +271,58 @@
                         </div>
                     </div>
                     <div class="history-grid" id="historyGrid">
-                        <!-- History items will appear here -->
+                        <div class="empty-state">
+                            <i class="fas fa-images"></i>
+                            <h3>No history yet</h3>
+                            <p>Your generated images will appear here</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <div class="footer-content">
-                <div class="footer-info">
-                    <p>Made with <i class="fas fa-heart heart-icon"></i> by <a href="https://t.me/TechyCSR" target="_blank">@TechyCSR</a></p>
-                </div>
-                <div class="footer-links">
-                    <a href="https://t.me/AdvChatGptBot" target="_blank" class="footer-link">
-                        <i class="fab fa-telegram"></i>
-                        Telegram Bot
-                    </a>
-                    <a href="https://github.com/TechyCSR" target="_blank" class="footer-link">
-                        <i class="fab fa-github"></i>
-                        GitHub
-                    </a>
-                </div>
-            </div>
-        </footer>
     </div>
 
-    <!-- Floating Navigate Button for Mobile -->
-    <button class="floating-nav-btn" id="floatingNavBtn" title="Go to Generate Button">
-        <i class="fas fa-arrow-down"></i>
-    </button>
-
-    <!-- Image Modal -->
-    <div class="image-modal" id="imageModal">
+    <!-- User Menu Modal -->
+    <div class="modal" id="userModal">
         <div class="modal-content">
-            <button class="modal-close" id="modalClose">
-                <i class="fas fa-times"></i>
-            </button>
-            
-            <img id="modalImage" class="modal-image" src="" alt="">
-            
-            <div class="modal-info">
-                <div class="modal-prompt" id="modalPrompt"></div>
-                <div class="modal-details">
-                    <div class="modal-detail">
-                        <strong>Size:</strong> <span id="modalSize"></span>
+            <div class="modal-header">
+                <h3>User Account</h3>
+                <button class="modal-close" id="closeUserModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="user-profile">
+                    <div class="user-avatar-large" id="userAvatarLarge">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <div class="modal-detail">
-                        <strong>Style:</strong> <span id="modalStyle"></span>
-                    </div>
-                    <div class="modal-detail">
-                        <strong>Model:</strong> <span id="modalModel"></span>
+                    <div class="user-info-detailed">
+                        <h4 id="userNameDetailed">User Name</h4>
+                        <p id="userIdDetailed">ID: 123456789</p>
+                        <span class="user-badge" id="userBadge">Standard User</span>
                     </div>
                 </div>
+                <div class="user-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Max Images per Request</span>
+                        <span class="stat-value" id="maxImagesPerRequest">2</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Premium Features</span>
+                        <span class="stat-value" id="premiumFeatures">No</span>
+                    </div>
+                </div>
+                <div class="user-actions">
+                    <button class="action-btn secondary" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
             </div>
-            
-            <div class="modal-actions">
-                <button class="modal-action-btn download" id="modalDownload" title="Download Image">
-                    <i class="fas fa-download"></i>
-                </button>
-                <button class="modal-action-btn share" id="modalShare" title="Share Image">
-                    <i class="fas fa-share"></i>
-                </button>
-            </div>
-            
-            <button class="modal-nav prev" id="modalPrev">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <button class="modal-nav next" id="modalNext">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-            
-            <div class="modal-counter" id="modalCounter">1 / 1</div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Load JavaScript -->
     <script src="static/js/app.js"></script>
 </body>
 </html> 
