@@ -631,13 +631,13 @@ class AdvAIApp {
             imageItem.className = 'image-item';
             imageItem.innerHTML = `
                 <div class="image-container">
-                    <img src="${imageUrl}" alt="Generated image ${index + 1}" loading="lazy">
+                    <img src="${imageUrl}" alt="Generated image ${index + 1}" loading="lazy" onclick="app.openImageViewer('${imageUrl}', '${data.prompt.replace(/'/g, "\\'")}', '${data.style} • ${data.size}')">
                     <div class="image-overlay">
                         <div class="image-actions">
-                            <button class="action-btn" onclick="app.downloadImage('${imageUrl}', ${index})">
+                            <button class="action-btn" onclick="app.downloadImage('${imageUrl}', ${index})" title="Download image">
                                 <i class="fas fa-download"></i>
                             </button>
-                            <button class="action-btn" onclick="app.shareImage('${imageUrl}')">
+                            <button class="action-btn" onclick="app.shareImage('${imageUrl}')" title="Share image">
                                 <i class="fas fa-share"></i>
                             </button>
                         </div>
@@ -711,20 +711,17 @@ class AdvAIApp {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
             historyItem.innerHTML = `
-                <div class="history-preview">
-                    <img src="${item.images[0]}" alt="Generated image" loading="lazy">
-                    <div class="history-count">${item.count}</div>
-                </div>
+                <img class="history-image" src="${item.images[0]}" alt="Generated image" loading="lazy" onclick="app.openImageViewer('${item.images[0]}', '${item.prompt.replace(/'/g, "\\'")}', '${item.style} • ${item.model} • ${item.size}')">
                 <div class="history-info">
                     <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
                     <div class="history-details">${item.style} • ${item.model} • ${item.size}</div>
                     <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
                 </div>
                 <div class="history-actions">
-                    <button class="action-btn" onclick="app.reloadFromHistory(${item.id})">
+                    <button class="action-btn" onclick="app.reloadFromHistory(${item.id})" title="Reload settings">
                         <i class="fas fa-redo"></i>
                     </button>
-                    <button class="action-btn" onclick="app.deleteFromHistory(${item.id})">
+                    <button class="action-btn" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -810,6 +807,92 @@ class AdvAIApp {
         }).catch(() => {
             this.showError('Failed to copy link');
         });
+    }
+
+    // Image Viewer functionality
+    openImageViewer(imageUrl, prompt, details) {
+        const modal = document.getElementById('imageModal');
+        if (!modal) {
+            this.createImageModal();
+        }
+        
+        const modalImage = document.getElementById('modalImage');
+        const modalPrompt = document.getElementById('modalPrompt');
+        const modalDetails = document.getElementById('modalDetails');
+        
+        if (modalImage) modalImage.src = imageUrl;
+        if (modalPrompt) modalPrompt.textContent = prompt;
+        if (modalDetails) modalDetails.textContent = details;
+        
+        const imageModal = document.getElementById('imageModal');
+        if (imageModal) {
+            imageModal.classList.add('active');
+        }
+    }
+
+    createImageModal() {
+        const modal = document.createElement('div');
+        modal.id = 'imageModal';
+        modal.className = 'image-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <img id="modalImage" class="modal-image" src="" alt="Preview image">
+                <button class="modal-close" onclick="app.closeImageViewer()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="modal-info">
+                    <div class="modal-prompt" id="modalPrompt"></div>
+                    <div class="modal-details" id="modalDetails"></div>
+                    <div class="modal-actions">
+                        <button class="modal-action-btn download" onclick="app.downloadCurrentImage()">
+                            <i class="fas fa-download"></i>
+                            Download
+                        </button>
+                        <button class="modal-action-btn share" onclick="app.shareCurrentImage()">
+                            <i class="fas fa-share"></i>
+                            Share
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeImageViewer();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                this.closeImageViewer();
+            }
+        });
+        
+        document.body.appendChild(modal);
+    }
+
+    closeImageViewer() {
+        const modal = document.getElementById('imageModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    downloadCurrentImage() {
+        const modalImage = document.getElementById('modalImage');
+        if (modalImage && modalImage.src) {
+            this.downloadImage(modalImage.src, 0);
+        }
+    }
+
+    shareCurrentImage() {
+        const modalImage = document.getElementById('modalImage');
+        if (modalImage && modalImage.src) {
+            this.shareImage(modalImage.src);
+        }
     }
 
     showUserModal() {

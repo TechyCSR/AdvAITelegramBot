@@ -127,15 +127,22 @@ body {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    border: none;
+    border: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: var(--transition);
     text-decoration: none;
-    border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
+    outline: none;
+}
+
+.theme-toggle:focus,
+.telegram-link:focus,
+.clear-data-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
 }
 
 .theme-toggle {
@@ -187,7 +194,7 @@ body {
 .hamburger-btn {
     width: 40px;
     height: 40px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     background: var(--surface);
     cursor: pointer;
@@ -198,6 +205,12 @@ body {
     gap: 4px;
     transition: var(--transition);
     box-shadow: var(--shadow-sm);
+    outline: none;
+}
+
+.hamburger-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
 }
 
 .hamburger-btn:hover {
@@ -237,27 +250,30 @@ body {
     right: 0;
     background: var(--background);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    min-width: 150px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-10px);
-    transition: var(--transition);
+    transform: translateY(-10px) scale(0.95);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     margin-top: 8px;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
 }
 
 .mobile-dropdown.active {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
 }
 
 .mobile-menu-item {
     width: 100%;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 12px;
     padding: 12px 16px;
     border: none;
@@ -268,6 +284,7 @@ body {
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
+    min-height: 44px;
 }
 
 .mobile-menu-item:first-child {
@@ -280,38 +297,51 @@ body {
 
 .mobile-menu-item:hover {
     background: var(--surface);
+    transform: translateX(2px);
 }
 
 .mobile-menu-item.clear-data-btn:hover {
-    background: #ff4757;
+    background: linear-gradient(135deg, #ff4757, #ff3838);
     color: white;
+    transform: translateX(2px);
 }
 
 .mobile-menu-item.theme-toggle:hover {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
     color: white;
+    transform: translateX(2px);
 }
 
 .mobile-menu-item.telegram-link:hover {
-    background: #0088cc;
+    background: linear-gradient(135deg, #0088cc, #006ba6);
     color: white;
+    transform: translateX(2px);
 }
 
 .mobile-menu-item.user-menu-btn:hover {
-    background: var(--accent-color);
+    background: linear-gradient(135deg, var(--accent-color), #059669);
     color: white;
+    transform: translateX(2px);
 }
 
 .mobile-menu-item i {
     font-size: 16px;
     width: 20px;
+    height: 20px;
     text-align: center;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 .mobile-menu-item span {
     flex: 1;
     text-align: left;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
 }
 
 /* Header Styles */
@@ -1094,6 +1124,7 @@ body {
 [data-theme="dark"] .mobile-dropdown {
     background: var(--background);
     border-color: var(--border);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .mobile-menu-item {
@@ -1222,21 +1253,29 @@ body {
 
 .history-item {
     background: var(--background);
-    border-radius: var(--radius);
+    border-radius: 12px;
     overflow: hidden;
     box-shadow: var(--shadow-md);
-    transition: var(--transition);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border-light);
 }
 
 .history-item:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
 }
 
 .history-image {
     width: 100%;
     height: 200px;
     object-fit: cover;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.history-image:hover {
+    transform: scale(1.02);
 }
 
 .history-info {
@@ -2343,6 +2382,11 @@ body {
     height: 100%;
     object-fit: cover;
     transition: var(--transition);
+    cursor: pointer;
+}
+
+.image-container:hover img {
+    transform: scale(1.05);
 }
 
 .image-overlay {
