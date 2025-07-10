@@ -560,7 +560,7 @@ def generate_images_api():
         size = data.get('size', '1024x1024')
         try:
             if 'x' in size:
-            width, height = map(int, size.split('x'))
+                width, height = map(int, size.split('x'))
             else:
                 width = height = 1024
             
@@ -597,7 +597,7 @@ def generate_images_api():
                 'success': True,
                 'images': image_urls,
                 'prompt': prompt,
-                    'style': style,
+                'style': style,
                 'model': model,
                 'size': f"{width}x{height}",
                 'count': len(image_urls)
