@@ -1466,6 +1466,34 @@ body {
     gap: 1.5rem;
 }
 
+/* When history grid only contains empty state, center it */
+.history-grid:has(.empty-state:only-child) {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+/* Fallback for browsers without :has() support */
+.history-grid.empty-history {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+/* Enhanced empty state styling */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
 .history-item {
     background: var(--background);
     border-radius: var(--radius-lg);

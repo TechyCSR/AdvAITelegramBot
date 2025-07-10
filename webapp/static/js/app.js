@@ -1028,6 +1028,12 @@ class AdvAIApp {
         // Show loading overlay with progress animation
         this.showProgressOverlay();
 
+        // Scroll to progress bar to show generation in progress
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         try {
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -1222,6 +1228,7 @@ class AdvAIApp {
         if (!historyGrid) return;
 
         if (AppState.history.length === 0) {
+            historyGrid.className = 'history-grid empty-history';
             historyGrid.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-images"></i>
@@ -1232,6 +1239,7 @@ class AdvAIApp {
             return;
         }
 
+        historyGrid.className = 'history-grid';
         historyGrid.innerHTML = '';
         
         AppState.history.forEach(item => {
