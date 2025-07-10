@@ -652,6 +652,23 @@ class AuthSystem {
             enhanceBtn.title = 'Feature not available';
         }
     }
+
+    openHistoryImage(historyId, imageIndex) {
+        const historyItem = AppState.history.find(h => h.id === historyId);
+        if (!historyItem) return;
+
+        // Set up current image data for navigation
+        this.currentImages = historyItem.images;
+        this.currentImageData = historyItem;
+        this.currentImageIndex = imageIndex;
+
+        // Open the image viewer
+        this.openImageViewer(
+            historyItem.images[imageIndex], 
+            historyItem.prompt, 
+            `${historyItem.style} • ${historyItem.model} • ${historyItem.size}`
+        );
+    }
 }
 
 // Authentication UI helpers (moved below hideAuthStatus function)
@@ -689,6 +706,8 @@ class AdvAIApp {
         this.authSystem = new AuthSystem();
         this.currentImages = [];
         this.selectedVariants = 1;
+        this.currentImageIndex = 0;
+        this.currentImageData = null;
     }
 
     async initialize() {
@@ -829,6 +848,12 @@ class AdvAIApp {
         if (clearHistoryBtn) {
             clearHistoryBtn.addEventListener('click', () => this.clearHistory());
         }
+
+        // Image modal event listeners
+        this.initializeImageModal();
+        
+        // Floating navigation button
+        this.initializeFloatingNav();
     }
 
     switchTab(tabName) {
@@ -996,6 +1021,7 @@ class AdvAIApp {
 
             if (response.ok && data.success) {
                 this.currentImages = data.images;
+                this.currentImageData = data; // Store full generation data
                 this.displayImages(data);
                 this.addToHistory(data);
                 this.showSuccess(`Generated ${data.images.length} image(s) successfully!`);
@@ -1118,11 +1144,12 @@ class AdvAIApp {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
             historyItem.innerHTML = `
-                <img class="history-image" src="${item.images[0]}" alt="Generated image" loading="lazy" onclick="app.openImageViewer('${item.images[0]}', '${item.prompt.replace(/'/g, "\\'")}', '${item.style} • ${item.model} • ${item.size}')">
+                <img class="history-image" src="${item.images[0]}" alt="Generated image" loading="lazy" onclick="app.openHistoryImage(${item.id}, 0)">
                 <div class="history-info">
                     <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
                     <div class="history-details">${item.style} • ${item.model} • ${item.size}</div>
                     <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
+                    ${item.images.length > 1 ? `<div class="image-count">${item.images.length} images</div>` : ''}
                 </div>
                 <div class="history-actions">
                     <button class="action-btn" onclick="app.reloadFromHistory(${item.id})" title="Reload settings">
@@ -1296,22 +1323,37 @@ class AdvAIApp {
     // Image Viewer functionality
     openImageViewer(imageUrl, prompt, details) {
         const modal = document.getElementById('imageModal');
-        if (!modal) {
-            this.createImageModal();
+        if (!modal) return;
+        
+        // Set up current image data
+        this.currentImageIndex = this.currentImages.findIndex(img => img === imageUrl);
+        if (this.currentImageIndex === -1) {
+            this.currentImageIndex = 0;
+            this.currentImages = [imageUrl];
         }
         
+        // Update modal content
         const modalImage = document.getElementById('modalImage');
         const modalPrompt = document.getElementById('modalPrompt');
-        const modalDetails = document.getElementById('modalDetails');
+        const modalSize = document.getElementById('modalSize');
+        const modalStyle = document.getElementById('modalStyle');
+        const modalModel = document.getElementById('modalModel');
         
         if (modalImage) modalImage.src = imageUrl;
         if (modalPrompt) modalPrompt.textContent = prompt;
-        if (modalDetails) modalDetails.textContent = details;
         
-        const imageModal = document.getElementById('imageModal');
-        if (imageModal) {
-            imageModal.classList.add('active');
+        // Set image details if available
+        if (this.currentImageData) {
+            if (modalSize) modalSize.textContent = this.currentImageData.size || 'Unknown';
+            if (modalStyle) modalStyle.textContent = this.currentImageData.style || 'Default';
+            if (modalModel) modalModel.textContent = this.currentImageData.model || 'Unknown';
         }
+        
+        // Update navigation
+        this.updateModalImage();
+        
+        // Show modal
+        modal.classList.add('active');
     }
 
     createImageModal() {
@@ -1407,6 +1449,117 @@ class AdvAIApp {
         } else {
             console.error('Error:', message);
             alert(`Error: ${message}`);
+        }
+    }
+
+    initializeImageModal() {
+        const modal = document.getElementById('imageModal');
+        const modalClose = document.getElementById('modalClose');
+        const modalPrev = document.getElementById('modalPrev');
+        const modalNext = document.getElementById('modalNext');
+        const modalDownload = document.getElementById('modalDownload');
+        const modalShare = document.getElementById('modalShare');
+
+        if (modalClose) {
+            modalClose.addEventListener('click', () => this.closeImageViewer());
+        }
+
+        if (modalPrev) {
+            modalPrev.addEventListener('click', () => this.navigateImage(-1));
+        }
+
+        if (modalNext) {
+            modalNext.addEventListener('click', () => this.navigateImage(1));
+        }
+
+        if (modalDownload) {
+            modalDownload.addEventListener('click', () => this.downloadCurrentImage());
+        }
+
+        if (modalShare) {
+            modalShare.addEventListener('click', () => this.shareCurrentImage());
+        }
+
+        // Close modal when clicking outside
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeImageViewer();
+                }
+            });
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (modal && modal.classList.contains('active')) {
+                switch (e.key) {
+                    case 'Escape':
+                        this.closeImageViewer();
+                        break;
+                    case 'ArrowLeft':
+                        this.navigateImage(-1);
+                        break;
+                    case 'ArrowRight':
+                        this.navigateImage(1);
+                        break;
+                }
+            }
+        });
+    }
+
+    initializeFloatingNav() {
+        const floatingBtn = document.getElementById('floatingNavBtn');
+        if (!floatingBtn) return;
+
+        // Show/hide floating button based on scroll position
+        window.addEventListener('scroll', () => {
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                const rect = generateBtn.getBoundingClientRect();
+                const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+                
+                floatingBtn.classList.toggle('visible', !isVisible);
+            }
+        });
+
+        // Click to scroll to generate button
+        floatingBtn.addEventListener('click', () => {
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    navigateImage(direction) {
+        if (!this.currentImages || this.currentImages.length <= 1) return;
+
+        this.currentImageIndex = (this.currentImageIndex + direction + this.currentImages.length) % this.currentImages.length;
+        this.updateModalImage();
+    }
+
+    updateModalImage() {
+        if (!this.currentImages || this.currentImageIndex < 0) return;
+
+        const modalImage = document.getElementById('modalImage');
+        const modalCounter = document.getElementById('modalCounter');
+        const modalPrev = document.getElementById('modalPrev');
+        const modalNext = document.getElementById('modalNext');
+
+        if (modalImage) {
+            modalImage.src = this.currentImages[this.currentImageIndex];
+        }
+
+        if (modalCounter) {
+            modalCounter.textContent = `${this.currentImageIndex + 1} / ${this.currentImages.length}`;
+        }
+
+        if (modalPrev) {
+            modalPrev.disabled = this.currentImages.length <= 1;
+        }
+
+        if (modalNext) {
+            modalNext.disabled = this.currentImages.length <= 1;
         }
     }
 }

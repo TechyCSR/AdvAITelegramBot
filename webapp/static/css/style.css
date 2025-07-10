@@ -3447,4 +3447,12 @@ body {
         height: 50px;
         font-size: 1.25rem;
     }
+}
+
+/* Image count display in history */
+.image-count {
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
 } 
