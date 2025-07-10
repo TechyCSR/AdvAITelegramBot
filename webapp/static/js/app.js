@@ -34,6 +34,13 @@ class AuthSystem {
         // Check if running in Telegram
         this.isInTelegram = typeof Telegram !== 'undefined' && Telegram.WebApp;
         
+        console.log('Environment check:', {
+            isInTelegram: this.isInTelegram,
+            hasTelegram: typeof Telegram !== 'undefined',
+            hasWebApp: typeof Telegram !== 'undefined' && !!Telegram.WebApp,
+            authConfig: this.authConfig
+        });
+        
         if (this.isInTelegram) {
             console.log('Running in Telegram environment');
             return this.initializeTelegram();
@@ -45,12 +52,24 @@ class AuthSystem {
 
     async loadAuthConfig() {
         try {
+            console.log('Loading auth config...');
             const response = await fetch('/api/auth/config');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             this.authConfig = await response.json();
-            console.log('Auth config loaded:', this.authConfig);
+            console.log('Auth config loaded successfully:', this.authConfig);
         } catch (error) {
             console.error('Failed to load auth config:', error);
-            this.authConfig = { telegram_enabled: false, google_enabled: false };
+            // Default fallback config - assume both are disabled for safety
+            this.authConfig = { 
+                telegram_enabled: false, 
+                google_enabled: false,
+                google_client_id: null
+            };
+            console.log('Using fallback auth config:', this.authConfig);
         }
     }
 
@@ -85,12 +104,17 @@ class AuthSystem {
     }
 
     async initializeBrowser() {
+        console.log('Initializing browser authentication...');
+        
         // Check if user is already authenticated
         const isAuthenticated = await this.checkAuthStatus();
         
         if (!isAuthenticated) {
+            console.log('User not authenticated, showing authentication options...');
             // Show authentication options
             this.showAuthenticationOptions();
+        } else {
+            console.log('User already authenticated');
         }
         
         return isAuthenticated;
@@ -145,39 +169,83 @@ class AuthSystem {
 
     async authenticateGoogle() {
         try {
-            if (!this.authConfig.google_enabled) {
-                throw new Error('Google authentication not available');
+            if (!this.authConfig || !this.authConfig.google_enabled) {
+                console.log('Google authentication not enabled in config');
+                return;
             }
 
+            console.log('Starting Google authentication setup...');
             showAuthStatus('Initializing Google login...');
 
             // Load Google Sign-In library
             await this.loadGoogleSignIn();
+            console.log('Google Sign-In library loaded');
+
+            // Check if google_client_id is available
+            if (!this.authConfig.google_client_id) {
+                throw new Error('Google Client ID not configured');
+            }
 
             // Initialize Google Sign-In
             await google.accounts.id.initialize({
                 client_id: this.authConfig.google_client_id,
                 callback: this.handleGoogleCredentialResponse.bind(this)
             });
+            console.log('Google Sign-In initialized');
 
-            // Render the sign-in button
-            google.accounts.id.renderButton(
-                document.getElementById('googleSignInButton'),
-                {
-                    theme: AppState.currentTheme === 'dark' ? 'filled_black' : 'outline',
-                    size: 'large',
-                    width: 250
+            // Wait a moment for DOM to be ready
+            setTimeout(() => {
+                const googleButtonContainer = document.getElementById('googleSignInButton');
+                if (googleButtonContainer) {
+                    // Render the sign-in button
+                    google.accounts.id.renderButton(
+                        googleButtonContainer,
+                        {
+                            theme: AppState.currentTheme === 'dark' ? 'filled_black' : 'outline',
+                            size: 'large',
+                            width: 250,
+                            text: 'continue_with'
+                        }
+                    );
+                    console.log('Google Sign-In button rendered');
+
+                    // Also show One Tap if available (but don't block if it fails)
+                    try {
+                        google.accounts.id.prompt();
+                    } catch (promptError) {
+                        console.log('One Tap prompt not available:', promptError);
+                    }
+                } else {
+                    console.error('Google Sign-In button container not found');
                 }
-            );
-
-            // Also show One Tap if available
-            google.accounts.id.prompt();
+            }, 100);
 
             hideAuthStatus();
             
         } catch (error) {
             console.error('Google authentication setup error:', error);
-            this.showAuthError('Failed to initialize Google login');
+            
+            // Show a more specific error message to the user
+            const googleButton = document.getElementById('googleSignInButton');
+            if (googleButton) {
+                googleButton.innerHTML = `
+                    <div style="text-align: center; padding: 1rem; color: #dc3545; border: 1px solid #dc3545; border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p style="margin: 0.5rem 0;">Google login temporarily unavailable</p>
+                        <small style="color: #6c757d;">Please try again later or use Telegram</small>
+                        <br><br>
+                        <button onclick="authSystem.hideAuthOverlay()" style="background: #6c757d; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            Continue Anyway
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Also show the auth overlay in case it was hidden
+            const authOverlay = document.getElementById('authOverlay');
+            if (authOverlay) {
+                authOverlay.style.display = 'flex';
+            }
         }
     }
 
@@ -239,37 +307,63 @@ class AuthSystem {
     }
 
     showAuthenticationOptions() {
-        const authOverlay = document.getElementById('authOverlay');
-        if (!authOverlay) return;
-
-        let optionsHtml = '<div class="auth-options">';
+        console.log('Showing authentication options...', this.authConfig);
         
-        if (this.authConfig.google_enabled) {
+        const authOverlay = document.getElementById('authOverlay');
+        if (!authOverlay) {
+            console.error('Auth overlay not found');
+            return;
+        }
+
+        // Hide the auth status while showing options
+        hideAuthStatus();
+
+        // Create the authentication options HTML
+        let optionsHtml = `
+            <div class="auth-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h2>Choose Login Method</h2>
+            <p>Select your preferred way to access the app</p>
+            <div class="auth-options">
+        `;
+        
+        if (this.authConfig && this.authConfig.google_enabled) {
             optionsHtml += `
                 <div class="auth-option">
-                    <h3>Login with Google</h3>
-                    <p>Get premium access with your Google account</p>
+                    <h3><i class="fab fa-google"></i> Login with Google</h3>
+                    <p>Get premium access with unlimited image generation</p>
+                    <div class="google-premium-badge">
+                        <i class="fas fa-crown"></i>
+                        Premium Features Included
+                    </div>
                     <div id="googleSignInButton"></div>
                 </div>
             `;
         }
 
-        if (this.authConfig.telegram_enabled) {
+        if (this.authConfig && this.authConfig.telegram_enabled) {
             optionsHtml += `
                 <div class="auth-option">
-                    <h3>Telegram Users</h3>
-                    <p>This app is designed to be opened through Telegram.</p>
-                    <p>Please open it via your Telegram bot.</p>
+                    <h3><i class="fab fa-telegram"></i> Telegram Users</h3>
+                    <p>This app works best when opened through Telegram</p>
+                    <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link-btn">
+                        <i class="fab fa-telegram"></i>
+                        Open in Telegram
+                    </a>
                 </div>
             `;
         }
 
-        if (!this.authConfig.google_enabled && !this.authConfig.telegram_enabled) {
+        if (!this.authConfig || (!this.authConfig.google_enabled && !this.authConfig.telegram_enabled)) {
             optionsHtml += `
                 <div class="auth-option">
-                    <h3>Authentication Disabled</h3>
-                    <p>You can use the app without authentication.</p>
-                    <button onclick="authSystem.hideAuthOverlay()">Continue</button>
+                    <h3><i class="fas fa-unlock"></i> Continue Without Login</h3>
+                    <p>Authentication is disabled. You can use the app freely.</p>
+                    <button class="auth-option button" onclick="authSystem.hideAuthOverlay()">
+                        <i class="fas fa-arrow-right"></i>
+                        Continue to App
+                    </button>
                 </div>
             `;
         }
@@ -279,22 +373,29 @@ class AuthSystem {
         const authContent = document.querySelector('.auth-content');
         if (authContent) {
             authContent.innerHTML = optionsHtml;
+            console.log('Auth content updated with options');
+        } else {
+            console.error('Auth content container not found');
         }
 
         authOverlay.style.display = 'flex';
 
         // Initialize Google Sign-In if enabled
-        if (this.authConfig.google_enabled) {
-            this.authenticateGoogle();
+        if (this.authConfig && this.authConfig.google_enabled) {
+            console.log('Initializing Google Sign-In...');
+            setTimeout(() => this.authenticateGoogle(), 500); // Small delay to ensure DOM is updated
         }
     }
 
     async checkAuthStatus() {
         try {
+            console.log('Checking authentication status...');
             const response = await fetch('/api/auth/status', {
                 credentials: 'include'
             });
             const data = await response.json();
+            
+            console.log('Auth status response:', data);
             
             if (data.authenticated) {
                 this.authenticated = true;
@@ -304,8 +405,10 @@ class AuthSystem {
                 AppState.permissions = data.permissions;
                 this.hideAuthOverlay();
                 this.updateUI();
+                console.log('User is already authenticated:', this.user);
                 return true;
             }
+            console.log('User is not authenticated');
             return false;
         } catch (error) {
             console.error('Auth status check failed:', error);
@@ -440,16 +543,7 @@ class AuthSystem {
     }
 }
 
-// Authentication UI helpers
-function showAuthStatus(message, isError = false) {
-    const authStatus = document.getElementById('authStatus');
-    if (authStatus) {
-        authStatus.innerHTML = isError ? 
-            `<i class="fas fa-exclamation-triangle"></i><span>${message}</span>` :
-            `<div class="loading-spinner"></div><span>${message}</span>`;
-        authStatus.className = `auth-status ${isError ? 'error' : ''}`;
-    }
-}
+// Authentication UI helpers (moved below hideAuthStatus function)
 
 function showAuthActions() {
     const authActions = document.getElementById('authActions');
@@ -462,6 +556,19 @@ function hideAuthStatus() {
     const authStatus = document.getElementById('authStatus');
     if (authStatus) {
         authStatus.style.display = 'none';
+        console.log('Auth status hidden');
+    }
+}
+
+function showAuthStatus(message, isError = false) {
+    const authStatus = document.getElementById('authStatus');
+    if (authStatus) {
+        authStatus.innerHTML = isError ? 
+            `<i class="fas fa-exclamation-triangle"></i><span>${message}</span>` :
+            `<div class="loading-spinner"></div><span>${message}</span>`;
+        authStatus.className = `auth-status ${isError ? 'error' : ''}`;
+        authStatus.style.display = 'flex';
+        console.log('Auth status shown:', message);
     }
 }
 
@@ -476,20 +583,30 @@ class AdvAIApp {
     async initialize() {
         console.log('Initializing AdvAI App...');
         
-        // Initialize authentication system first
-        await this.authSystem.initialize();
-        
-        // Check if already authenticated
-        if (!this.authSystem.authenticated) {
-            await this.authSystem.checkAuthStatus();
+        try {
+            // Initialize authentication system first
+            console.log('Starting authentication system initialization...');
+            await this.authSystem.initialize();
+            
+            // Check if already authenticated
+            if (!this.authSystem.authenticated) {
+                console.log('Not authenticated, checking auth status...');
+                await this.authSystem.checkAuthStatus();
+            }
+            
+            // Initialize UI components regardless of auth status
+            console.log('Initializing UI components...');
+            this.initializeTheme();
+            this.initializeEventListeners();
+            this.loadHistory();
+            
+            console.log('App initialized successfully');
+        } catch (error) {
+            console.error('App initialization failed:', error);
+            // Still try to initialize basic UI even if auth fails
+            this.initializeTheme();
+            this.initializeEventListeners();
         }
-        
-        // Initialize UI components
-        this.initializeTheme();
-        this.initializeEventListeners();
-        this.loadHistory();
-        
-        console.log('App initialized successfully');
     }
 
     initializeTheme() {
