@@ -18,8 +18,8 @@
                         <i class="fas fa-robot"></i>
                     </div>
                     <div class="logo-text">
-                        <h1>AdvAI Image Generator</h1>
-                        <span class="logo-subtitle">Powered by Advanced AI</span>
+                        <h1>AI Image Generator</h1>
+                        <span class="logo-subtitle">Powered by @AdvChatGptBot</span>
                     </div>
                 </div>
                 <nav class="nav">
@@ -43,6 +43,29 @@
                         <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link" title="Open Telegram Bot">
                             <i class="fab fa-telegram"></i>
                         </a>
+                    </div>
+                    
+                    <!-- Mobile Hamburger Menu -->
+                    <div class="mobile-menu">
+                        <button class="hamburger-btn" id="hamburgerBtn" title="Menu">
+                            <span class="hamburger-line"></span>
+                            <span class="hamburger-line"></span>
+                            <span class="hamburger-line"></span>
+                        </button>
+                        <div class="mobile-dropdown" id="mobileDropdown">
+                            <button class="mobile-menu-item clear-data-btn" id="mobileCleanDataBtn" title="Clear all saved data">
+                                <i class="fas fa-broom"></i>
+                                <span>Clear All</span>
+                            </button>
+                            <button class="mobile-menu-item theme-toggle" id="mobileThemeToggle" title="Toggle theme">
+                                <i class="fas fa-moon"></i>
+                                <span>Theme</span>
+                            </button>
+                            <a href="https://t.me/AdvChatGptBot" target="_blank" class="mobile-menu-item telegram-link" title="Open Telegram Bot">
+                                <i class="fab fa-telegram"></i>
+                                <span>Bot</span>
+                            </a>
+                        </div>
                     </div>
                 </nav>
             </div>
@@ -68,17 +91,24 @@
                                     id="description" 
                                     placeholder="e.g., A futuristic city at sunset with flying cars and neon lights, vibrant colors, cinematic lighting"
                                     rows="4"
+                                    maxlength="1000"
                                 ></textarea>
                                 <div class="textarea-overlay">
-                                    <div class="char-count">0/500</div>
+                                    <div class="char-count">0/1000</div>
                                 </div>
                             </div>
                             <div class="input-actions enhanced">
-                                <button class="enhance-btn premium" id="enhanceBtn">
-                                    <i class="fas fa-sparkles"></i>
-                                    <span>Enhance Prompt</span>
-                                    <div class="btn-shine"></div>
-                                </button>
+                                <div class="action-buttons">
+                                    <button class="clear-btn" id="clearPromptBtn" title="Clear prompt">
+                                        <i class="fas fa-eraser"></i>
+                                        <span>Clear Prompt</span>
+                                    </button>
+                                    <button class="enhance-btn premium" id="enhanceBtn">
+                                        <i class="fas fa-sparkles"></i>
+                                        <span>Enhance Prompt</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
                                 <div class="input-tips">
                                     <i class="fas fa-lightbulb"></i>
                                     <span>Tip: Be specific about style, lighting, and mood for better results</span>
@@ -230,6 +260,55 @@
                 </div>
             </div>
         </footer>
+    </div>
+
+    <!-- Floating Navigate Button for Mobile -->
+    <button class="floating-nav-btn" id="floatingNavBtn" title="Go to Generate Button">
+        <i class="fas fa-arrow-down"></i>
+    </button>
+
+    <!-- Image Modal -->
+    <div class="image-modal" id="imageModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <img id="modalImage" class="modal-image" src="" alt="">
+            
+            <div class="modal-info">
+                <div class="modal-prompt" id="modalPrompt"></div>
+                <div class="modal-details">
+                    <div class="modal-detail">
+                        <strong>Size:</strong> <span id="modalSize"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <strong>Style:</strong> <span id="modalStyle"></span>
+                    </div>
+                    <div class="modal-detail">
+                        <strong>Model:</strong> <span id="modalModel"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-action-btn download" id="modalDownload" title="Download Image">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="modal-action-btn share" id="modalShare" title="Share Image">
+                    <i class="fas fa-share"></i>
+                </button>
+            </div>
+            
+            <button class="modal-nav prev" id="modalPrev">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="modal-nav next" id="modalNext">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            
+            <div class="modal-counter" id="modalCounter">1 / 1</div>
+        </div>
     </div>
 
     <!-- Scripts -->
