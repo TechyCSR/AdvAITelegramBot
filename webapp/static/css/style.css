@@ -297,14 +297,21 @@ body {
     color: white;
 }
 
+.mobile-menu-item.user-menu-btn:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
 .mobile-menu-item i {
     font-size: 16px;
     width: 20px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .mobile-menu-item span {
     flex: 1;
+    text-align: left;
 }
 
 /* Header Styles */
@@ -1112,6 +1119,11 @@ body {
     color: white;
 }
 
+[data-theme="dark"] .mobile-menu-item.user-menu-btn:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
 /* Dark Theme - Clear Button */
 [data-theme="dark"] .clear-btn {
     background: linear-gradient(135deg, var(--danger-color), #dc2626);
@@ -1438,11 +1450,16 @@ body {
     .mobile-menu-item {
         padding: 10px 14px;
         font-size: 13px;
+        gap: 10px;
     }
 
     .mobile-menu-item i {
         font-size: 14px;
         width: 18px;
+    }
+
+    .mobile-menu-item span {
+        white-space: nowrap;
     }
 
     .header-content {

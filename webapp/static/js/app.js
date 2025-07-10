@@ -402,9 +402,20 @@ class AdvAIApp {
         const mobileDropdown = document.getElementById('mobileDropdown');
         if (hamburgerBtn && mobileDropdown) {
             hamburgerBtn.addEventListener('click', () => {
+                hamburgerBtn.classList.toggle('active');
                 mobileDropdown.classList.toggle('active');
             });
         }
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (hamburgerBtn && mobileDropdown && 
+                !hamburgerBtn.contains(e.target) && 
+                !mobileDropdown.contains(e.target)) {
+                hamburgerBtn.classList.remove('active');
+                mobileDropdown.classList.remove('active');
+            }
+        });
 
         // Clear data buttons
         document.querySelectorAll('.clear-data-btn').forEach(btn => {
