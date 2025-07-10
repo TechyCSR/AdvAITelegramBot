@@ -21,6 +21,10 @@ POLLINATIONS_KEY = os.getenv('POLLINATIONS_KEY') or "your_pollinations_api_key_h
 # Telegram Bot Token for Mini App Authentication
 BOT_TOKEN = os.getenv('BOT_TOKEN') or "your_telegram_bot_token"
 
+# Google OAuth Configuration (for non-Telegram users)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or "your_google_client_id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or "your_google_client_secret"
+
 # Flask Secret Key for session management
 FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY') or "your-secret-key-change-this-in-production"
 
@@ -54,6 +58,8 @@ For production deployment, set these environment variables:
 
 POLLINATIONS_KEY=your_actual_pollinations_api_key
 BOT_TOKEN=your_actual_telegram_bot_token
+GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
 FLASK_SECRET_KEY=your_secure_random_secret_key
 FLASK_DEBUG=False
 TELEGRAM_MINI_APP_REQUIRED=True
@@ -61,6 +67,14 @@ SESSION_TIMEOUT=86400
 
 For Vercel deployment, add these to your environment variables in the dashboard.
 For other platforms, consult their documentation for setting environment variables.
+
+Google OAuth Setup:
+1. Go to Google Cloud Console (https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials (Web application)
+5. Add your domain to authorized origins
+6. Add redirect URI: https://yourdomain.com/api/auth/google/callback
 """
 
 # =============================================================================
@@ -86,6 +100,15 @@ def validate_config():
         issues.append("⚠️  WARNING: FLASK_SECRET_KEY using default value!")
         issues.append("   Please change FLASK_SECRET_KEY for production deployment")
         issues.append("   Use a cryptographically secure random string")
+    
+    # Check Google OAuth configuration (optional for non-Telegram users)
+    google_configured = (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID != "your_google_client_id.apps.googleusercontent.com" and
+                        GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_SECRET != "your_google_client_secret")
+    
+    if not google_configured:
+        issues.append("ℹ️  INFO: Google OAuth not configured")
+        issues.append("   Non-Telegram users won't be able to login")
+        issues.append("   Configure Google OAuth to allow browser-based access")
     
     if issues:
         for issue in issues:

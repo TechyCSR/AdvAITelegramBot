@@ -2094,6 +2094,120 @@ body {
     transform: translateY(-1px);
 }
 
+/* Google Authentication Styles */
+.auth-options {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.auth-option {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    transition: var(--transition);
+}
+
+.auth-option:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.auth-option h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.auth-option p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+#googleSignInButton {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+}
+
+.auth-option button {
+    padding: 0.75rem 1.5rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.auth-option button:hover {
+    background: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+/* Google Sign-In Button Overrides */
+.auth-option .g-sign-in-button {
+    margin: 0 auto;
+    border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Premium Badge for Google Users */
+.google-premium-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #4285f4, #34a853);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.google-premium-badge i {
+    font-size: 0.75rem;
+}
+
+/* Dark theme adjustments for Google auth */
+[data-theme="dark"] .auth-option {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .auth-option:hover {
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .google-premium-badge {
+    background: linear-gradient(135deg, #1a73e8, #137333);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .auth-options {
+        max-width: 100%;
+        gap: 1.5rem;
+    }
+    
+    .auth-option {
+        padding: 1.5rem;
+    }
+    
+    .auth-option h3 {
+        font-size: 1.25rem;
+    }
+}
+
 /* User Info Section */
 .user-info {
     display: none;

@@ -14,24 +14,47 @@ const AppState = {
     telegramWebApp: null
 };
 
-// Telegram Mini App Integration
-class TelegramAuth {
+// Multi-Platform Authentication System
+class AuthSystem {
     constructor() {
         this.webApp = null;
         this.initData = null;
         this.user = null;
         this.authenticated = false;
+        this.authConfig = null;
+        this.isInTelegram = false;
     }
 
     async initialize() {
-        console.log('Initializing Telegram Mini App...');
+        console.log('Initializing Authentication System...');
+        
+        // Get authentication configuration from backend
+        await this.loadAuthConfig();
         
         // Check if running in Telegram
-        if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
-            console.warn('Not running in Telegram environment');
-            return this.handleNonTelegramEnvironment();
+        this.isInTelegram = typeof Telegram !== 'undefined' && Telegram.WebApp;
+        
+        if (this.isInTelegram) {
+            console.log('Running in Telegram environment');
+            return this.initializeTelegram();
+        } else {
+            console.log('Running in browser environment');
+            return this.initializeBrowser();
         }
+    }
 
+    async loadAuthConfig() {
+        try {
+            const response = await fetch('/api/auth/config');
+            this.authConfig = await response.json();
+            console.log('Auth config loaded:', this.authConfig);
+        } catch (error) {
+            console.error('Failed to load auth config:', error);
+            this.authConfig = { telegram_enabled: false, google_enabled: false };
+        }
+    }
+
+    async initializeTelegram() {
         this.webApp = Telegram.WebApp;
         this.initData = this.webApp.initData;
         
@@ -58,10 +81,22 @@ class TelegramAuth {
             themeParams: this.webApp.themeParams
         });
 
-        return this.authenticate();
+        return this.authenticateTelegram();
     }
 
-    async authenticate() {
+    async initializeBrowser() {
+        // Check if user is already authenticated
+        const isAuthenticated = await this.checkAuthStatus();
+        
+        if (!isAuthenticated) {
+            // Show authentication options
+            this.showAuthenticationOptions();
+        }
+        
+        return isAuthenticated;
+    }
+
+    async authenticateTelegram() {
         if (!this.initData) {
             return this.showAuthError('No initialization data available');
         }
@@ -89,7 +124,7 @@ class TelegramAuth {
                 AppState.authenticated = true;
                 AppState.permissions = data.permissions;
                 
-                console.log('Authentication successful:', this.user);
+                console.log('Telegram authentication successful:', this.user);
                 this.hideAuthOverlay();
                 this.updateUI();
                 
@@ -103,8 +138,154 @@ class TelegramAuth {
                 throw new Error(data.error || 'Authentication failed');
             }
         } catch (error) {
-            console.error('Authentication error:', error);
+            console.error('Telegram authentication error:', error);
             return this.showAuthError(error.message);
+        }
+    }
+
+    async authenticateGoogle() {
+        try {
+            if (!this.authConfig.google_enabled) {
+                throw new Error('Google authentication not available');
+            }
+
+            showAuthStatus('Initializing Google login...');
+
+            // Load Google Sign-In library
+            await this.loadGoogleSignIn();
+
+            // Initialize Google Sign-In
+            await google.accounts.id.initialize({
+                client_id: this.authConfig.google_client_id,
+                callback: this.handleGoogleCredentialResponse.bind(this)
+            });
+
+            // Render the sign-in button
+            google.accounts.id.renderButton(
+                document.getElementById('googleSignInButton'),
+                {
+                    theme: AppState.currentTheme === 'dark' ? 'filled_black' : 'outline',
+                    size: 'large',
+                    width: 250
+                }
+            );
+
+            // Also show One Tap if available
+            google.accounts.id.prompt();
+
+            hideAuthStatus();
+            
+        } catch (error) {
+            console.error('Google authentication setup error:', error);
+            this.showAuthError('Failed to initialize Google login');
+        }
+    }
+
+    async loadGoogleSignIn() {
+        return new Promise((resolve, reject) => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                resolve();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    async handleGoogleCredentialResponse(response) {
+        try {
+            showAuthStatus('Authenticating with Google...');
+
+            const authResponse = await fetch('/api/auth/google/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    token: response.credential
+                })
+            });
+
+            const data = await authResponse.json();
+
+            if (authResponse.ok && data.success) {
+                this.authenticated = true;
+                this.user = data.user;
+                AppState.user = data.user;
+                AppState.authenticated = true;
+                AppState.permissions = data.permissions;
+                
+                console.log('Google authentication successful:', this.user);
+                this.hideAuthOverlay();
+                this.updateUI();
+                
+                this.showSuccess(`Welcome, ${this.user.display_name}! You have premium access.`);
+                
+                return true;
+            } else {
+                throw new Error(data.error || 'Google authentication failed');
+            }
+        } catch (error) {
+            console.error('Google authentication error:', error);
+            this.showAuthError(error.message);
+        }
+    }
+
+    showAuthenticationOptions() {
+        const authOverlay = document.getElementById('authOverlay');
+        if (!authOverlay) return;
+
+        let optionsHtml = '<div class="auth-options">';
+        
+        if (this.authConfig.google_enabled) {
+            optionsHtml += `
+                <div class="auth-option">
+                    <h3>Login with Google</h3>
+                    <p>Get premium access with your Google account</p>
+                    <div id="googleSignInButton"></div>
+                </div>
+            `;
+        }
+
+        if (this.authConfig.telegram_enabled) {
+            optionsHtml += `
+                <div class="auth-option">
+                    <h3>Telegram Users</h3>
+                    <p>This app is designed to be opened through Telegram.</p>
+                    <p>Please open it via your Telegram bot.</p>
+                </div>
+            `;
+        }
+
+        if (!this.authConfig.google_enabled && !this.authConfig.telegram_enabled) {
+            optionsHtml += `
+                <div class="auth-option">
+                    <h3>Authentication Disabled</h3>
+                    <p>You can use the app without authentication.</p>
+                    <button onclick="authSystem.hideAuthOverlay()">Continue</button>
+                </div>
+            `;
+        }
+
+        optionsHtml += '</div>';
+
+        const authContent = document.querySelector('.auth-content');
+        if (authContent) {
+            authContent.innerHTML = optionsHtml;
+        }
+
+        authOverlay.style.display = 'flex';
+
+        // Initialize Google Sign-In if enabled
+        if (this.authConfig.google_enabled) {
+            this.authenticateGoogle();
         }
     }
 
@@ -151,25 +332,13 @@ class TelegramAuth {
         }
     }
 
-    handleNonTelegramEnvironment() {
-        console.log('Handling non-Telegram environment');
-        
-        // Check if authentication is required
-        fetch('/api/health')
-            .then(response => response.json())
-            .then(data => {
-                if (data.telegram_auth_required) {
-                    this.showAuthError('This app can only be opened through Telegram');
-                } else {
-                    // Authentication disabled, proceed without auth
-                    this.hideAuthOverlay();
-                }
-            })
-            .catch(() => {
-                this.showAuthError('Service unavailable');
-            });
-        
-        return false;
+    showSuccess(message) {
+        const app = window.app;
+        if (app && app.showSuccess) {
+            app.showSuccess(message);
+        } else {
+            console.log('Success:', message);
+        }
     }
 
     showAuthError(message) {
@@ -289,10 +458,17 @@ function showAuthActions() {
     }
 }
 
+function hideAuthStatus() {
+    const authStatus = document.getElementById('authStatus');
+    if (authStatus) {
+        authStatus.style.display = 'none';
+    }
+}
+
 // Main application class
 class AdvAIApp {
     constructor() {
-        this.telegramAuth = new TelegramAuth();
+        this.authSystem = new AuthSystem();
         this.currentImages = [];
         this.selectedVariants = 1;
     }
@@ -300,12 +476,12 @@ class AdvAIApp {
     async initialize() {
         console.log('Initializing AdvAI App...');
         
-        // Initialize Telegram authentication first
-        await this.telegramAuth.initialize();
+        // Initialize authentication system first
+        await this.authSystem.initialize();
         
         // Check if already authenticated
-        if (!this.telegramAuth.authenticated) {
-            await this.telegramAuth.checkAuthStatus();
+        if (!this.authSystem.authenticated) {
+            await this.authSystem.checkAuthStatus();
         }
         
         // Initialize UI components
@@ -388,7 +564,7 @@ class AdvAIApp {
         // Logout button
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.telegramAuth.logout());
+            logoutBtn.addEventListener('click', () => this.authSystem.logout());
         }
 
         // Retry authentication
@@ -785,7 +961,7 @@ class AdvAIApp {
     }
 
     async shareImage(imageUrl) {
-        if (navigator.share && this.telegramAuth.webApp) {
+        if (navigator.share && this.authSystem.webApp) {
             try {
                 await navigator.share({
                     title: 'AI Generated Image',
@@ -910,16 +1086,16 @@ class AdvAIApp {
     }
 
     showSuccess(message) {
-        if (this.telegramAuth.webApp) {
-            this.telegramAuth.webApp.showAlert(message);
+        if (this.authSystem.webApp) {
+            this.authSystem.webApp.showAlert(message);
         } else {
             console.log('Success:', message);
         }
     }
 
     showError(message) {
-        if (this.telegramAuth.webApp) {
-            this.telegramAuth.webApp.showAlert(`Error: ${message}`);
+        if (this.authSystem.webApp) {
+            this.authSystem.webApp.showAlert(`Error: ${message}`);
         } else {
             console.error('Error:', message);
             alert(`Error: ${message}`);
@@ -929,10 +1105,13 @@ class AdvAIApp {
 
 // Initialize app when DOM is loaded
 let app;
+let authSystem;
 document.addEventListener('DOMContentLoaded', async () => {
     app = new AdvAIApp();
+    authSystem = app.authSystem;
     await app.initialize();
 });
 
-// Make app globally available for onclick handlers
+// Make app and authSystem globally available for onclick handlers
 window.app = app;
+window.authSystem = authSystem;

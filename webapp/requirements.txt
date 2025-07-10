@@ -7,3 +7,6 @@ pillow>=10.0.0
 python-dotenv>=1.0.0
 gunicorn>=21.0.0
 dotenv
+google-auth>=2.23.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.1

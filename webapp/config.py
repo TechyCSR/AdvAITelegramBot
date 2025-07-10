@@ -19,12 +19,22 @@ FLASK_DEBUG = os.getenv('FLASK_DEBUG') or ""
 # Telegram Bot Configuration for Mini App Authentication
 BOT_TOKEN = os.getenv('BOT_TOKEN') or ""
 
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or ""
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or ""
+
 # Alternative: Load from environment variable (recommended for production)
 if os.environ.get('POLLINATIONS_KEY'):
     POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY')
 
 if os.environ.get('BOT_TOKEN'):
     BOT_TOKEN = os.environ.get('BOT_TOKEN')
+
+if os.environ.get('GOOGLE_CLIENT_ID'):
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+    
+if os.environ.get('GOOGLE_CLIENT_SECRET'):
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # =============================================================================
 # WEBAPP CONFIGURATION

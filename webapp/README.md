@@ -1,13 +1,14 @@
-# 🤖 AdvAI Image Generator - Telegram Mini App
+# 🤖 AdvAI Image Generator - Multi-Platform Authentication
 
-A powerful AI image generation web application designed to work as a **Telegram Mini App** with seamless authentication and user management.
+A powerful AI image generation web application that works as a **Telegram Mini App** or standalone web app with **Google OAuth** authentication for premium features.
 
 ## ✨ Features
 
-- 🔐 **Telegram Mini App Authentication** - Secure login through Telegram
+- 🔐 **Multi-Platform Authentication** - Telegram Mini App + Google OAuth support
 - 🎨 **AI Image Generation** - Multiple models (Flux, DALL-E 3) with style options
 - ✨ **Prompt Enhancement** - AI-powered prompt improvement
 - 👤 **User Management** - Premium features and permission-based access
+- 💎 **Google Premium Access** - Automatic premium features for Google users
 - 🌙 **Theme Support** - Dark/Light modes that sync with Telegram
 - 📱 **Mobile Responsive** - Optimized for mobile and desktop
 - 🎯 **Real-time Generation** - Progress tracking and status updates
@@ -16,9 +17,10 @@ A powerful AI image generation web application designed to work as a **Telegram 
 
 ### Prerequisites
 
-1. **Telegram Bot Token** - Get from [@BotFather](https://t.me/BotFather)
-2. **Pollinations API Key** - Get from [Pollinations.ai](https://pollinations.ai/)
-3. **Python 3.8+** - For local development
+1. **Telegram Bot Token** - Get from [@BotFather](https://t.me/BotFather) (for Telegram integration)
+2. **Google OAuth Credentials** - Get from [Google Cloud Console](https://console.cloud.google.com/) (for browser access)
+3. **Pollinations API Key** - Get from [Pollinations.ai](https://pollinations.ai/)
+4. **Python 3.8+** - For local development
 
 ### Installation
 
@@ -56,7 +58,9 @@ A powerful AI image generation web application designed to work as a **Telegram 
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `BOT_TOKEN` | Telegram Bot Token from @BotFather | ✅ Yes |
+| `BOT_TOKEN` | Telegram Bot Token from @BotFather | ⚡ For Telegram |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | ⚡ For Google Auth |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | ⚡ For Google Auth |
 | `POLLINATIONS_KEY` | API key for image generation | ✅ Yes |
 | `FLASK_SECRET_KEY` | Secret key for session management | ✅ Yes |
 | `TELEGRAM_MINI_APP_REQUIRED` | Enable/disable Telegram auth | ❌ No (default: True) |
@@ -67,7 +71,14 @@ A powerful AI image generation web application designed to work as a **Telegram 
 
 ```python
 # config.py
+# Telegram Integration (optional)
 BOT_TOKEN = "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi"
+
+# Google OAuth (optional - for browser access)
+GOOGLE_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "your_google_client_secret"
+
+# Required for all setups
 POLLINATIONS_KEY = "your_pollinations_api_key"
 FLASK_SECRET_KEY = "your-cryptographically-secure-secret-key"
 
@@ -106,6 +117,43 @@ MAX_IMAGES_PER_REQUEST = 4
 2. Tap the menu button or send `/start`
 3. The webapp should open with authentication
 
+## 🔑 Google OAuth Setup (Browser Access)
+
+### 1. Create Google Cloud Project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable the **Google+ API** or **People API**
+
+### 2. Create OAuth 2.0 Credentials
+
+1. Navigate to **APIs & Services** → **Credentials**
+2. Click **Create Credentials** → **OAuth 2.0 Client IDs**
+3. Choose **Web application** as application type
+4. Add your domains to **Authorized origins**:
+   ```
+   https://yourdomain.com
+   http://localhost:5000  (for development)
+   ```
+5. Add callback URLs to **Authorized redirect URIs**:
+   ```
+   https://yourdomain.com/api/auth/google/callback
+   http://localhost:5000/api/auth/google/callback
+   ```
+
+### 3. Configure Environment Variables
+
+```bash
+export GOOGLE_CLIENT_ID="your_client_id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your_client_secret"
+```
+
+### 4. Test Google Authentication
+
+1. Open your webapp directly in browser (not through Telegram)
+2. You should see a "Login with Google" option
+3. After login, users automatically get premium features
+
 ## 🚀 Deployment Options
 
 ### Option 1: Vercel (Recommended)
@@ -118,6 +166,8 @@ MAX_IMAGES_PER_REQUEST = 4
 3. **Set environment variables in Vercel dashboard:**
    ```
    BOT_TOKEN=your_telegram_bot_token
+   GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
    POLLINATIONS_KEY=your_pollinations_api_key
    FLASK_SECRET_KEY=your_secure_secret_key
    ```
@@ -134,6 +184,8 @@ MAX_IMAGES_PER_REQUEST = 4
 2. **Set environment variables:**
    ```bash
    heroku config:set BOT_TOKEN=your_telegram_bot_token
+   heroku config:set GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+   heroku config:set GOOGLE_CLIENT_SECRET=your_google_client_secret
    heroku config:set POLLINATIONS_KEY=your_pollinations_api_key
    heroku config:set FLASK_SECRET_KEY=your_secure_secret_key
    ```
@@ -154,6 +206,8 @@ MAX_IMAGES_PER_REQUEST = 4
    ```bash
    docker run -p 5000:5000 \
      -e BOT_TOKEN=your_telegram_bot_token \
+     -e GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com \
+     -e GOOGLE_CLIENT_SECRET=your_google_client_secret \
      -e POLLINATIONS_KEY=your_pollinations_api_key \
      -e FLASK_SECRET_KEY=your_secure_secret_key \
      advai-webapp
@@ -163,10 +217,18 @@ MAX_IMAGES_PER_REQUEST = 4
 
 ### Authentication Flow
 
+**Telegram Users:**
 1. **Telegram Verification** - Validates initData from Telegram WebApp
 2. **Hash Validation** - Ensures data integrity using HMAC-SHA256
-3. **Session Management** - Secure session handling with timeout
-4. **Permission System** - Role-based access to features
+
+**Google Users:**
+1. **OAuth 2.0 Flow** - Secure Google authentication
+2. **ID Token Validation** - Verifies Google JWT tokens
+3. **Automatic Premium** - Google users get premium features
+
+**All Users:**
+1. **Session Management** - Secure session handling with timeout
+2. **Permission System** - Role-based access to features
 
 ### Security Best Practices
 
@@ -235,7 +297,11 @@ webapp/
 
 | Endpoint | Method | Description |
 |----------|---------|-------------|
+| `/api/auth/config` | GET | Get authentication configuration |
 | `/api/auth/telegram` | POST | Authenticate with Telegram |
+| `/api/auth/google` | GET | Initiate Google OAuth flow |
+| `/api/auth/google/callback` | GET | Google OAuth callback |
+| `/api/auth/google/token` | POST | Authenticate with Google ID token |
 | `/api/auth/status` | GET | Check authentication status |
 | `/api/auth/logout` | POST | Logout user |
 | `/api/generate` | POST | Generate images |
@@ -257,6 +323,15 @@ A: Increase `SESSION_TIMEOUT` in configuration
 
 **Q: Mini App doesn't open**
 A: Verify your webapp URL is correct in @BotFather settings
+
+**Q: Google login button doesn't appear**
+A: Check if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are configured
+
+**Q: Google authentication fails**
+A: Ensure your domain is added to authorized origins in Google Cloud Console
+
+**Q: "Google authentication not available" error**
+A: Install Google auth dependencies: `pip install google-auth google-auth-oauthlib`
 
 ### Debug Mode
 

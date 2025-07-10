@@ -25,14 +25,21 @@ except ImportError:
 from flask import Flask, request, jsonify, send_from_directory, Response, session, redirect, url_for
 from flask_cors import CORS
 
-# Import Telegram authentication
+# Import Multi-Platform authentication
 from telegram_auth import (
-    require_telegram_auth,
+    require_auth,
+    require_telegram_auth,  # Backward compatibility
     authenticate_telegram_user,
+    authenticate_google_user,
     get_current_user,
     clear_user_session,
     get_user_permissions,
-    TelegramUser
+    get_auth_config,
+    is_google_auth_available,
+    create_google_oauth_flow,
+    generate_state_token,
+    User,
+    TelegramUser  # Backward compatibility alias
 )
 
 # Import g4f directly
@@ -304,6 +311,138 @@ def logout():
     clear_user_session()
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
+@app.route('/api/auth/config', methods=['GET'])
+def auth_config():
+    """Get authentication configuration for frontend"""
+    return jsonify(get_auth_config())
+
+@app.route('/api/auth/google', methods=['GET'])
+def google_auth():
+    """Initiate Google OAuth flow"""
+    try:
+        if not is_google_auth_available():
+            return jsonify({'error': 'Google authentication not available'}), 503
+        
+        # Generate state token for security
+        state = generate_state_token()
+        session['oauth_state'] = state
+        
+        # Create OAuth flow
+        flow = create_google_oauth_flow()
+        
+        # Get authorization URL
+        authorization_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            state=state
+        )
+        
+        return jsonify({
+            'authorization_url': authorization_url,
+            'state': state
+        })
+        
+    except Exception as e:
+        logger.error(f"Error initiating Google OAuth: {e}")
+        return jsonify({'error': 'Failed to initiate Google login'}), 500
+
+@app.route('/api/auth/google/callback', methods=['GET', 'POST'])
+def auth_google_callback():
+    """Handle Google OAuth callback"""
+    try:
+        if not is_google_auth_available():
+            return jsonify({'error': 'Google authentication not available'}), 503
+        
+        # Verify state parameter to prevent CSRF
+        state = request.args.get('state')
+        if not state or state != session.get('oauth_state'):
+            return jsonify({'error': 'Invalid state parameter'}), 400
+        
+        # Clear the state from session
+        session.pop('oauth_state', None)
+        
+        # Get authorization code
+        code = request.args.get('code')
+        if not code:
+            error = request.args.get('error')
+            return jsonify({'error': f'OAuth failed: {error}'}), 400
+        
+        # Exchange code for tokens
+        flow = create_google_oauth_flow()
+        flow.fetch_token(code=code)
+        
+        # Get user info from ID token
+        credentials = flow.credentials
+        id_token_jwt = credentials.id_token
+        
+        # Authenticate user with the token
+        success, user, error = authenticate_google_user(id_token_jwt)
+        
+        if not success:
+            logger.warning(f"Google authentication failed: {error}")
+            return jsonify({'error': error}), 401
+        
+        # Get user permissions
+        permissions = get_user_permissions(user)
+        
+        logger.info(f"Google user authenticated: {user.display_name} (ID: {user.id})")
+        
+        # Check if this is a direct API call or browser redirect
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            # API call - return JSON
+            return jsonify({
+                'success': True,
+                'user': user.to_dict(),
+                'permissions': permissions,
+                'message': f'Welcome, {user.display_name}!'
+            })
+        else:
+            # Browser redirect - redirect to main page with success
+            return redirect('/?auth=success')
+            
+    except Exception as e:
+        logger.error(f"Error in Google OAuth callback: {e}")
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'error': 'Authentication failed'}), 500
+        else:
+            return redirect('/?auth=error')
+
+@app.route('/api/auth/google/token', methods=['POST'])
+def google_token_auth():
+    """Authenticate with Google ID token directly"""
+    try:
+        if not is_google_auth_available():
+            return jsonify({'error': 'Google authentication not available'}), 503
+        
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        
+        if not token:
+            return jsonify({'error': 'No token provided'}), 400
+        
+        # Authenticate user with the token
+        success, user, error = authenticate_google_user(token)
+        
+        if not success:
+            logger.warning(f"Google token authentication failed: {error}")
+            return jsonify({'error': error}), 401
+        
+        # Get user permissions
+        permissions = get_user_permissions(user)
+        
+        logger.info(f"Google user authenticated via token: {user.display_name} (ID: {user.id})")
+        
+        return jsonify({
+            'success': True,
+            'user': user.to_dict(),
+            'permissions': permissions,
+            'message': f'Welcome, {user.display_name}!'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in Google token authentication: {e}")
+        return jsonify({'error': 'Authentication failed'}), 500
+
 # =============================================================================
 # PROTECTED ROUTES
 # =============================================================================
@@ -327,7 +466,7 @@ def serve_static(filename):
         return "File not found", 404
 
 @app.route('/api/enhance-prompt', methods=['POST'])
-@require_telegram_auth
+@require_auth
 def enhance_prompt():
     """Enhance a user prompt using AI"""
     try:
@@ -392,7 +531,7 @@ def enhance_prompt():
         return jsonify({'error': 'Server error'}), 500
 
 @app.route('/api/generate', methods=['POST'])
-@require_telegram_auth
+@require_auth
 def generate_images_api():
     """Generate images using AI"""
     try:
@@ -482,7 +621,7 @@ def health_check():
     })
 
 @app.route('/api/stats', methods=['GET'])
-@require_telegram_auth
+@require_auth
 def get_stats():
     """Get user statistics"""
     user = get_current_user()

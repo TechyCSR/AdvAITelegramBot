@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Telegram Mini App Authentication Module
-Handles validation of Telegram Web App data and user sessions
+Multi-Platform Authentication Module
+Handles validation of Telegram Web App data, Google OAuth, and user sessions
 """
 
 import hashlib
@@ -12,29 +12,59 @@ import urllib.parse
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import request, jsonify, session
+from flask import request, jsonify, session, redirect, url_for
+import secrets
+import string
+
+# Google OAuth imports
+try:
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+    from google_auth_oauthlib.flow import Flow
+    GOOGLE_AUTH_AVAILABLE = True
+except ImportError:
+    GOOGLE_AUTH_AVAILABLE = False
 
 try:
-    from config import BOT_TOKEN, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED
+    from config import BOT_TOKEN, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 except ImportError:
     # Fallback for environment variables
     import os
     BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
     SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '86400'))  # 24 hours
     TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 
-class TelegramUser:
-    """Represents a Telegram user with their data"""
+class User:
+    """Represents a user with their data from either Telegram or Google"""
     
-    def __init__(self, user_data: Dict[str, Any]):
-        self.id = user_data.get('id')
-        self.first_name = user_data.get('first_name', '')
-        self.last_name = user_data.get('last_name', '')
-        self.username = user_data.get('username', '')
-        self.language_code = user_data.get('language_code', 'en')
-        self.is_premium = user_data.get('is_premium', False)
-        self.allows_write_to_pm = user_data.get('allows_write_to_pm', False)
-        self.photo_url = user_data.get('photo_url', '')
+    def __init__(self, user_data: Dict[str, Any], auth_type: str = 'telegram'):
+        self.auth_type = auth_type  # 'telegram' or 'google'
+        
+        if auth_type == 'telegram':
+            self.id = f"tg_{user_data.get('id')}"
+            self.telegram_id = user_data.get('id')
+            self.first_name = user_data.get('first_name', '')
+            self.last_name = user_data.get('last_name', '')
+            self.username = user_data.get('username', '')
+            self.language_code = user_data.get('language_code', 'en')
+            self.is_premium = user_data.get('is_premium', False)
+            self.allows_write_to_pm = user_data.get('allows_write_to_pm', False)
+            self.photo_url = user_data.get('photo_url', '')
+            self.email = None
+        elif auth_type == 'google':
+            self.id = f"g_{user_data.get('sub')}"  # Google user ID
+            self.google_id = user_data.get('sub')
+            self.first_name = user_data.get('given_name', '')
+            self.last_name = user_data.get('family_name', '')
+            self.username = None
+            self.language_code = user_data.get('locale', 'en')
+            self.is_premium = True  # Google users get premium status
+            self.allows_write_to_pm = True
+            self.photo_url = user_data.get('picture', '')
+            self.email = user_data.get('email', '')
+            self.telegram_id = None
         
     @property
     def full_name(self) -> str:
@@ -44,13 +74,21 @@ class TelegramUser:
     
     @property
     def display_name(self) -> str:
-        """Get user's display name (full name or username)"""
-        return self.full_name or f"@{self.username}" if self.username else f"User {self.id}"
+        """Get user's display name (full name, username, or email)"""
+        if self.full_name:
+            return self.full_name
+        elif self.username:
+            return f"@{self.username}"
+        elif self.email:
+            return self.email
+        else:
+            return f"User {self.id}"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert user to dictionary"""
         return {
             'id': self.id,
+            'auth_type': self.auth_type,
             'first_name': self.first_name,
             'last_name': self.last_name,
             'username': self.username,
@@ -58,9 +96,15 @@ class TelegramUser:
             'is_premium': self.is_premium,
             'allows_write_to_pm': self.allows_write_to_pm,
             'photo_url': self.photo_url,
+            'email': self.email,
             'full_name': self.full_name,
-            'display_name': self.display_name
+            'display_name': self.display_name,
+            'telegram_id': getattr(self, 'telegram_id', None),
+            'google_id': getattr(self, 'google_id', None)
         }
+
+# Backward compatibility - alias for existing code
+TelegramUser = User
 
 def validate_telegram_webapp_data(init_data: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
@@ -146,35 +190,98 @@ def validate_telegram_webapp_data(init_data: str) -> Tuple[bool, Optional[Dict[s
     except Exception as e:
         return False, None, f"Error validating data: {str(e)}"
 
-def create_user_session(user_data: Dict[str, Any]) -> TelegramUser:
+def create_google_oauth_flow(redirect_uri: str = None):
+    """Create Google OAuth flow"""
+    if not GOOGLE_AUTH_AVAILABLE:
+        raise ImportError("Google auth libraries not installed")
+    
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise ValueError("Google OAuth not configured")
+    
+    if not redirect_uri:
+        redirect_uri = url_for('auth_google_callback', _external=True)
+    
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [redirect_uri]
+            }
+        },
+        scopes=['openid', 'email', 'profile']
+    )
+    flow.redirect_uri = redirect_uri
+    return flow
+
+def validate_google_token(token: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
-    Create a user session from validated Telegram data
+    Validate Google ID token
     
     Args:
-        user_data: Validated user data from Telegram
+        token: Google ID token
         
     Returns:
-        TelegramUser object
+        Tuple of (is_valid, user_data, error_message)
     """
-    telegram_user = TelegramUser(user_data)
+    if not GOOGLE_AUTH_AVAILABLE:
+        return False, None, "Google auth not available"
+    
+    if not GOOGLE_CLIENT_ID:
+        return False, None, "Google OAuth not configured"
+    
+    try:
+        # Verify the token
+        id_info = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            GOOGLE_CLIENT_ID
+        )
+        
+        # Check if the token is valid
+        if id_info['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+            return False, None, "Invalid token issuer"
+        
+        return True, id_info, None
+        
+    except ValueError as e:
+        return False, None, f"Invalid token: {str(e)}"
+    except Exception as e:
+        return False, None, f"Error validating token: {str(e)}"
+
+def create_user_session(user_data: Dict[str, Any], auth_type: str = 'telegram') -> User:
+    """
+    Create a user session from validated data
+    
+    Args:
+        user_data: Validated user data from Telegram or Google
+        auth_type: Authentication type ('telegram' or 'google')
+        
+    Returns:
+        User object
+    """
+    user = User(user_data, auth_type)
     
     # Store user data in Flask session
-    session['telegram_user'] = telegram_user.to_dict()
+    session['user'] = user.to_dict()
     session['authenticated'] = True
     session['auth_time'] = time.time()
-    session['user_id'] = telegram_user.id
+    session['user_id'] = user.id
+    session['auth_type'] = auth_type
     
     # Set session to be permanent and configure timeout
     session.permanent = True
     
-    return telegram_user
+    return user
 
-def get_current_user() -> Optional[TelegramUser]:
+def get_current_user() -> Optional[User]:
     """
     Get current authenticated user from session
     
     Returns:
-        TelegramUser object if authenticated, None otherwise
+        User object if authenticated, None otherwise
     """
     if not session.get('authenticated'):
         return None
@@ -185,43 +292,58 @@ def get_current_user() -> Optional[TelegramUser]:
         clear_user_session()
         return None
     
-    user_data = session.get('telegram_user')
+    user_data = session.get('user')
     if not user_data:
         return None
     
-    return TelegramUser(user_data)
+    auth_type = user_data.get('auth_type', 'telegram')
+    return User(user_data, auth_type)
 
 def clear_user_session():
     """Clear user session data"""
-    session.pop('telegram_user', None)
+    session.pop('user', None)
+    session.pop('telegram_user', None)  # Backward compatibility
     session.pop('authenticated', None)
     session.pop('auth_time', None)
     session.pop('user_id', None)
+    session.pop('auth_type', None)
 
-def require_telegram_auth(f):
+def generate_state_token() -> str:
+    """Generate a secure state token for OAuth"""
+    return ''.join(secrets.choice(string.ascii_letters + string.digits) for i in range(32))
+
+def require_auth(f):
     """
-    Decorator to require Telegram authentication for routes
+    Decorator to require authentication for routes (Telegram or Google)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not TELEGRAM_MINI_APP_REQUIRED:
-            # Authentication disabled, proceed with dummy user
+        if not TELEGRAM_MINI_APP_REQUIRED and not GOOGLE_CLIENT_ID:
+            # Authentication disabled, proceed without user
             return f(*args, **kwargs)
         
         user = get_current_user()
         if not user:
             return jsonify({
                 'error': 'Authentication required',
-                'message': 'Please open this app through Telegram'
+                'message': 'Please login to access this feature',
+                'auth_options': {
+                    'telegram': bool(BOT_TOKEN and TELEGRAM_MINI_APP_REQUIRED),
+                    'google': bool(GOOGLE_CLIENT_ID and GOOGLE_AUTH_AVAILABLE)
+                }
             }), 401
         
         # Add user to request context
-        request.telegram_user = user
+        request.user = user
+        request.telegram_user = user  # Backward compatibility
         return f(*args, **kwargs)
     
     return decorated_function
 
-def authenticate_telegram_user(init_data: str) -> Tuple[bool, Optional[TelegramUser], Optional[str]]:
+# Backward compatibility
+require_telegram_auth = require_auth
+
+def authenticate_telegram_user(init_data: str) -> Tuple[bool, Optional[User], Optional[str]]:
     """
     Complete authentication flow for Telegram user
     
@@ -242,25 +364,73 @@ def authenticate_telegram_user(init_data: str) -> Tuple[bool, Optional[TelegramU
     
     # Create user session
     try:
-        user = create_user_session(parsed_data['user'])
+        user = create_user_session(parsed_data['user'], 'telegram')
         return True, user, None
     except Exception as e:
         return False, None, f"Error creating user session: {str(e)}"
 
-def get_user_permissions(user: TelegramUser) -> Dict[str, bool]:
+def authenticate_google_user(token: str) -> Tuple[bool, Optional[User], Optional[str]]:
     """
-    Get user permissions based on their Telegram status
+    Complete authentication flow for Google user
     
     Args:
-        user: TelegramUser object
+        token: Google ID token
+        
+    Returns:
+        Tuple of (success, user_object, error_message)
+    """
+    # Validate the token
+    is_valid, user_data, error = validate_google_token(token)
+    
+    if not is_valid:
+        return False, None, error
+    
+    if not user_data:
+        return False, None, "No user data found in token"
+    
+    # Create user session
+    try:
+        user = create_user_session(user_data, 'google')
+        return True, user, None
+    except Exception as e:
+        return False, None, f"Error creating user session: {str(e)}"
+
+def get_user_permissions(user: User) -> Dict[str, bool]:
+    """
+    Get user permissions based on their status
+    
+    Args:
+        user: User object
         
     Returns:
         Dictionary of permissions
     """
+    if not user:
+        return {
+            'can_generate_images': False,
+            'can_enhance_prompts': False,
+            'can_access_premium_models': False,
+            'can_generate_multiple_images': False,
+            'max_images_per_request': 0
+        }
+    
     return {
         'can_generate_images': True,
         'can_enhance_prompts': True,
-        'can_access_premium_models': user.is_premium if user else False,
+        'can_access_premium_models': user.is_premium,
         'can_generate_multiple_images': True,
-        'max_images_per_request': 4 if user and user.is_premium else 2
+        'max_images_per_request': 4 if user.is_premium else 2
+    }
+
+def is_google_auth_available() -> bool:
+    """Check if Google authentication is available and configured"""
+    return GOOGLE_AUTH_AVAILABLE and bool(GOOGLE_CLIENT_ID) and bool(GOOGLE_CLIENT_SECRET)
+
+def get_auth_config() -> Dict[str, Any]:
+    """Get authentication configuration for frontend"""
+    return {
+        'telegram_enabled': bool(BOT_TOKEN and TELEGRAM_MINI_APP_REQUIRED),
+        'google_enabled': is_google_auth_available(),
+        'google_client_id': GOOGLE_CLIENT_ID if is_google_auth_available() else None,
+        'session_timeout': SESSION_TIMEOUT
     } 
