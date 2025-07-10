@@ -120,7 +120,7 @@
         <main class="main">
             <!-- Generate Tab -->
             <div class="tab-content active" id="generate">
-                <div class="generate-section">
+                <div class="generate-section" style="position: relative;">
                     <div class="input-section">
                         <h2>Create Amazing Images with AI</h2>
                         <p class="subtitle">Describe what you want to see and let AI bring it to life</p>
@@ -229,7 +229,7 @@
                     </div>
 
                     <!-- Results Section -->
-                    <div class="results-section" id="resultsSection" style="position: relative;">
+                    <div class="results-section" id="resultsSection">
                         <div class="results-header">
                             <h3>Generated Images</h3>
                             <div class="results-actions">
@@ -246,16 +246,16 @@
                         <div class="images-grid" id="imagesGrid">
                             <!-- Generated images will be inserted here -->
                         </div>
-                        
-                        <!-- Loading Overlay -->
-                        <div class="loading-overlay" id="loadingOverlay">
-                            <div class="loading-content">
-                                <div class="spinner"></div>
-                                <h3>Generating your images...</h3>
-                                <p>This may take a few moments</p>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="progressFill"></div>
-                                </div>
+                    </div>
+                    
+                    <!-- Loading Overlay -->
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <h3>Generating your images...</h3>
+                            <p>This may take a few moments</p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
                             </div>
                         </div>
                     </div>

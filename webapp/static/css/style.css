@@ -1133,7 +1133,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(45, 55, 70, 0.95);
     display: none;
     align-items: center;
     justify-content: center;
@@ -1152,8 +1152,8 @@ body {
 .spinner {
     width: 3rem;
     height: 3rem;
-    border: 3px solid var(--border);
-    border-top: 3px solid var(--primary-color);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top: 3px solid #00bcd4;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem;
@@ -1166,26 +1166,30 @@ body {
 
 .loading-content h3 {
     margin-bottom: 0.5rem;
-    color: var(--text-primary);
+    color: white;
+    font-weight: 500;
+    font-size: 1.125rem;
 }
 
 .loading-content p {
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.8);
     margin-bottom: 1.5rem;
+    font-size: 0.95rem;
 }
 
 .progress-bar {
     width: 100%;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 1.5px;
     overflow: hidden;
+    margin-top: 1rem;
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
-    border-radius: 2px;
+    background: linear-gradient(90deg, #00bcd4, #26c6da);
+    border-radius: 1.5px;
     transition: width 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -1198,7 +1202,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
     animation: shimmer 1.5s ease-in-out infinite;
 }
 
@@ -1222,15 +1226,19 @@ body {
 
 [data-theme="dark"] .spinner {
     border-color: rgba(255, 255, 255, 0.2);
-    border-top-color: var(--primary-color);
+    border-top-color: #00bcd4;
 }
 
 [data-theme="dark"] .progress-bar {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .progress-fill {
+    background: linear-gradient(90deg, #00bcd4, #26c6da);
 }
 
 [data-theme="dark"] .progress-fill::after {
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
 }
 
 /* Dark Theme - Mobile Menu */
