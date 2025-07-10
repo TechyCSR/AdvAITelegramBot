@@ -355,40 +355,61 @@
 
     <!-- User Menu Modal -->
     <div class="modal" id="userModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>User Account</h3>
-                <button class="modal-close" id="closeUserModal">
-                <i class="fas fa-times"></i>
-            </button>
+        <div class="modern-modal-content">
+            <div class="modern-modal-header">
+                <div class="modal-title-section">
+                    <i class="fas fa-user-circle modal-icon"></i>
+                    <h3>User Account</h3>
+                </div>
+                <button class="modern-modal-close" id="closeUserModal">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <div class="user-profile">
-                    <div class="user-avatar-large" id="userAvatarLarge">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="user-info-detailed">
-                        <h4 id="userNameDetailed">User Name</h4>
-                        <p id="userIdDetailed">ID: 123456789</p>
-                        <span class="user-badge" id="userBadge">Standard User</span>
-                    </div>
-                </div>
-                <div class="user-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Max Images per Request</span>
-                        <span class="stat-value" id="maxImagesPerRequest">2</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Premium Features</span>
-                        <span class="stat-value" id="premiumFeatures">No</span>
+            
+            <div class="modern-modal-body">
+                <!-- User Profile Card -->
+                <div class="modern-user-profile">
+                    <div class="profile-header">
+                        <div class="user-avatar-modern" id="userAvatarLarge">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="profile-info">
+                            <h4 id="userNameDetailed">User Name</h4>
+                            <p id="userIdDetailed">ID: 123456789</p>
+                            <div class="user-badge-modern" id="userBadge">Standard User</div>
+                        </div>
                     </div>
                 </div>
-                <div class="user-actions">
-                    <button class="action-btn secondary" id="logoutBtn">
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-images"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-label">Max Images</span>
+                            <span class="stat-value" id="maxImagesPerRequest">2</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon premium">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-label">Premium</span>
+                            <span class="stat-value" id="premiumFeatures">No</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="modern-user-actions">
+                    <button class="modern-action-btn logout" id="logoutBtn">
                         <i class="fas fa-sign-out-alt"></i>
-                        Logout
+                        <span>Logout</span>
                     </button>
-            </div>
+                </div>
             </div>
         </div>
     </div>

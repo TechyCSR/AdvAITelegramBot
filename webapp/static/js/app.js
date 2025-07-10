@@ -501,7 +501,7 @@ class AuthSystem {
                             <p>Access through our powerful Telegram bot</p>
                         </div>
                     </div>
-                    <a href="https://t.me/AdvAIImageBot" target="_blank" class="auth-button telegram-button">
+                    <a href="https://t.me/AdvChatGPTBot" target="_blank" class="auth-button telegram-button">
                         <i class="fab fa-telegram"></i>
                         <span>Open Telegram Bot</span>
                         <i class="fas fa-external-link-alt"></i>
@@ -670,7 +670,7 @@ class AuthSystem {
         }
         if (elements.userBadge) {
             elements.userBadge.textContent = this.user.is_premium ? '✨ Premium User' : '👤 Standard User';
-            elements.userBadge.className = `user-badge ${this.user.is_premium ? 'premium' : 'standard'}`;
+            elements.userBadge.className = `user-badge-modern ${this.user.is_premium ? 'premium' : 'standard'}`;
         }
         if (elements.userAvatarLarge && this.user.photo_url) {
             elements.userAvatarLarge.innerHTML = `<img src="${this.user.photo_url}" alt="User Avatar">`;
