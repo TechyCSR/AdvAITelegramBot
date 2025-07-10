@@ -295,9 +295,6 @@ class AdvAIApp {
         this.telegramAuth = new TelegramAuth();
         this.currentImages = [];
         this.selectedVariants = 1;
-        this.currentModalImages = [];
-        this.currentModalIndex = 0;
-        this.currentModalMetadata = {};
     }
 
     async initialize() {
@@ -430,29 +427,6 @@ class AdvAIApp {
         if (clearHistoryBtn) {
             clearHistoryBtn.addEventListener('click', () => this.clearHistory());
         }
-
-        // Image modal functionality
-        const closeImageModal = document.getElementById('closeImageModal');
-        if (closeImageModal) {
-            closeImageModal.addEventListener('click', () => this.closeImageModal());
-        }
-
-        const modalPrev = document.getElementById('modalPrev');
-        if (modalPrev) {
-            modalPrev.addEventListener('click', () => this.showPreviousImage());
-        }
-
-        const modalNext = document.getElementById('modalNext');
-        if (modalNext) {
-            modalNext.addEventListener('click', () => this.showNextImage());
-        }
-
-        // Close modal with escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeImageModal();
-            }
-        });
     }
 
     switchTab(tabName) {
@@ -655,26 +629,15 @@ class AdvAIApp {
         data.images.forEach((imageUrl, index) => {
             const imageItem = document.createElement('div');
             imageItem.className = 'image-item';
-            
-            // Escape quotes for JSON data
-            const escapedPrompt = data.prompt.replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const imagesJson = JSON.stringify(data.images).replace(/'/g, "\\'");
-            const metadataJson = JSON.stringify({
-                prompt: data.prompt,
-                style: data.style,
-                model: data.model,
-                size: data.size
-            }).replace(/'/g, "\\'");
-            
             imageItem.innerHTML = `
-                <div class="image-container" onclick="app.openImageModal(${imagesJson}, ${index}, ${metadataJson})">
+                <div class="image-container">
                     <img src="${imageUrl}" alt="Generated image ${index + 1}" loading="lazy">
                     <div class="image-overlay">
                         <div class="image-actions">
-                            <button class="action-btn" onclick="event.stopPropagation(); app.downloadImage('${imageUrl}', ${index})">
+                            <button class="action-btn" onclick="app.downloadImage('${imageUrl}', ${index})">
                                 <i class="fas fa-download"></i>
                             </button>
-                            <button class="action-btn" onclick="event.stopPropagation(); app.shareImage('${imageUrl}')">
+                            <button class="action-btn" onclick="app.shareImage('${imageUrl}')">
                                 <i class="fas fa-share"></i>
                             </button>
                         </div>
@@ -747,31 +710,21 @@ class AdvAIApp {
         AppState.history.forEach(item => {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
-            
-            // Escape quotes for JSON data
-            const imagesJson = JSON.stringify(item.images).replace(/'/g, "\\'");
-            const metadataJson = JSON.stringify({
-                prompt: item.prompt,
-                style: item.style,
-                model: item.model,
-                size: item.size
-            }).replace(/'/g, "\\'");
-            
             historyItem.innerHTML = `
-                <div class="history-preview" onclick="app.openImageModal(${imagesJson}, 0, ${metadataJson})">
+                <div class="history-preview">
                     <img src="${item.images[0]}" alt="Generated image" loading="lazy">
                     <div class="history-count">${item.count}</div>
                 </div>
                 <div class="history-info">
-                    <div class="history-prompt">${item.prompt.substring(0, 80)}${item.prompt.length > 80 ? '...' : ''}</div>
+                    <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
                     <div class="history-details">${item.style} • ${item.model} • ${item.size}</div>
                     <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
                 </div>
                 <div class="history-actions">
-                    <button class="action-btn" onclick="app.reloadFromHistory(${item.id})" title="Reload settings">
+                    <button class="action-btn" onclick="app.reloadFromHistory(${item.id})">
                         <i class="fas fa-redo"></i>
                     </button>
-                    <button class="action-btn" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
+                    <button class="action-btn" onclick="app.deleteFromHistory(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -887,89 +840,6 @@ class AdvAIApp {
         } else {
             console.error('Error:', message);
             alert(`Error: ${message}`);
-        }
-    }
-
-    // Image Modal Functions
-    openImageModal(images, currentIndex, metadata = {}) {
-        this.currentModalImages = images;
-        this.currentModalIndex = currentIndex;
-        this.currentModalMetadata = metadata;
-        
-        const modal = document.getElementById('imageModal');
-        const modalImage = document.getElementById('modalImage');
-        const modalPrompt = document.getElementById('modalPrompt');
-        const modalStyle = document.getElementById('modalStyle');
-        const modalModel = document.getElementById('modalModel');
-        const modalSize = document.getElementById('modalSize');
-        const modalCounter = document.getElementById('modalCounter');
-        const modalPrev = document.getElementById('modalPrev');
-        const modalNext = document.getElementById('modalNext');
-        const modalDownload = document.getElementById('modalDownload');
-        const modalShare = document.getElementById('modalShare');
-
-        if (modal && modalImage) {
-            modalImage.src = images[currentIndex];
-            
-            if (modalPrompt) {
-                modalPrompt.textContent = metadata.prompt || 'Generated image';
-            }
-            if (modalStyle) {
-                modalStyle.textContent = `Style: ${metadata.style || 'Default'}`;
-            }
-            if (modalModel) {
-                modalModel.textContent = `Model: ${metadata.model || 'Flux'}`;
-            }
-            if (modalSize) {
-                modalSize.textContent = `Size: ${metadata.size || '1024x1024'}`;
-            }
-            if (modalCounter) {
-                modalCounter.textContent = `${currentIndex + 1} / ${images.length}`;
-            }
-            
-            // Show/hide navigation buttons
-            if (modalPrev) {
-                modalPrev.style.display = images.length > 1 ? 'flex' : 'none';
-            }
-            if (modalNext) {
-                modalNext.style.display = images.length > 1 ? 'flex' : 'none';
-            }
-            
-            // Setup download and share
-            if (modalDownload) {
-                modalDownload.onclick = () => this.downloadImage(images[currentIndex], currentIndex);
-            }
-            if (modalShare) {
-                modalShare.onclick = () => this.shareImage(images[currentIndex]);
-            }
-            
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-    }
-
-    closeImageModal() {
-        const modal = document.getElementById('imageModal');
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = 'auto';
-        }
-        this.currentModalImages = [];
-        this.currentModalIndex = 0;
-        this.currentModalMetadata = {};
-    }
-
-    showPreviousImage() {
-        if (this.currentModalImages && this.currentModalImages.length > 1) {
-            this.currentModalIndex = (this.currentModalIndex - 1 + this.currentModalImages.length) % this.currentModalImages.length;
-            this.openImageModal(this.currentModalImages, this.currentModalIndex, this.currentModalMetadata);
-        }
-    }
-
-    showNextImage() {
-        if (this.currentModalImages && this.currentModalImages.length > 1) {
-            this.currentModalIndex = (this.currentModalIndex + 1) % this.currentModalImages.length;
-            this.openImageModal(this.currentModalImages, this.currentModalIndex, this.currentModalMetadata);
         }
     }
 }
