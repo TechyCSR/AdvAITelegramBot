@@ -296,8 +296,37 @@ def get_current_user() -> Optional[User]:
     if not user_data:
         return None
     
+    # Handle session restoration properly
     auth_type = user_data.get('auth_type', 'telegram')
-    return User(user_data, auth_type)
+    
+    # If this is a restored session, recreate the user object properly
+    if auth_type == 'google' and 'given_name' not in user_data and 'first_name' in user_data:
+        # Convert stored session data back to Google token format for proper User construction
+        google_user_data = {
+            'sub': user_data.get('google_id', ''),
+            'given_name': user_data.get('first_name', ''),
+            'family_name': user_data.get('last_name', ''),
+            'email': user_data.get('email', ''),
+            'picture': user_data.get('photo_url', ''),
+            'locale': user_data.get('language_code', 'en')
+        }
+        return User(google_user_data, auth_type)
+    elif auth_type == 'telegram' and 'id' not in user_data and 'telegram_id' in user_data:
+        # Convert stored session data back to Telegram format for proper User construction
+        telegram_user_data = {
+            'id': user_data.get('telegram_id', ''),
+            'first_name': user_data.get('first_name', ''),
+            'last_name': user_data.get('last_name', ''),
+            'username': user_data.get('username', ''),
+            'language_code': user_data.get('language_code', 'en'),
+            'is_premium': user_data.get('is_premium', False),
+            'allows_write_to_pm': user_data.get('allows_write_to_pm', False),
+            'photo_url': user_data.get('photo_url', '')
+        }
+        return User(telegram_user_data, auth_type)
+    else:
+        # This is fresh session data, use as-is
+        return User(user_data, auth_type)
 
 def clear_user_session():
     """Clear user session data"""

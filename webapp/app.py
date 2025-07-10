@@ -494,11 +494,10 @@ def enhance_prompt():
         
         Please provide an enhanced version that:
         - Adds more visual details and descriptions
-        - Includes artistic style suggestions
         - Adds lighting, mood, and atmosphere details
         - Keeps the core concept intact
         - Is suitable for AI image generation
-        - Is no more than 400 characters
+        - Is no more than 500 characters
         
         Enhanced prompt:"""
         
