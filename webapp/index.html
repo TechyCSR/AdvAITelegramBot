@@ -229,7 +229,7 @@
                     </div>
 
                     <!-- Results Section -->
-                    <div class="results-section" id="resultsSection">
+                    <div class="results-section" id="resultsSection" style="position: relative;">
                         <div class="results-header">
                             <h3>Generated Images</h3>
                             <div class="results-actions">
@@ -245,6 +245,18 @@
                         </div>
                         <div class="images-grid" id="imagesGrid">
                             <!-- Generated images will be inserted here -->
+                        </div>
+                        
+                        <!-- Loading Overlay -->
+                        <div class="loading-overlay" id="loadingOverlay">
+                            <div class="loading-content">
+                                <div class="spinner"></div>
+                                <h3>Generating your images...</h3>
+                                <p>This may take a few moments</p>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -973,6 +973,9 @@ class AdvAIApp {
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
         generateBtn.disabled = true;
 
+        // Show loading overlay with progress animation
+        this.showProgressOverlay();
+
         try {
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -1009,6 +1012,8 @@ class AdvAIApp {
             AppState.isGenerating = false;
             generateBtn.innerHTML = originalText;
             generateBtn.disabled = false;
+            // Hide loading overlay
+            this.hideProgressOverlay();
         }
     }
 
@@ -1209,6 +1214,83 @@ class AdvAIApp {
         }).catch(() => {
             this.showError('Failed to copy link');
         });
+    }
+
+    showProgressOverlay() {
+        const overlay = document.getElementById('loadingOverlay');
+        const progressFill = document.getElementById('progressFill');
+        
+        if (overlay) {
+            // Reset progress bar
+            if (progressFill) {
+                progressFill.style.width = '0%';
+                progressFill.style.animation = 'none';
+                
+                // Force reflow to restart animation
+                progressFill.offsetHeight;
+                
+                // Start progress animation
+                progressFill.style.animation = 'progress 2s ease-in-out infinite';
+            }
+            
+            // Show overlay
+            overlay.style.display = 'flex';
+            
+            // Simulate progress updates for better UX
+            this.startProgressSimulation();
+        }
+    }
+
+    hideProgressOverlay() {
+        const overlay = document.getElementById('loadingOverlay');
+        const progressFill = document.getElementById('progressFill');
+        
+        if (overlay) {
+            // Complete the progress bar first
+            if (progressFill) {
+                progressFill.style.animation = 'none';
+                progressFill.style.width = '100%';
+                progressFill.style.transition = 'width 0.3s ease';
+            }
+            
+            // Hide overlay after a short delay
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+                if (progressFill) {
+                    progressFill.style.width = '0%';
+                    progressFill.style.transition = '';
+                }
+            }, 300);
+        }
+    }
+
+    startProgressSimulation() {
+        const progressFill = document.getElementById('progressFill');
+        if (!progressFill) return;
+        
+        let progress = 0;
+        const maxProgress = 85; // Don't go to 100% until completion
+        const increment = Math.random() * 3 + 1; // Random increment between 1-4%
+        
+        const progressInterval = setInterval(() => {
+            if (!AppState.isGenerating) {
+                clearInterval(progressInterval);
+                return;
+            }
+            
+            progress += increment * (1 - progress / 100); // Slow down as we approach max
+            progress = Math.min(progress, maxProgress);
+            
+            if (progressFill && progressFill.style.animation === 'none') {
+                progressFill.style.width = `${progress}%`;
+            }
+            
+            if (progress >= maxProgress) {
+                clearInterval(progressInterval);
+            }
+        }, 200 + Math.random() * 300); // Random interval between 200-500ms
     }
 
     // Image Viewer functionality

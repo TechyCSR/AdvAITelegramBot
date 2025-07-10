@@ -1138,8 +1138,10 @@ body {
     align-items: center;
     justify-content: center;
     z-index: 50;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(8px);
     border-radius: var(--radius-lg);
+    min-height: 200px;
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 .loading-content {
@@ -1185,13 +1187,31 @@ body {
     background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
     border-radius: 2px;
     transition: width 0.3s ease;
-    animation: progress 2s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 1.5s ease-in-out infinite;
 }
 
 @keyframes progress {
     0% { width: 0%; }
-    50% { width: 70%; }
-    100% { width: 100%; }
+    30% { width: 40%; }
+    70% { width: 75%; }
+    100% { width: 85%; }
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 /* Dark theme support for loading overlay */
@@ -1207,6 +1227,10 @@ body {
 
 [data-theme="dark"] .progress-bar {
     background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .progress-fill::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
 }
 
 /* Dark Theme - Mobile Menu */
