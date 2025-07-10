@@ -25,6 +25,21 @@ class AuthSystem {
         this.isInTelegram = false;
     }
 
+    isDirectBrowserAccess() {
+        // Check if user is directly accessing the web app in browser
+        // (not through Telegram Web App)
+        const hasTelegramUA = navigator.userAgent.includes('Telegram');
+        const hasTelegramScript = typeof Telegram !== 'undefined';
+        const hasValidInitData = hasTelegramScript && 
+                                Telegram.WebApp && 
+                                Telegram.WebApp.initData && 
+                                Telegram.WebApp.initData.length > 0;
+        
+        // If we have Telegram script but no init data and no Telegram UA,
+        // it's likely direct browser access
+        return hasTelegramScript && !hasValidInitData && !hasTelegramUA;
+    }
+
     async initialize() {
         console.log('Initializing Authentication System...');
         
@@ -41,13 +56,17 @@ class AuthSystem {
         const hasTelegramParams = window.location.search.includes('tgWebAppData') || 
                                  window.location.hash.includes('tgWebAppData');
         
-        // Force browser mode for direct web access
-        const isDirectWebAccess = window.location.hostname === 'bot.techycsr.me' || 
-                                 window.location.hostname === 'localhost' ||
-                                 (window.location.protocol === 'https:' && !hasTelegramUA && !hasTelegramParams);
+        // Primary check: If we have valid Telegram init data, it's definitely Telegram
+        // Secondary check: If no init data but has Telegram indicators, might be Telegram
+        // Only consider it browser mode if no Telegram indicators at all
+        this.isInTelegram = hasInitData || (hasTelegramUA && !this.isDirectBrowserAccess());
         
-        // Only consider it Telegram if we have strong indicators AND not direct web access
-        this.isInTelegram = !isDirectWebAccess && hasInitData;
+        console.log('Telegram Detection Debug:', {
+            hasInitData: hasInitData,
+            initDataValue: hasInitData ? 'Has data' : 'No data',
+            hasTelegramUA: hasTelegramUA,
+            hasTelegramParams: hasTelegramParams
+        });
         
         console.log('Environment check:', {
             isInTelegram: this.isInTelegram,
@@ -522,16 +541,17 @@ class AuthSystem {
     showAuthError(message) {
         console.error('Auth error:', message);
         
-        // If we're in browser mode, always show authentication options instead of errors
-        if (!this.isInTelegram) {
-            console.log('Browser mode detected, showing auth options instead of error:', message);
-            this.showAuthenticationOptions();
+        // In Telegram mode, show error with retry option
+        if (this.isInTelegram) {
+            console.log('Telegram mode: showing authentication error with retry option');
+            showAuthStatus(message, true);
+            showAuthActions();
             return false;
         }
         
-        // Only show errors in Telegram mode
-        showAuthStatus(message, true);
-        showAuthActions();
+        // In browser mode, show authentication options
+        console.log('Browser mode detected, showing auth options instead of error:', message);
+        this.showAuthenticationOptions();
         return false;
     }
 
