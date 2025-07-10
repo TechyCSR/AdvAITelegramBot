@@ -31,13 +31,36 @@ class AuthSystem {
         // Get authentication configuration from backend
         await this.loadAuthConfig();
         
-        // Check if running in Telegram
-        this.isInTelegram = typeof Telegram !== 'undefined' && Telegram.WebApp;
+        // Check if running in Telegram - comprehensive detection
+        const hasInitData = typeof Telegram !== 'undefined' && 
+                            Telegram.WebApp && 
+                            Telegram.WebApp.initData && 
+                            Telegram.WebApp.initData.length > 0;
+        
+        const hasTelegramUA = navigator.userAgent.includes('Telegram');
+        const hasTelegramParams = window.location.search.includes('tgWebAppData') || 
+                                 window.location.hash.includes('tgWebAppData');
+        
+        // Force browser mode for direct web access
+        const isDirectWebAccess = window.location.hostname === 'bot.techycsr.me' || 
+                                 window.location.hostname === 'localhost' ||
+                                 (window.location.protocol === 'https:' && !hasTelegramUA && !hasTelegramParams);
+        
+        // Only consider it Telegram if we have strong indicators AND not direct web access
+        this.isInTelegram = !isDirectWebAccess && hasInitData;
         
         console.log('Environment check:', {
             isInTelegram: this.isInTelegram,
             hasTelegram: typeof Telegram !== 'undefined',
             hasWebApp: typeof Telegram !== 'undefined' && !!Telegram.WebApp,
+            hasInitData: hasInitData,
+            hasTelegramUA: hasTelegramUA,
+            hasTelegramParams: hasTelegramParams,
+            isDirectWebAccess: isDirectWebAccess,
+            userAgent: navigator.userAgent,
+            hostname: window.location.hostname,
+            protocol: window.location.protocol,
+            search: window.location.search,
             authConfig: this.authConfig
         });
         
