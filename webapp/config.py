@@ -6,14 +6,17 @@ Webapp-specific configuration for API keys and settings
 
 import os
 from typing import Optional
+from dotenv import load_dotenv
 
-# =============================================================================
-# API KEYS CONFIGURATION
-# =============================================================================
 
-# Pollinations AI API Key for image generation
-# Get your API key from: https://pollinations.ai/
-POLLINATIONS_KEY: Optional[str] ="amL9EhK5lonFIcBh"
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API keys from environment variables
+POLLINATIONS_KEY = os.getenv('POLLINATIONS_KEY') or ""
+FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY') or ""
+FLASK_DEBUG = os.getenv('FLASK_DEBUG') or ""
 
 
 # Alternative: Load from environment variable (recommended for production)
