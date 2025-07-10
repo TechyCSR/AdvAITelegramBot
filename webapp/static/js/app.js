@@ -1058,56 +1058,96 @@ class AdvAIApp {
         if (!imagesGrid) return;
 
         imagesGrid.innerHTML = '';
+        
+        // Store current generation data for batch save
+        this.currentGeneration = data;
 
         data.images.forEach((imageUrl, index) => {
             const imageItem = document.createElement('div');
-            imageItem.className = 'image-item';
+            imageItem.className = 'result-item';
             imageItem.innerHTML = `
-                <div class="image-container">
-                    <img src="${imageUrl}" alt="Generated image ${index + 1}" loading="lazy" onclick="app.openImageViewer('${imageUrl}', '${data.prompt.replace(/'/g, "\\'")}', '${data.style} • ${data.size}')">
-                    <div class="image-overlay">
-                        <div class="image-actions">
-                            <button class="action-btn" onclick="app.downloadImage('${imageUrl}', ${index})" title="Download image">
-                                <i class="fas fa-download"></i>
-                            </button>
-                            <button class="action-btn" onclick="app.shareImage('${imageUrl}')" title="Share image">
-                                <i class="fas fa-share"></i>
-                            </button>
-                        </div>
+                <img src="${imageUrl}" alt="Generated image ${index + 1}" class="result-image" loading="lazy" data-index="${index}">
+                <div class="result-content">
+                    <div class="result-actions">
+                        <button class="result-btn download" onclick="app.downloadImage('${imageUrl}', ${index})" title="Download image">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <button class="result-btn share" onclick="app.shareImage('${imageUrl}')" title="Share image">
+                            <i class="fas fa-share"></i> Share
+                        </button>
                     </div>
                 </div>
-                <div class="image-info">
-                    <span class="image-prompt">${data.prompt.substring(0, 50)}${data.prompt.length > 50 ? '...' : ''}</span>
-                    <span class="image-details">${data.style} • ${data.size}</span>
-                </div>
             `;
+            
+            // Add click handler to image for viewer
+            const img = imageItem.querySelector('.result-image');
+            img.addEventListener('click', () => {
+                this.openImageViewer(data.images, index, {
+                    prompt: data.prompt,
+                    size: data.size,
+                    style: data.style,
+                    model: data.model || 'DALL-E 3'
+                });
+            });
+            
             imagesGrid.appendChild(imageItem);
         });
+
+        // Add Save All button
+        const saveAllBtn = document.createElement('button');
+        saveAllBtn.className = 'save-all-btn';
+        saveAllBtn.innerHTML = `
+            <i class="fas fa-save"></i>
+            Save All to History (${data.images.length} images)
+        `;
+        saveAllBtn.onclick = () => this.saveAllToHistory();
+        
+        imagesGrid.appendChild(saveAllBtn);
 
         // Show results section
         document.getElementById('resultsSection').style.display = 'block';
     }
 
-    addToHistory(data) {
-        const historyItem = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            prompt: data.prompt,
-            style: data.style,
-            model: data.model,
-            size: data.size,
-            images: data.images,
-            count: data.count
-        };
+    saveAllToHistory() {
+        if (!this.currentGeneration) {
+            this.showError('No images to save');
+            return;
+        }
 
-        AppState.history.unshift(historyItem);
+        const data = this.currentGeneration;
+        const baseTimestamp = Date.now();
         
-        // Keep only last 50 items
-        if (AppState.history.length > 50) {
-            AppState.history = AppState.history.slice(0, 50);
+        // Save each image as a separate history item
+        data.images.forEach((imageUrl, index) => {
+            const historyItem = {
+                id: baseTimestamp + index,
+                timestamp: new Date().toISOString(),
+                prompt: data.prompt,
+                style: data.style,
+                model: data.model || 'DALL-E 3',
+                size: data.size,
+                imageUrl: imageUrl,
+                imageIndex: index + 1,
+                totalImages: data.images.length
+            };
+
+            AppState.history.unshift(historyItem);
+        });
+        
+        // Keep only last 100 items (since we're saving individual images now)
+        if (AppState.history.length > 100) {
+            AppState.history = AppState.history.slice(0, 100);
         }
 
         this.saveHistory();
+        this.renderHistory();
+        this.showNotification(`Saved ${data.images.length} images to history!`, 'success');
+    }
+
+    addToHistory(data) {
+        // For backward compatibility - now saves all images individually
+        this.currentGeneration = data;
+        this.saveAllToHistory();
     }
 
     saveHistory() {
@@ -1143,23 +1183,44 @@ class AdvAIApp {
         AppState.history.forEach(item => {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
+            
+            // Support both old format (with images array) and new format (single imageUrl)
+            const imageUrl = item.imageUrl || (item.images && item.images[0]) || '';
+            const imageCount = item.totalImages || (item.images && item.images.length) || 1;
+            
             historyItem.innerHTML = `
-                <img class="history-image" src="${item.images[0]}" alt="Generated image" loading="lazy" onclick="app.openHistoryImage(${item.id}, 0)">
-                <div class="history-info">
-                    <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
-                    <div class="history-details">${item.style} • ${item.model} • ${item.size}</div>
-                    <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
-                    ${item.images.length > 1 ? `<div class="image-count">${item.images.length} images</div>` : ''}
-                </div>
-                <div class="history-actions">
-                    <button class="action-btn" onclick="app.reloadFromHistory(${item.id})" title="Reload settings">
-                        <i class="fas fa-redo"></i>
-                    </button>
-                    <button class="action-btn" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                <img class="history-image" src="${imageUrl}" alt="Generated image" loading="lazy" data-id="${item.id}">
+                <div class="history-content">
+                    <div class="history-info">
+                        <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
+                        <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
+                        ${imageCount > 1 ? `<div class="image-count">Image ${item.imageIndex || 1} of ${imageCount}</div>` : ''}
+                    </div>
+                    <div class="history-actions">
+                        <button class="history-btn download" onclick="app.downloadImage('${imageUrl}', 0)" title="Download image">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="history-btn share" onclick="app.shareImage('${imageUrl}')" title="Share image">
+                            <i class="fas fa-share"></i>
+                        </button>
+                        <button class="history-btn delete" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
+            
+            // Add click handler to image for viewer
+            const img = historyItem.querySelector('.history-image');
+            img.addEventListener('click', () => {
+                this.openImageViewer([imageUrl], 0, {
+                    prompt: item.prompt,
+                    size: item.size,
+                    style: item.style,
+                    model: item.model || 'DALL-E 3'
+                });
+            });
+            
             historyGrid.appendChild(historyItem);
         });
     }
@@ -1186,9 +1247,12 @@ class AdvAIApp {
     }
 
     deleteFromHistory(id) {
-        AppState.history = AppState.history.filter(h => h.id !== id);
-        this.saveHistory();
-        this.renderHistory();
+        if (confirm('Are you sure you want to delete this image from history?')) {
+            AppState.history = AppState.history.filter(h => h.id !== id);
+            this.saveHistory();
+            this.renderHistory();
+            this.showNotification('Image deleted from history', 'success');
+        }
     }
 
     clearHistory() {
@@ -1196,6 +1260,7 @@ class AdvAIApp {
             AppState.history = [];
             this.saveHistory();
             this.renderHistory();
+            this.showNotification('History cleared successfully', 'success');
         }
     }
 
@@ -1204,7 +1269,7 @@ class AdvAIApp {
             localStorage.clear();
             AppState.history = [];
             this.renderHistory();
-            this.showSuccess('All data cleared successfully');
+            this.showNotification('All data cleared successfully', 'success');
         }
     }
 
@@ -1216,6 +1281,8 @@ class AdvAIApp {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        this.showNotification('Image download started!', 'success');
     }
 
     async shareImage(imageUrl) {
@@ -1226,6 +1293,7 @@ class AdvAIApp {
                     text: 'Check out this AI-generated image!',
                     url: imageUrl
                 });
+                this.showNotification('Image shared successfully!', 'success');
             } catch (error) {
                 console.log('Share failed:', error);
                 this.copyToClipboard(imageUrl);
@@ -1237,9 +1305,9 @@ class AdvAIApp {
 
     copyToClipboard(text) {
         navigator.clipboard.writeText(text).then(() => {
-            this.showSuccess('Link copied to clipboard!');
+            this.showNotification('Image link copied to clipboard!', 'success');
         }).catch(() => {
-            this.showError('Failed to copy link');
+            this.showNotification('Failed to copy link', 'error');
         });
     }
 
@@ -1321,39 +1389,35 @@ class AdvAIApp {
     }
 
     // Image Viewer functionality
-    openImageViewer(imageUrl, prompt, details) {
-        const modal = document.getElementById('imageModal');
-        if (!modal) return;
-        
-        // Set up current image data
-        this.currentImageIndex = this.currentImages.findIndex(img => img === imageUrl);
-        if (this.currentImageIndex === -1) {
-            this.currentImageIndex = 0;
-            this.currentImages = [imageUrl];
+    openImageViewer(images, currentIndex = 0, details = {}) {
+        // Ensure images is an array
+        if (!Array.isArray(images)) {
+            images = [images];
         }
-        
+
+        // Create or get the modal
+        let modal = document.getElementById('imageModal');
+        if (!modal) {
+            this.createImageModal();
+            modal = document.getElementById('imageModal');
+        }
+
+        // Store current image data
+        this.currentModalData = {
+            images: images,
+            currentIndex: currentIndex,
+            prompt: details.prompt || '',
+            size: details.size || '',
+            style: details.style || '',
+            model: details.model || 'DALL-E 3'
+        };
+
         // Update modal content
-        const modalImage = document.getElementById('modalImage');
-        const modalPrompt = document.getElementById('modalPrompt');
-        const modalSize = document.getElementById('modalSize');
-        const modalStyle = document.getElementById('modalStyle');
-        const modalModel = document.getElementById('modalModel');
-        
-        if (modalImage) modalImage.src = imageUrl;
-        if (modalPrompt) modalPrompt.textContent = prompt;
-        
-        // Set image details if available
-        if (this.currentImageData) {
-            if (modalSize) modalSize.textContent = this.currentImageData.size || 'Unknown';
-            if (modalStyle) modalStyle.textContent = this.currentImageData.style || 'Default';
-            if (modalModel) modalModel.textContent = this.currentImageData.model || 'Unknown';
-        }
-        
-        // Update navigation
         this.updateModalImage();
-        
+
         // Show modal
         modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
 
     createImageModal() {
@@ -1404,6 +1468,7 @@ class AdvAIApp {
         const modal = document.getElementById('imageModal');
         if (modal) {
             modal.classList.remove('active');
+            document.body.style.overflow = '';
         }
     }
 
@@ -1532,35 +1597,93 @@ class AdvAIApp {
     }
 
     navigateImage(direction) {
-        if (!this.currentImages || this.currentImages.length <= 1) return;
+        if (!this.currentModalData || !this.currentModalData.images || this.currentModalData.images.length <= 1) return;
 
-        this.currentImageIndex = (this.currentImageIndex + direction + this.currentImages.length) % this.currentImages.length;
-        this.updateModalImage();
+        const newIndex = this.currentModalData.currentIndex + direction;
+        if (newIndex >= 0 && newIndex < this.currentModalData.images.length) {
+            this.currentModalData.currentIndex = newIndex;
+            this.updateModalImage();
+        }
     }
 
     updateModalImage() {
-        if (!this.currentImages || this.currentImageIndex < 0) return;
+        if (!this.currentModalData || !this.currentModalData.images) return;
 
         const modalImage = document.getElementById('modalImage');
         const modalCounter = document.getElementById('modalCounter');
         const modalPrev = document.getElementById('modalPrev');
         const modalNext = document.getElementById('modalNext');
+        const modalPrompt = document.getElementById('modalPrompt');
+        const modalSize = document.getElementById('modalSize');
+        const modalStyle = document.getElementById('modalStyle');
+        const modalModel = document.getElementById('modalModel');
+
+        const currentImage = this.currentModalData.images[this.currentModalData.currentIndex];
 
         if (modalImage) {
-            modalImage.src = this.currentImages[this.currentImageIndex];
+            modalImage.src = currentImage;
         }
 
         if (modalCounter) {
-            modalCounter.textContent = `${this.currentImageIndex + 1} / ${this.currentImages.length}`;
+            modalCounter.textContent = `${this.currentModalData.currentIndex + 1} / ${this.currentModalData.images.length}`;
         }
 
         if (modalPrev) {
-            modalPrev.disabled = this.currentImages.length <= 1;
+            modalPrev.style.display = this.currentModalData.images.length > 1 ? 'flex' : 'none';
+            modalPrev.disabled = this.currentModalData.currentIndex <= 0;
         }
 
         if (modalNext) {
-            modalNext.disabled = this.currentImages.length <= 1;
+            modalNext.style.display = this.currentModalData.images.length > 1 ? 'flex' : 'none';
+            modalNext.disabled = this.currentModalData.currentIndex >= this.currentModalData.images.length - 1;
         }
+
+        if (modalPrompt) {
+            modalPrompt.textContent = this.currentModalData.prompt;
+        }
+
+        if (modalSize) {
+            modalSize.textContent = this.currentModalData.size;
+        }
+
+        if (modalStyle) {
+            modalStyle.textContent = this.currentModalData.style;
+        }
+
+        if (modalModel) {
+            modalModel.textContent = this.currentModalData.model;
+        }
+    }
+
+    showNotification(message, type = 'success') {
+        // Remove existing notifications
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(n => n.remove());
+
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icon = type === 'success' ? 'fa-check-circle' : 
+                     type === 'error' ? 'fa-exclamation-circle' : 
+                     'fa-info-circle';
+        
+        notification.innerHTML = `
+            <i class="fas ${icon}"></i>
+            <span>${message}</span>
+        `;
+
+        // Add to DOM
+        document.body.appendChild(notification);
+
+        // Show notification
+        setTimeout(() => notification.classList.add('show'), 100);
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 }
 

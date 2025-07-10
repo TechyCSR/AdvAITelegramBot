@@ -314,47 +314,46 @@
         <i class="fas fa-arrow-down"></i>
     </button>
 
-    <!-- Image Modal -->
+    <!-- Modern Image Viewer Modal -->
     <div class="image-modal" id="imageModal">
-        <div class="modal-content">
-            <button class="modal-close" id="modalClose">
-                <i class="fas fa-times"></i>
-            </button>
-            
-            <img id="modalImage" class="modal-image" src="" alt="">
-            
-            <div class="modal-info">
-                <div class="modal-prompt" id="modalPrompt"></div>
-                <div class="modal-details">
-                    <div class="modal-detail">
-                        <strong>Size:</strong> <span id="modalSize"></span>
-                    </div>
-                    <div class="modal-detail">
-                        <strong>Style:</strong> <span id="modalStyle"></span>
-                    </div>
-                    <div class="modal-detail">
-                        <strong>Model:</strong> <span id="modalModel"></span>
-                    </div>
+        <div class="modal-backdrop" id="modalBackdrop"></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-counter" id="modalCounter">1 / 1</div>
+                <div class="modal-actions">
+                    <button class="modal-action-btn download" id="modalDownload" title="Download Image">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="modal-action-btn share" id="modalShare" title="Share Image">
+                        <i class="fas fa-share"></i>
+                    </button>
+                    <button class="modal-close" id="modalClose" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
             </div>
             
-            <div class="modal-actions">
-                <button class="modal-action-btn download" id="modalDownload" title="Download Image">
-                    <i class="fas fa-download"></i>
+            <div class="modal-content">
+                <img id="modalImage" class="modal-image" src="" alt="">
+                
+                <button class="modal-nav prev" id="modalPrev" title="Previous Image">
+                    <i class="fas fa-chevron-left"></i>
                 </button>
-                <button class="modal-action-btn share" id="modalShare" title="Share Image">
-                    <i class="fas fa-share"></i>
+                <button class="modal-nav next" id="modalNext" title="Next Image">
+                    <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
             
-            <button class="modal-nav prev" id="modalPrev">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <button class="modal-nav next" id="modalNext">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-            
-            <div class="modal-counter" id="modalCounter">1 / 1</div>
+            <div class="modal-footer">
+                <div class="modal-info">
+                    <div class="modal-prompt" id="modalPrompt"></div>
+                    <div class="modal-details">
+                        <span class="modal-detail"><strong>Size:</strong> <span id="modalSize"></span></span>
+                        <span class="modal-detail"><strong>Style:</strong> <span id="modalStyle"></span></span>
+                        <span class="modal-detail"><strong>Model:</strong> <span id="modalModel"></span></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
