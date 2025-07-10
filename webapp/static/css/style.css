@@ -1983,12 +1983,20 @@ body {
     align-items: center;
     justify-content: center;
     animation: fadeIn 0.3s ease-out;
+    padding: 1rem;
+    box-sizing: border-box;
+    overflow-y: auto;
 }
 
 .auth-container {
-    max-width: 400px;
-    width: 90%;
+    max-width: 500px;
+    width: 100%;
     margin: 0 auto;
+    max-height: 100%;
+    overflow-y: auto;
+    display: flex;
+    align-items: center;
+    min-height: 100%;
 }
 
 .auth-content {
@@ -1996,9 +2004,10 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 2rem;
-    text-align: center;
+    width: 100%;
     box-shadow: var(--shadow-lg);
     animation: slideUp 0.4s ease-out;
+    margin: auto 0;
 }
 
 .auth-icon {
@@ -2094,92 +2103,563 @@ body {
     transform: translateY(-1px);
 }
 
-/* Google Authentication Styles */
-.auth-options {
+/* Modern Authentication Styles */
+.auth-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.auth-logo {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+    animation: float 3s ease-in-out infinite;
+    position: relative;
+}
+
+.auth-logo::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    z-index: -1;
+    animation: pulse 2s infinite;
+}
+
+.auth-logo i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.auth-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.auth-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 400;
+}
+
+.auth-options-container {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
-    max-width: 500px;
-    margin: 1rem auto;
+    gap: 1.5rem;
+    max-width: 480px;
+    margin: 0 auto;
     width: 100%;
 }
 
 .auth-option {
     background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    text-align: center;
-    transition: var(--transition);
-    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-option::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.auth-option::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
 }
 
 .auth-option:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     border-color: var(--primary-color);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
 }
 
-.auth-option h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.25rem;
-    font-weight: 700;
+.auth-option:hover::before {
+    opacity: 1;
+}
+
+.auth-option:hover::after {
+    opacity: 1;
+}
+
+.auth-option-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.auth-option-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-}
-
-.auth-option h3 i {
     font-size: 1.5rem;
-}
-
-.auth-option p {
-    margin: 0 0 1.5rem 0;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    font-size: 0.95rem;
-}
-
-#googleSignInButton {
-    display: flex;
-    justify-content: center;
-    margin: 1rem 0;
-    min-height: 50px;
-    align-items: center;
-}
-
-.auth-option button {
-    padding: 0.75rem 1.5rem;
-    background: var(--primary-color);
     color: white;
-    border: none;
-    border-radius: var(--radius);
+    flex-shrink: 0;
+}
+
+.google-icon {
+    background: linear-gradient(135deg, #4285f4, #34a853);
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
+}
+
+.telegram-icon {
+    background: linear-gradient(135deg, #0088cc, #229ed9);
+    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
+}
+
+.auth-option-content {
+    flex: 1;
+    text-align: left;
+}
+
+.auth-option-content h3 {
+    font-size: 1.25rem;
     font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    font-size: 1rem;
-    min-height: 44px;
-    display: flex;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+}
+
+.auth-option-content p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.premium-badge {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+    position: relative;
+    overflow: hidden;
 }
 
-.auth-option button:hover {
-    background: var(--accent-color);
-    transform: translateY(-1px);
+.premium-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        45deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 70%
+    );
+    animation: shimmer 2s infinite;
 }
 
-/* Make the first auth option (Google) more prominent */
-.auth-option:first-child {
+.premium-badge i {
+    font-size: 0.9rem;
+}
+
+.google-signin-container {
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
+    align-items: center;
+}
+
+.auth-button {
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.telegram-button {
+    background: linear-gradient(135deg, #0088cc, #229ed9);
+    color: white;
+    box-shadow: 0 4px 14px rgba(0, 136, 204, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.telegram-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.telegram-button:hover::before {
+    left: 100%;
+}
+
+.telegram-button:hover {
+    background: linear-gradient(135deg, #007bb5, #1e8bc9);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 136, 204, 0.4);
+    color: white;
+}
+
+.auth-button i:last-child {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+/* Google option specific styles */
+.google-option {
+    border-color: rgba(66, 133, 244, 0.2);
+}
+
+.google-option:hover {
     border-color: #4285f4;
-    background: linear-gradient(135deg, rgba(66, 133, 244, 0.05), rgba(52, 168, 83, 0.05));
+    box-shadow: 0 20px 25px -5px rgba(66, 133, 244, 0.1), 0 10px 10px -5px rgba(66, 133, 244, 0.05);
 }
 
-.auth-option:first-child:hover {
-    border-color: #4285f4;
-    background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(52, 168, 83, 0.1));
+/* Telegram option specific styles */
+.telegram-option {
+    border-color: rgba(0, 136, 204, 0.2);
+}
+
+.telegram-option:hover {
+    border-color: #0088cc;
+    box-shadow: 0 20px 25px -5px rgba(0, 136, 204, 0.1), 0 10px 10px -5px rgba(0, 136, 204, 0.05);
+}
+
+/* Responsive Design for Authentication */
+@media (max-width: 768px) {
+    .auth-overlay {
+        padding: 0.75rem;
+    }
+    
+    .auth-content {
+        padding: 1.5rem;
+    }
+    
+    .auth-header {
+        margin-bottom: 2rem;
+    }
+    
+    .auth-header h1 {
+        font-size: 1.75rem;
+        line-height: 1.2;
+    }
+    
+    .auth-subtitle {
+        font-size: 1rem;
+        padding: 0 0.5rem;
+    }
+    
+    .auth-logo {
+        width: 65px;
+        height: 65px;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-logo i {
+        font-size: 2rem;
+    }
+    
+    .auth-options-container {
+        gap: 1rem;
+    }
+    
+    .auth-option {
+        padding: 1.25rem;
+        border-radius: 14px;
+    }
+    
+    .auth-option-header {
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-option-icon {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+    
+    .auth-option-content h3 {
+        font-size: 1.1rem;
+    }
+    
+    .auth-option-content p {
+        font-size: 0.875rem;
+        line-height: 1.3;
+    }
+    
+    .premium-badge {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-button {
+        padding: 0.875rem 1rem;
+        font-size: 0.95rem;
+        gap: 0.5rem;
+        min-height: 48px;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-overlay {
+        padding: 0.5rem;
+        align-items: flex-start;
+        padding-top: 2rem;
+    }
+    
+    .auth-container {
+        align-items: flex-start;
+        min-height: auto;
+    }
+    
+    .auth-content {
+        padding: 1.25rem;
+        margin: 0;
+    }
+    
+    .auth-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .auth-header h1 {
+        font-size: 1.4rem;
+        line-height: 1.2;
+        margin-bottom: 0.5rem;
+    }
+    
+    .auth-subtitle {
+        font-size: 0.9rem;
+        padding: 0;
+    }
+    
+    .auth-logo {
+        width: 55px;
+        height: 55px;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-logo i {
+        font-size: 1.5rem;
+    }
+    
+    .auth-options-container {
+        gap: 0.75rem;
+    }
+    
+    .auth-option {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+    
+    .auth-option-header {
+        flex-direction: row;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        align-items: center;
+    }
+    
+    .auth-option-content {
+        text-align: left;
+    }
+    
+    .auth-option-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+    
+    .auth-option-content h3 {
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .auth-option-content p {
+        font-size: 0.8rem;
+        line-height: 1.3;
+    }
+    
+    .premium-badge {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.6rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .auth-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        gap: 0.4rem;
+        min-height: 44px;
+    }
+    
+    .auth-button span {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .auth-overlay {
+        padding: 0.25rem;
+        padding-top: 1rem;
+    }
+    
+    .auth-content {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+    
+    .auth-header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .auth-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .auth-logo {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .auth-logo i {
+        font-size: 1.4rem;
+    }
+    
+    .auth-option {
+        padding: 0.875rem;
+    }
+    
+    .auth-option-content h3 {
+        font-size: 0.95rem;
+    }
+    
+    .auth-option-content p {
+        font-size: 0.75rem;
+    }
+    
+    .premium-badge {
+        font-size: 0.65rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .auth-button {
+        padding: 0.65rem 0.875rem;
+        font-size: 0.85rem;
+        min-height: 42px;
+    }
+}
+
+/* Touch and Active States for Mobile */
+.auth-option:active {
+    transform: translateY(-2px) scale(0.98);
+}
+
+.auth-button:active {
+    transform: translateY(0) scale(0.95);
+}
+
+.telegram-button:active {
+    transform: translateY(0) scale(0.95);
+}
+
+/* Improve touch targets for mobile */
+@media (hover: none) and (pointer: coarse) {
+    .auth-option {
+        min-height: 60px;
+    }
+    
+    .auth-button {
+        min-height: 50px;
+        padding: 1rem 1.5rem;
+    }
+    
+    .auth-option:hover {
+        transform: none;
+    }
+    
+    .auth-option:active {
+        transform: scale(0.98);
+        background: rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* Dark theme adjustments for authentication */
+[data-theme="dark"] .auth-option {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .auth-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .auth-option:active {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .google-option {
+    border-color: rgba(66, 133, 244, 0.3);
+}
+
+[data-theme="dark"] .telegram-option {
+    border-color: rgba(0, 136, 204, 0.3);
 }
 
 /* Google Sign-In Button Overrides */
@@ -2617,23 +3097,53 @@ body {
 @keyframes slideUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(30px) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
 @keyframes bounce {
     0%, 20%, 50%, 80%, 100% {
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
     40% {
-        transform: translateY(-10px);
+        transform: translateY(-10px) scale(1.05);
     }
     60% {
-        transform: translateY(-5px);
+        transform: translateY(-5px) scale(1.02);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
     }
 }
 

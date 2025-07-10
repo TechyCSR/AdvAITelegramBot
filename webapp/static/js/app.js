@@ -368,51 +368,54 @@ class AuthSystem {
 
         // Create the authentication options HTML
         let optionsHtml = `
-            <div class="auth-icon">
-                <i class="fas fa-shield-alt"></i>
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h1>Welcome to AI Image Generator</h1>
+                <p class="auth-subtitle">Choose your preferred login method to get started</p>
             </div>
-            <h2>Choose Login Method</h2>
-            <p>Select your preferred way to access the app</p>
-            <div class="auth-options">
+            <div class="auth-options-container">
         `;
         
         if (this.authConfig && this.authConfig.google_enabled) {
             optionsHtml += `
-                <div class="auth-option">
-                    <h3><i class="fab fa-google"></i> Sign in with Google</h3>
-                    <p>Get <strong>premium access</strong> with 4 images per generation</p>
-                    <div class="google-premium-badge">
-                        <i class="fas fa-crown"></i>
-                        Premium Features Included
+                <div class="auth-option google-option">
+                    <div class="auth-option-header">
+                        <div class="auth-option-icon google-icon">
+                            <i class="fab fa-google"></i>
+                        </div>
+                        <div class="auth-option-content">
+                            <h3>Continue with Google</h3>
+                            <p>Get instant access with premium features</p>
+                        </div>
                     </div>
-                    <div id="googleSignInButton"></div>
+                    <div class="premium-badge">
+                        <i class="fas fa-crown"></i>
+                        <span>Premium Features • 4 Images per Generation</span>
+                    </div>
+                    <div id="googleSignInButton" class="google-signin-container"></div>
                 </div>
             `;
         }
 
         if (this.authConfig && this.authConfig.telegram_enabled) {
             optionsHtml += `
-                <div class="auth-option">
-                    <h3><i class="fab fa-telegram"></i> Telegram Users</h3>
-                    <p>Access through our Telegram bot for the full experience</p>
-                    <a href="https://t.me/AdvAIImageBot" target="_blank" class="telegram-link-btn">
+                <div class="auth-option telegram-option">
+                    <div class="auth-option-header">
+                        <div class="auth-option-icon telegram-icon">
+                            <i class="fab fa-telegram"></i>
+                        </div>
+                        <div class="auth-option-content">
+                            <h3>Continue with Telegram</h3>
+                            <p>Access through our powerful Telegram bot</p>
+                        </div>
+                    </div>
+                    <a href="https://t.me/AdvAIImageBot" target="_blank" class="auth-button telegram-button">
                         <i class="fab fa-telegram"></i>
-                        Open Telegram Bot
+                        <span>Open Telegram Bot</span>
+                        <i class="fas fa-external-link-alt"></i>
                     </a>
-                </div>
-            `;
-        }
-
-        // Add "Continue Anyway" option for browsers
-        if (!this.isInTelegram) {
-            optionsHtml += `
-                <div class="auth-option" style="border-style: dashed; opacity: 0.8;">
-                    <h3><i class="fas fa-eye"></i> Continue Anyway</h3>
-                    <p>View the interface without authentication (limited access)</p>
-                    <button onclick="authSystem.hideAuthOverlay()" style="background: #666;">
-                        <i class="fas fa-arrow-right"></i>
-                        Browse Interface
-                    </button>
                 </div>
             `;
         }
@@ -420,11 +423,18 @@ class AuthSystem {
         if (!this.authConfig || (!this.authConfig.google_enabled && !this.authConfig.telegram_enabled)) {
             optionsHtml += `
                 <div class="auth-option">
-                    <h3><i class="fas fa-unlock"></i> Continue Without Login</h3>
-                    <p>Authentication is disabled. You can use the app freely.</p>
-                    <button class="auth-option button" onclick="authSystem.hideAuthOverlay()">
+                    <div class="auth-option-header">
+                        <div class="auth-option-icon">
+                            <i class="fas fa-unlock"></i>
+                        </div>
+                        <div class="auth-option-content">
+                            <h3>Authentication Disabled</h3>
+                            <p>You can use the app freely without login</p>
+                        </div>
+                    </div>
+                    <button class="auth-button" onclick="authSystem.hideAuthOverlay()">
                         <i class="fas fa-arrow-right"></i>
-                        Continue to App
+                        <span>Continue to App</span>
                     </button>
                 </div>
             `;
