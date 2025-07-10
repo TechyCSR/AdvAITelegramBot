@@ -3200,6 +3200,16 @@ body {
     animation: fadeIn 0.2s ease-out;
 }
 
+/* Mobile modal backdrop adjustments */
+@media (max-width: 768px) {
+    .modal {
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(3px);
+        align-items: flex-end;
+        justify-content: center;
+    }
+}
+
 .modal .modal-content {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -4069,64 +4079,79 @@ body {
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .modern-modal-content {
-        max-width: 95%;
-        margin: 1rem;
-        max-height: 95vh;
+        max-width: 100%;
+        width: 100%;
+        margin: 0;
+        max-height: 100vh;
+        border-radius: 20px 20px 0 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        animation: slideUpFromBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .modern-modal-header {
-        padding: 1.5rem 1.5rem 1rem;
+        padding: 1.75rem 1.5rem 1rem;
+        position: relative;
+    }
+
+    .modern-modal-header::after {
+        content: '';
+        position: absolute;
+        top: 0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 36px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.4);
+        border-radius: 2px;
     }
 
     .modern-modal-body {
-        padding: 1.5rem;
+        padding: 1.25rem;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    /* Add safe area padding for devices with notches */
+    .modern-modal-content {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .modern-modal-body {
+        padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    }
+
+    /* Improve scrolling experience on mobile */
+    .modern-modal-body::-webkit-scrollbar {
+        display: none;
+    }
+
+    .modern-modal-body {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
     }
 
     .modern-user-profile {
-        padding: 1.5rem;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        border-radius: 16px;
     }
 
     .profile-header {
         flex-direction: column;
         text-align: center;
         gap: 1rem;
+        align-items: center;
     }
 
     .stats-grid {
         grid-template-columns: 1fr;
         gap: 0.75rem;
-    }
-
-    .user-avatar-modern {
-        width: 70px;
-        height: 70px;
-        font-size: 1.75rem;
-    }
-
-    .profile-info h4 {
-        font-size: 1.25rem;
-        white-space: normal;
-        text-align: center;
-    }
-}
-
-@media (max-width: 480px) {
-    .modern-modal-content {
-        border-radius: 20px;
-    }
-
-    .modern-modal-header {
-        padding: 1.25rem;
-        border-radius: 20px 20px 0 0;
-    }
-
-    .modern-modal-body {
-        padding: 1.25rem;
-    }
-
-    .modern-user-profile {
-        padding: 1.25rem;
-        border-radius: 16px;
+        margin-bottom: 1.5rem;
     }
 
     .stat-card {
@@ -4135,9 +4160,234 @@ body {
     }
 
     .user-avatar-modern {
-        width: 60px;
-        height: 60px;
+        width: 64px;
+        height: 64px;
         font-size: 1.5rem;
         border-radius: 16px;
+    }
+
+    .profile-info h4 {
+        font-size: 1.25rem;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.3;
+    }
+
+    .profile-info p {
+        text-align: center;
+        font-size: 0.8rem;
+    }
+
+    .modern-modal-close {
+        top: 1rem;
+        right: 1rem;
+        width: 36px;
+        height: 36px;
+    }
+
+    .modal-title-section h3 {
+        font-size: 1.25rem;
+    }
+
+    .modal-icon {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .modern-modal-content {
+        border-radius: 16px 16px 0 0;
+    }
+
+    .modern-modal-header {
+        padding: 1rem 1.25rem 0.75rem;
+    }
+
+    .modern-modal-body {
+        padding: 1rem;
+        max-height: calc(100vh - 80px);
+    }
+
+    .modern-user-profile {
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+        border-radius: 10px;
+        gap: 0.75rem;
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .stat-content {
+        gap: 0.125rem;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+    }
+
+    .stat-value {
+        font-size: 1rem;
+    }
+
+    .user-avatar-modern {
+        width: 56px;
+        height: 56px;
+        font-size: 1.25rem;
+        border-radius: 14px;
+    }
+
+    .profile-info h4 {
+        font-size: 1.125rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .profile-info p {
+        font-size: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .user-badge-modern {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8rem;
+        border-radius: 10px;
+    }
+
+    .modern-action-btn {
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9rem;
+        border-radius: 12px;
+    }
+
+    .modern-modal-close {
+        width: 32px;
+        height: 32px;
+        top: 0.75rem;
+        right: 1rem;
+    }
+
+    .modal-title-section h3 {
+        font-size: 1.125rem;
+    }
+
+    .modal-icon {
+        font-size: 1.125rem;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+    .modern-modal-header {
+        padding: 0.875rem 1rem 0.625rem;
+    }
+
+    .modern-modal-body {
+        padding: 0.875rem;
+        max-height: calc(100vh - 70px);
+    }
+
+    .modern-user-profile {
+        padding: 0.875rem;
+    }
+
+    .stat-card {
+        padding: 0.875rem;
+        gap: 0.625rem;
+    }
+
+    .stat-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    .user-avatar-modern {
+        width: 48px;
+        height: 48px;
+        font-size: 1.125rem;
+        border-radius: 12px;
+    }
+
+    .profile-info h4 {
+        font-size: 1rem;
+    }
+
+    .profile-info p {
+        font-size: 0.7rem;
+    }
+
+    .user-badge-modern {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    .modern-action-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.85rem;
+        gap: 0.5rem;
+    }
+
+    .modal-title-section h3 {
+        font-size: 1rem;
+    }
+
+    .modal-icon {
+        font-size: 1rem;
+    }
+}
+
+/* Mobile landscape orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+    .modern-modal-content {
+        max-height: 95vh;
+        border-radius: 16px;
+        position: relative;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        width: 90%;
+        max-width: 420px;
+        margin: 2.5vh auto;
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modern-modal-body {
+        max-height: calc(95vh - 80px);
+    }
+
+    .profile-header {
+        flex-direction: row;
+        text-align: left;
+        gap: 1rem;
+    }
+
+    .profile-info h4,
+    .profile-info p {
+        text-align: left;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+}
+
+/* Add the slide up from bottom animation */
+@keyframes slideUpFromBottom {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 } 
