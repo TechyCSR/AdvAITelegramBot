@@ -70,6 +70,9 @@ I'm here to make your life easier and more creative. Here's what we can do toget
 
 tip_text = "💡 **Pro Tip:** Type any message to start chatting with me **OR**\nuse `/img` with your prompt to generate images!\n**For more commands use /help.**"
 
+# Mini app promotion message
+mini_app_text = "🎨 **Want a Better Image Generation Experience?**\n\nTry our **Advanced Image Generator Mini App** for enhanced features, better interface, and more creative control!\n\n✨ **Features:**\n• Interactive image generation\n• Real-time previews\n• Advanced options\n• Better user experience"
+
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 UPI_QR_CODE_PATH = "assets/upi_qr.png" # Placeholder - replace with actual path or URL
 
@@ -82,9 +85,10 @@ async def start(client, message: Message):
     mention = message.from_user.mention
     user_lang = user_db.get_user_language(user_id)
     translated_welcome = await format_with_mention(welcome_text.replace("{user_mention}", "{mention}"), mention, user_id, user_lang)
-    translated_texts = await batch_translate([tip_text] + button_list, user_id)
+    translated_texts = await batch_translate([tip_text, mini_app_text] + button_list, user_id)
     translated_tip = translated_texts[0]
-    translated_buttons = translated_texts[1:]
+    translated_mini_app = translated_texts[1]
+    translated_buttons = translated_texts[2:]
 
     # Get bot username from cache (for multi-bot support) or fallback to API call
     bot_username = await get_bot_username(client)
@@ -100,11 +104,17 @@ async def start(client, message: Message):
     keyboard = InlineKeyboardMarkup(keyboard_layout)
 
     await client.send_animation(chat_id=message.chat.id, animation=LOGO, caption=translated_welcome, reply_markup=keyboard)
-    #if user is premium, skip the tip
-
-    premium_message = await get_premium_status_message(user_id)
-    if not premium_message:
-        await message.reply_text(translated_tip)
+    
+    # premium_message = await get_premium_status_message(user_id)
+    # if not premium_message:
+    #     await message.reply_text(translated_tip)
+    
+    # Send mini app promotion message with inline button
+    mini_app_button_text = await async_translate_to_lang("🚀 Try Mini App", user_id)
+    mini_app_keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(mini_app_button_text, url="https://t.me/AdvChatGptbot/ImageGenerator")]
+    ])
+    await message.reply_text(translated_mini_app, reply_markup=mini_app_keyboard)
 
 async def start_inline(bot, callback: CallbackQuery):
     user_id = callback.from_user.id
