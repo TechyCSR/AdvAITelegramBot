@@ -75,6 +75,31 @@ class AuthSystem {
         }
     }
 
+    getCurrentTelegramUser() {
+        // Extract current user data from Telegram initData
+        if (!this.initData || this.initData.length === 0) {
+            return null;
+        }
+
+        try {
+            // Parse the URL-encoded initData
+            const urlParams = new URLSearchParams(this.initData);
+            const userDataString = urlParams.get('user');
+            
+            if (!userDataString) {
+                return null;
+            }
+
+            // Parse the user JSON data
+            const userData = JSON.parse(userDataString);
+            console.log('Current Telegram user data:', userData);
+            return userData;
+        } catch (error) {
+            console.error('Error parsing current Telegram user data:', error);
+            return null;
+        }
+    }
+
     async handleTelegramAuth() {
         try {
             // Load auth config
@@ -106,11 +131,38 @@ class AuthSystem {
                 platform: this.webApp.platform
             });
             
-            // Check existing session first
+            // Check existing session but validate current user matches
             const existingAuth = await this.checkAuthStatus();
             if (existingAuth) {
-                console.log('✅ Already authenticated from session');
-                return true;
+                // Validate that the current Telegram user matches the stored session
+                const currentTelegramUser = this.getCurrentTelegramUser();
+                if (currentTelegramUser && this.user) {
+                    const storedUserId = this.user.telegram_id;
+                    const currentUserId = currentTelegramUser.id;
+                    
+                    if (storedUserId === currentUserId) {
+                        console.log('✅ Already authenticated from session with matching user');
+                        return true;
+                    } else {
+                        console.log('⚠️ Session user mismatch - clearing session and re-authenticating');
+                        console.log(`Stored: ${storedUserId}, Current: ${currentUserId}`);
+                        // Clear session without page reload to continue with fresh auth
+                        await fetch('/api/auth/logout', {
+                            method: 'POST',
+                            credentials: 'include'
+                        });
+                        // Reset local state
+                        this.authenticated = false;
+                        this.user = null;
+                        AppState.user = null;
+                        AppState.authenticated = false;
+                        AppState.permissions = {};
+                        // Continue to fresh authentication below
+                    }
+                } else {
+                    console.log('✅ Already authenticated from session (non-Telegram user)');
+                    return true;
+                }
             }
             
             // Authenticate with Telegram
