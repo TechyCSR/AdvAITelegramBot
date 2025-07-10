@@ -45,7 +45,7 @@ class AuthSystem {
             console.log('Running in Telegram environment');
             return this.initializeTelegram();
         } else {
-            console.log('Running in browser environment');
+            console.log('Running in browser environment - skipping Telegram auth attempts');
             return this.initializeBrowser();
         }
     }
@@ -106,15 +106,25 @@ class AuthSystem {
     async initializeBrowser() {
         console.log('Initializing browser authentication...');
         
+        // Show auth overlay immediately in browser mode
+        const authOverlay = document.getElementById('authOverlay');
+        if (authOverlay) {
+            authOverlay.style.display = 'flex';
+        }
+        
         // Check if user is already authenticated
         const isAuthenticated = await this.checkAuthStatus();
         
         if (!isAuthenticated) {
             console.log('User not authenticated, showing authentication options...');
-            // Show authentication options
+            // Show authentication options immediately - don't try to authenticate with Telegram
             this.showAuthenticationOptions();
         } else {
             console.log('User already authenticated');
+            // Hide auth overlay if user is authenticated
+            if (authOverlay) {
+                authOverlay.style.display = 'none';
+            }
         }
         
         return isAuthenticated;
@@ -331,8 +341,8 @@ class AuthSystem {
         if (this.authConfig && this.authConfig.google_enabled) {
             optionsHtml += `
                 <div class="auth-option">
-                    <h3><i class="fab fa-google"></i> Login with Google</h3>
-                    <p>Get premium access with unlimited image generation</p>
+                    <h3><i class="fab fa-google"></i> Sign in with Google</h3>
+                    <p>Get <strong>premium access</strong> with 4 images per generation</p>
                     <div class="google-premium-badge">
                         <i class="fas fa-crown"></i>
                         Premium Features Included
@@ -346,11 +356,25 @@ class AuthSystem {
             optionsHtml += `
                 <div class="auth-option">
                     <h3><i class="fab fa-telegram"></i> Telegram Users</h3>
-                    <p>This app works best when opened through Telegram</p>
-                    <a href="https://t.me/AdvChatGptBot" target="_blank" class="telegram-link-btn">
+                    <p>Access through our Telegram bot for the full experience</p>
+                    <a href="https://t.me/AdvAIImageBot" target="_blank" class="telegram-link-btn">
                         <i class="fab fa-telegram"></i>
-                        Open in Telegram
+                        Open Telegram Bot
                     </a>
+                </div>
+            `;
+        }
+
+        // Add "Continue Anyway" option for browsers
+        if (!this.isInTelegram) {
+            optionsHtml += `
+                <div class="auth-option" style="border-style: dashed; opacity: 0.8;">
+                    <h3><i class="fas fa-eye"></i> Continue Anyway</h3>
+                    <p>View the interface without authentication (limited access)</p>
+                    <button onclick="authSystem.hideAuthOverlay()" style="background: #666;">
+                        <i class="fas fa-arrow-right"></i>
+                        Browse Interface
+                    </button>
                 </div>
             `;
         }
@@ -446,6 +470,19 @@ class AuthSystem {
 
     showAuthError(message) {
         console.error('Auth error:', message);
+        
+        // If we're in browser mode and this is a Telegram-related error, 
+        // show authentication options instead
+        if (!this.isInTelegram && (
+            message.includes('initialization data') || 
+            message.includes('No initialization data') ||
+            message.includes('Telegram')
+        )) {
+            console.log('Browser mode detected, showing auth options instead of error');
+            this.showAuthenticationOptions();
+            return false;
+        }
+        
         showAuthStatus(message, true);
         showAuthActions();
         return false;
@@ -687,7 +724,16 @@ class AdvAIApp {
         // Retry authentication
         const retryAuth = document.getElementById('retryAuth');
         if (retryAuth) {
-            retryAuth.addEventListener('click', () => location.reload());
+            retryAuth.addEventListener('click', () => {
+                if (this.authSystem.isInTelegram) {
+                    // In Telegram, retry Telegram authentication
+                    this.authSystem.authenticateTelegram();
+                } else {
+                    // In browser, show authentication options instead of reloading
+                    console.log('Retry clicked in browser mode, showing auth options');
+                    this.authSystem.showAuthenticationOptions();
+                }
+            });
         }
 
         // Mobile menu toggle

@@ -2099,8 +2099,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    max-width: 400px;
-    margin: 0 auto;
+    max-width: 500px;
+    margin: 1rem auto;
+    width: 100%;
 }
 
 .auth-option {
@@ -2110,6 +2111,7 @@ body {
     padding: 2rem;
     text-align: center;
     transition: var(--transition);
+    box-shadow: var(--shadow-sm);
 }
 
 .auth-option:hover {
@@ -2121,20 +2123,31 @@ body {
 .auth-option h3 {
     margin: 0 0 1rem 0;
     color: var(--text-primary);
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.auth-option h3 i {
+    font-size: 1.5rem;
 }
 
 .auth-option p {
     margin: 0 0 1.5rem 0;
     color: var(--text-secondary);
     line-height: 1.6;
+    font-size: 0.95rem;
 }
 
 #googleSignInButton {
     display: flex;
     justify-content: center;
     margin: 1rem 0;
+    min-height: 50px;
+    align-items: center;
 }
 
 .auth-option button {
@@ -2146,11 +2159,27 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
+    font-size: 1rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .auth-option button:hover {
     background: var(--accent-color);
     transform: translateY(-1px);
+}
+
+/* Make the first auth option (Google) more prominent */
+.auth-option:first-child {
+    border-color: #4285f4;
+    background: linear-gradient(135deg, rgba(66, 133, 244, 0.05), rgba(52, 168, 83, 0.05));
+}
+
+.auth-option:first-child:hover {
+    border-color: #4285f4;
+    background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(52, 168, 83, 0.1));
 }
 
 /* Google Sign-In Button Overrides */
