@@ -723,6 +723,7 @@ class AdvAIApp {
             this.initializeTheme();
             this.initializeEventListeners();
             this.loadHistory();
+            this.initializeUIState();
             
             console.log('App initialized successfully');
         } catch (error) {
@@ -743,6 +744,20 @@ class AdvAIApp {
                 icon.className = AppState.currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
             }
         });
+    }
+
+    initializeUIState() {
+        // Hide save to history button initially
+        const saveBtn = document.getElementById('saveToHistoryBtn');
+        if (saveBtn) {
+            saveBtn.style.display = 'none';
+        }
+        
+        // Hide results section initially
+        const resultsSection = document.getElementById('resultsSection');
+        if (resultsSection) {
+            resultsSection.style.display = 'none';
+        }
     }
 
     initializeEventListeners() {
@@ -847,6 +862,12 @@ class AdvAIApp {
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         if (clearHistoryBtn) {
             clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+        }
+
+        // Save to history button (will be managed dynamically)
+        const saveToHistoryBtn = document.getElementById('saveToHistoryBtn');
+        if (saveToHistoryBtn) {
+            saveToHistoryBtn.addEventListener('click', () => this.saveAllToHistory());
         }
 
         // Image modal event listeners
@@ -1093,19 +1114,11 @@ class AdvAIApp {
             imagesGrid.appendChild(imageItem);
         });
 
-        // Add Save All button
-        const saveAllBtn = document.createElement('button');
-        saveAllBtn.className = 'save-all-btn';
-        saveAllBtn.innerHTML = `
-            <i class="fas fa-save"></i>
-            Save All to History (${data.images.length} images)
-        `;
-        saveAllBtn.onclick = () => this.saveAllToHistory();
-        
-        imagesGrid.appendChild(saveAllBtn);
-
         // Show results section
         document.getElementById('resultsSection').style.display = 'block';
+        
+        // Update the Save to History button in the header
+        this.updateSaveToHistoryButton(data.images.length);
     }
 
     saveAllToHistory() {
@@ -1115,39 +1128,54 @@ class AdvAIApp {
         }
 
         const data = this.currentGeneration;
-        const baseTimestamp = Date.now();
         
-        // Save each image as a separate history item
-        data.images.forEach((imageUrl, index) => {
-            const historyItem = {
-                id: baseTimestamp + index,
-                timestamp: new Date().toISOString(),
-                prompt: data.prompt,
-                style: data.style,
-                model: data.model || 'DALL-E 3',
-                size: data.size,
-                imageUrl: imageUrl,
-                imageIndex: index + 1,
-                totalImages: data.images.length
-            };
+        // Save as a single generation with multiple images
+        const historyItem = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            prompt: data.prompt,
+            style: data.style,
+            model: data.model || 'DALL-E 3',
+            size: data.size,
+            images: data.images,
+            imageCount: data.images.length,
+            type: 'generation' // Mark as a generation group
+        };
 
-            AppState.history.unshift(historyItem);
-        });
+        AppState.history.unshift(historyItem);
         
-        // Keep only last 100 items (since we're saving individual images now)
-        if (AppState.history.length > 100) {
-            AppState.history = AppState.history.slice(0, 100);
+        // Keep only last 50 generations
+        if (AppState.history.length > 50) {
+            AppState.history = AppState.history.slice(0, 50);
         }
 
         this.saveHistory();
         this.renderHistory();
         this.showNotification(`Saved ${data.images.length} images to history!`, 'success');
+        
+        // Hide the save button after saving
+        const saveBtn = document.getElementById('saveToHistoryBtn');
+        if (saveBtn) {
+            saveBtn.style.display = 'none';
+        }
+    }
+
+    updateSaveToHistoryButton(imageCount) {
+        const saveBtn = document.getElementById('saveToHistoryBtn');
+        if (saveBtn) {
+            saveBtn.style.display = 'inline-flex';
+            saveBtn.innerHTML = `
+                <i class="fas fa-save"></i>
+                Save to History (${imageCount})
+            `;
+            saveBtn.onclick = () => this.saveAllToHistory();
+        }
     }
 
     addToHistory(data) {
-        // For backward compatibility - now saves all images individually
+        // For backward compatibility - this method no longer auto-saves
+        // Only saves when user explicitly clicks Save to History
         this.currentGeneration = data;
-        this.saveAllToHistory();
     }
 
     saveHistory() {
@@ -1184,23 +1212,25 @@ class AdvAIApp {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
             
-            // Support both old format (with images array) and new format (single imageUrl)
-            const imageUrl = item.imageUrl || (item.images && item.images[0]) || '';
-            const imageCount = item.totalImages || (item.images && item.images.length) || 1;
+            // Support both old format (single imageUrl) and new format (generation with multiple images)
+            const isGeneration = item.type === 'generation' || (item.images && Array.isArray(item.images));
+            const images = isGeneration ? item.images : [item.imageUrl || item.images[0]];
+            const imageCount = images.length;
+            const firstImage = images[0];
             
             historyItem.innerHTML = `
-                <img class="history-image" src="${imageUrl}" alt="Generated image" loading="lazy" data-id="${item.id}">
+                <img class="history-image" src="${firstImage}" alt="Generated image" loading="lazy" data-id="${item.id}">
                 <div class="history-content">
                     <div class="history-info">
                         <div class="history-prompt">${item.prompt.substring(0, 60)}${item.prompt.length > 60 ? '...' : ''}</div>
                         <div class="history-date">${new Date(item.timestamp).toLocaleDateString()}</div>
-                        ${imageCount > 1 ? `<div class="image-count">Image ${item.imageIndex || 1} of ${imageCount}</div>` : ''}
+                        ${imageCount > 1 ? `<div class="image-count">${imageCount} images</div>` : ''}
                     </div>
                     <div class="history-actions">
-                        <button class="history-btn download" onclick="app.downloadImage('${imageUrl}', 0)" title="Download image">
+                        <button class="history-btn download" onclick="app.downloadAllFromHistory(${item.id})" title="${imageCount > 1 ? 'Download all images' : 'Download image'}">
                             <i class="fas fa-download"></i>
                         </button>
-                        <button class="history-btn share" onclick="app.shareImage('${imageUrl}')" title="Share image">
+                        <button class="history-btn share" onclick="app.shareImage('${firstImage}')" title="Share first image">
                             <i class="fas fa-share"></i>
                         </button>
                         <button class="history-btn delete" onclick="app.deleteFromHistory(${item.id})" title="Delete from history">
@@ -1210,10 +1240,10 @@ class AdvAIApp {
                 </div>
             `;
             
-            // Add click handler to image for viewer
+            // Add click handler to image for viewer with navigation
             const img = historyItem.querySelector('.history-image');
             img.addEventListener('click', () => {
-                this.openImageViewer([imageUrl], 0, {
+                this.openImageViewer(images, 0, {
                     prompt: item.prompt,
                     size: item.size,
                     style: item.style,
@@ -1244,6 +1274,26 @@ class AdvAIApp {
         // Update UI
         this.updateCharCounter();
         this.toggleCustomSize();
+    }
+
+    downloadAllFromHistory(id) {
+        const historyItem = AppState.history.find(item => item.id === id);
+        if (!historyItem) return;
+        
+        const images = historyItem.images || [historyItem.imageUrl];
+        
+        if (images.length === 1) {
+            // Single image download
+            this.downloadImage(images[0], 0);
+        } else {
+            // Multiple images download
+            images.forEach((imageUrl, index) => {
+                setTimeout(() => {
+                    this.downloadImage(imageUrl, index);
+                }, index * 200); // Stagger downloads
+            });
+            this.showNotification(`Downloading ${images.length} images...`, 'success');
+        }
     }
 
     deleteFromHistory(id) {
