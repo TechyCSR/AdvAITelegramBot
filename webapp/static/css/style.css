@@ -371,12 +371,21 @@ body {
     outline: none !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 12px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
 }
 
 .mobile-menu-item.user-menu-btn:focus {
     outline: none !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
 }
 
 .mobile-menu-item.user-menu-btn:hover {
@@ -385,6 +394,7 @@ body {
     transform: translateX(2px);
     outline: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
 .mobile-menu-item i {
@@ -409,6 +419,32 @@ body {
     align-items: center;
     margin: 0;
     padding: 0;
+}
+
+/* Fix user menu button alignment in mobile */
+.mobile-menu-item.user-menu-btn i {
+    font-size: 16px !important;
+    width: 20px !important;
+    height: 20px !important;
+    text-align: center !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+}
+
+.mobile-menu-item.user-menu-btn span {
+    flex: 1 !important;
+    text-align: left !important;
+    line-height: 1.4 !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 /* Header Styles */
