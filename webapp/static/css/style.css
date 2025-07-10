@@ -1069,6 +1069,19 @@ body {
     transform: translateY(-1px);
 }
 
+#downloadAllBtn {
+    background: linear-gradient(135deg, var(--accent-color), #059669);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+#downloadAllBtn:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    border-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
 /* Results Grid */
 .results-grid {
     display: grid;
@@ -2257,12 +2270,7 @@ body {
     }
     
     .modal-prompt {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        font-size: 0.85rem;
+        display: none; /* Hide prompt on mobile */
     }
 }
 
@@ -2313,9 +2321,7 @@ body {
     }
     
     .modal-prompt {
-        font-size: 0.8rem;
-        -webkit-line-clamp: 1;
-        line-clamp: 1;
+        display: none; /* Hide prompt on mobile */
     }
     
     .modal-details {

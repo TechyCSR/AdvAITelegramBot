@@ -753,6 +753,12 @@ class AdvAIApp {
             saveBtn.style.display = 'none';
         }
         
+        // Hide download all button initially
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        if (downloadAllBtn) {
+            downloadAllBtn.style.display = 'none';
+        }
+        
         // Hide results section initially
         const resultsSection = document.getElementById('resultsSection');
         if (resultsSection) {
@@ -1162,6 +1168,8 @@ class AdvAIApp {
 
     updateSaveToHistoryButton(imageCount) {
         const saveBtn = document.getElementById('saveToHistoryBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        
         if (saveBtn) {
             saveBtn.style.display = 'inline-flex';
             saveBtn.innerHTML = `
@@ -1169,6 +1177,20 @@ class AdvAIApp {
                 Save to History (${imageCount})
             `;
             saveBtn.onclick = () => this.saveAllToHistory();
+        }
+        
+        // Show download all button only when not in Telegram
+        if (downloadAllBtn) {
+            if (!this.isInTelegram() && imageCount > 1) {
+                downloadAllBtn.style.display = 'inline-flex';
+                downloadAllBtn.innerHTML = `
+                    <i class="fas fa-download"></i>
+                    Download All (${imageCount})
+                `;
+                downloadAllBtn.onclick = () => this.downloadAllImages();
+            } else {
+                downloadAllBtn.style.display = 'none';
+            }
         }
     }
 
@@ -1243,12 +1265,7 @@ class AdvAIApp {
             // Add click handler to image for viewer with navigation
             const img = historyItem.querySelector('.history-image');
             img.addEventListener('click', () => {
-                this.openImageViewer(images, 0, {
-                    prompt: item.prompt,
-                    size: item.size,
-                    style: item.style,
-                    model: item.model || 'DALL-E 3'
-                });
+                this.openHistoryImageViewer(item.id);
             });
             
             historyGrid.appendChild(historyItem);
@@ -1282,17 +1299,28 @@ class AdvAIApp {
         
         const images = historyItem.images || [historyItem.imageUrl];
         
-        if (images.length === 1) {
-            // Single image download
-            this.downloadImage(images[0], 0);
-        } else {
-            // Multiple images download
+        if (this.isInTelegram()) {
+            // In Telegram: Open all in new tabs
             images.forEach((imageUrl, index) => {
                 setTimeout(() => {
-                    this.downloadImage(imageUrl, index);
-                }, index * 200); // Stagger downloads
+                    window.open(imageUrl, '_blank');
+                }, index * 500);
             });
-            this.showNotification(`Downloading ${images.length} images...`, 'success');
+            this.showNotification(`Opening ${images.length} image${images.length > 1 ? 's' : ''} in new tabs...`, 'success');
+        } else {
+            // In browser: Download all
+            images.forEach((imageUrl, index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `advai-history-${Date.now()}-${index + 1}.jpg`;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, index * 300);
+            });
+            this.showNotification(`Downloading ${images.length} image${images.length > 1 ? 's' : ''}...`, 'success');
         }
     }
 
@@ -1323,16 +1351,60 @@ class AdvAIApp {
         }
     }
 
+    isInTelegram() {
+        // Check if we're in Telegram environment
+        return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+    }
+
     downloadImage(imageUrl, index) {
-        const link = document.createElement('a');
-        link.href = imageUrl;
-        link.download = `advai-generated-${Date.now()}-${index + 1}.jpg`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (this.isInTelegram()) {
+            // In Telegram: Open in new tab
+            window.open(imageUrl, '_blank');
+            this.showNotification('Image opened in new tab!', 'success');
+        } else {
+            // In browser: Direct download
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = `advai-generated-${Date.now()}-${index + 1}.jpg`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            this.showNotification('Image download started!', 'success');
+        }
+    }
+
+    downloadAllImages() {
+        if (!this.currentGeneration || !this.currentGeneration.images) {
+            this.showError('No images to download');
+            return;
+        }
+
+        const images = this.currentGeneration.images;
         
-        this.showNotification('Image download started!', 'success');
+        if (this.isInTelegram()) {
+            // In Telegram: Open all in new tabs with delay
+            images.forEach((imageUrl, index) => {
+                setTimeout(() => {
+                    window.open(imageUrl, '_blank');
+                }, index * 500);
+            });
+            this.showNotification(`Opening ${images.length} images in new tabs...`, 'success');
+        } else {
+            // In browser: Download all with delay
+            images.forEach((imageUrl, index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `advai-generated-${Date.now()}-${index + 1}.jpg`;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, index * 300);
+            });
+            this.showNotification(`Downloading ${images.length} images...`, 'success');
+        }
     }
 
     async shareImage(imageUrl) {
@@ -1438,6 +1510,48 @@ class AdvAIApp {
         }, 200 + Math.random() * 300); // Random interval between 200-500ms
     }
 
+    getAllHistoryImages() {
+        const allImages = [];
+        const imageDetails = [];
+        
+        AppState.history.forEach(item => {
+            const images = item.images || [item.imageUrl];
+            images.forEach(imageUrl => {
+                allImages.push(imageUrl);
+                imageDetails.push({
+                    prompt: item.prompt,
+                    size: item.size,
+                    style: item.style,
+                    model: item.model || 'DALL-E 3',
+                    date: item.timestamp,
+                    generationId: item.id
+                });
+            });
+        });
+        
+        return { allImages, imageDetails };
+    }
+
+    openHistoryImageViewer(selectedItemId) {
+        const { allImages, imageDetails } = this.getAllHistoryImages();
+        
+        if (allImages.length === 0) {
+            this.showError('No images in history');
+            return;
+        }
+        
+        // Find the starting index based on the selected item
+        let startIndex = 0;
+        for (let i = 0; i < imageDetails.length; i++) {
+            if (imageDetails[i].generationId === selectedItemId) {
+                startIndex = i;
+                break;
+            }
+        }
+        
+        this.openImageViewer(allImages, startIndex, imageDetails[startIndex]);
+    }
+
     // Image Viewer functionality
     openImageViewer(images, currentIndex = 0, details = {}) {
         // Ensure images is an array
@@ -1459,7 +1573,9 @@ class AdvAIApp {
             prompt: details.prompt || '',
             size: details.size || '',
             style: details.style || '',
-            model: details.model || 'DALL-E 3'
+            model: details.model || 'DALL-E 3',
+            isHistoryViewer: details.date ? true : false,
+            imageDetails: details.date ? this.getAllHistoryImages().imageDetails : null
         };
 
         // Update modal content
@@ -1525,7 +1641,21 @@ class AdvAIApp {
     downloadCurrentImage() {
         const modalImage = document.getElementById('modalImage');
         if (modalImage && modalImage.src) {
-            this.downloadImage(modalImage.src, 0);
+            if (this.isInTelegram()) {
+                // In Telegram: Open in new tab
+                window.open(modalImage.src, '_blank');
+                this.showNotification('Image opened in new tab!', 'success');
+            } else {
+                // In browser: Direct download
+                const link = document.createElement('a');
+                link.href = modalImage.src;
+                link.download = `advai-image-${Date.now()}.jpg`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                this.showNotification('Image download started!', 'success');
+            }
         }
     }
 
@@ -1670,6 +1800,19 @@ class AdvAIApp {
 
         const currentImage = this.currentModalData.images[this.currentModalData.currentIndex];
 
+        // Get current image details (for history viewer, use specific image details)
+        let currentDetails;
+        if (this.currentModalData.isHistoryViewer && this.currentModalData.imageDetails) {
+            currentDetails = this.currentModalData.imageDetails[this.currentModalData.currentIndex];
+        } else {
+            currentDetails = {
+                prompt: this.currentModalData.prompt,
+                size: this.currentModalData.size,
+                style: this.currentModalData.style,
+                model: this.currentModalData.model
+            };
+        }
+
         if (modalImage) {
             modalImage.src = currentImage;
         }
@@ -1689,19 +1832,19 @@ class AdvAIApp {
         }
 
         if (modalPrompt) {
-            modalPrompt.textContent = this.currentModalData.prompt;
+            modalPrompt.textContent = currentDetails.prompt || '';
         }
 
         if (modalSize) {
-            modalSize.textContent = this.currentModalData.size;
+            modalSize.textContent = currentDetails.size || '';
         }
 
         if (modalStyle) {
-            modalStyle.textContent = this.currentModalData.style;
+            modalStyle.textContent = currentDetails.style || '';
         }
 
         if (modalModel) {
-            modalModel.textContent = this.currentModalData.model;
+            modalModel.textContent = currentDetails.model || '';
         }
     }
 
