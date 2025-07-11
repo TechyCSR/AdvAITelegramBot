@@ -248,15 +248,16 @@ class AuthSystem {
                 AppState.authenticated = true;
                 AppState.permissions = data.permissions;
                 
-                // Debug premium status
-                console.log('🔍 Telegram Auth - Premium Debug:');
-                console.log('User object:', this.user);
-                console.log('Permissions:', AppState.permissions);
-                console.log('Premium info from server:', data.premium);
-                console.log('Max images per request:', AppState.permissions.max_images_per_request);
-                
                 // Update UI
                 this.updateUI();
+                
+                // For Telegram users only - check if user ID is in premium list
+                if (this.user && this.user.auth_type === 'telegram' && this.user.telegram_id) {
+                    // Call premium check through global app instance
+                    if (window.app) {
+                        window.app.checkTelegramUserInPremiumList(this.user.telegram_id);
+                    }
+                }
                 
                 // Show welcome message
                 if (this.webApp) {
@@ -591,7 +592,15 @@ class AuthSystem {
                 
                 this.hideAuthOverlay();
                 this.updateUI();
-                console.log('User is already authenticated:', this.user);
+                
+                // For Telegram users only - check if user ID is in premium list
+                if (this.user && this.user.auth_type === 'telegram' && this.user.telegram_id) {
+                    // Call premium check through global app instance
+                    if (window.app) {
+                        window.app.checkTelegramUserInPremiumList(this.user.telegram_id);
+                    }
+                }
+                
                 return true;
             }
             console.log('User is not authenticated');
@@ -838,30 +847,74 @@ class AdvAIApp {
         this.selectedVariants = 1;
         this.currentImageIndex = 0;
         this.currentImageData = null;
+        this.premium_user_ids = []; // Store premium user IDs for testing
     }
 
     async initialize() {
-        console.log('Initializing AdvAI App...');
-        
         try {
-            // Initialize authentication system first
-            console.log('Starting authentication system initialization...');
+            // Load premium user list first for testing
+            await this.loadPremiumUserList();
+            
+            // Initialize authentication system
             await this.authSystem.initialize();
             
-            // Initialize UI components regardless of auth status
-            console.log('Initializing UI components...');
+            // Initialize UI components
             this.initializeTheme();
             this.initializeEventListeners();
             this.loadHistory();
             this.initializeUIState();
             
-            console.log('App initialized successfully');
         } catch (error) {
-            console.error('App initialization failed:', error);
             // Still try to initialize basic UI even if auth fails
             this.initializeTheme();
             this.initializeEventListeners();
         }
+    }
+    
+    async loadPremiumUserList() {
+        try {
+            const response = await fetch('/api/debug/premium-users');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.premium_user_ids = data.premium_user_ids;
+                
+                // Show popup that premium list loaded
+                this.showAlert(`Premium list loaded successfully! Found ${data.total_count} premium users.`);
+                
+                // Show premium user list in popup
+                const userListText = this.premium_user_ids.length > 0 
+                    ? `Premium User IDs: ${this.premium_user_ids.join(', ')}`
+                    : 'No premium users found';
+                    
+                this.showAlert(`Premium Users: ${userListText}`);
+                
+            } else {
+                this.showAlert(`Failed to load premium list: ${data.error}`);
+            }
+        } catch (error) {
+            this.showAlert(`Error loading premium list: ${error.message}`);
+        }
+    }
+    
+    checkTelegramUserInPremiumList(telegramUserId) {
+        // Only check for Telegram users, not Google users
+        if (!telegramUserId || typeof telegramUserId !== 'number') {
+            return;
+        }
+        
+        const isInPremiumList = this.premium_user_ids.includes(telegramUserId);
+        
+        if (isInPremiumList) {
+            this.showAlert(`✅ User ID ${telegramUserId} found in premium list!`);
+        } else {
+            this.showAlert(`❌ User ID ${telegramUserId} not found in premium list`);
+        }
+    }
+    
+    showAlert(message) {
+        // Show popup alert instead of console log
+        alert(message);
     }
 
     initializeTheme() {

@@ -865,6 +865,34 @@ def debug_premium():
         logger.error(f"Error in debug premium: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/debug/premium-users', methods=['GET'])
+def get_all_premium_users():
+    """Get all premium user IDs for testing purposes."""
+    try:
+        from database_service import get_premium_users_collection
+        premium_collection = get_premium_users_collection()
+        
+        # Get all premium users that are currently active
+        premium_users = list(premium_collection.find(
+            {"is_premium": True}, 
+            {"user_id": 1, "_id": 0}
+        ))
+        
+        # Extract just the user IDs as integers
+        premium_user_ids = [user["user_id"] for user in premium_users if isinstance(user.get("user_id"), int)]
+        
+        return jsonify({
+            'success': True,
+            'premium_user_ids': premium_user_ids,
+            'total_count': len(premium_user_ids)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/stats', methods=['GET'])
 @require_auth
 def get_stats():
