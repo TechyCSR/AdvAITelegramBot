@@ -728,14 +728,6 @@ def generate_images_api():
         if not permissions.get('can_generate_images'):
             return jsonify({'error': 'Permission denied'}), 403
         
-        # Get user's image limit based on premium status
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            user_image_limit = loop.run_until_complete(user.get_image_limit())
-        finally:
-            loop.close()
-        
         data = request.get_json()
         
         # Validate input
@@ -751,15 +743,8 @@ def generate_images_api():
         model = data.get('model', 'flux')
         requested_images = int(data.get('num_images', 1))
         
-        # Enforce premium limits
-        if requested_images > user_image_limit:
-            return jsonify({
-                'error': f'Maximum {user_image_limit} images per request. {"Upgrade to Premium for more!" if user_image_limit == 1 else ""}',
-                'max_allowed': user_image_limit,
-                'upgrade_required': user_image_limit == 1
-            }), 400
-        
-        num_images = min(requested_images, user_image_limit)
+        # Use requested images directly (frontend UI already handles limits)
+        num_images = max(1, min(requested_images, 4))  # Cap at 4 images max
         
         # Parse image size
         size = data.get('size', '1024x1024')
