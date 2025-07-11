@@ -248,6 +248,13 @@ class AuthSystem {
                 AppState.authenticated = true;
                 AppState.permissions = data.permissions;
                 
+                // Debug premium status
+                console.log('🔍 Telegram Auth - Premium Debug:');
+                console.log('User object:', this.user);
+                console.log('Permissions:', AppState.permissions);
+                console.log('Premium info from server:', data.premium);
+                console.log('Max images per request:', AppState.permissions.max_images_per_request);
+                
                 // Update UI
                 this.updateUI();
                 
@@ -420,6 +427,12 @@ class AuthSystem {
                 AppState.permissions = data.permissions;
                 
                 console.log('Google authentication successful:', this.user);
+                console.log('🔍 Google Auth - Premium Debug:');
+                console.log('User object:', this.user);
+                console.log('Permissions:', AppState.permissions);
+                console.log('Premium info from server:', data.premium);
+                console.log('Max images per request:', AppState.permissions.max_images_per_request);
+                
                 this.hideAuthOverlay();
                 this.updateUI();
                 
@@ -568,6 +581,14 @@ class AuthSystem {
                 AppState.user = data.user;
                 AppState.authenticated = true;
                 AppState.permissions = data.permissions;
+                
+                // Debug premium status
+                console.log('🔍 Premium Debug Info:');
+                console.log('User object:', this.user);
+                console.log('Permissions:', AppState.permissions);
+                console.log('Premium info from server:', data.premium);
+                console.log('Max images per request:', AppState.permissions.max_images_per_request);
+                
                 this.hideAuthOverlay();
                 this.updateUI();
                 console.log('User is already authenticated:', this.user);
@@ -650,6 +671,8 @@ class AuthSystem {
 
         // Update UI based on permissions
         this.updatePermissionBasedUI();
+        
+        console.log('🎯 UI update completed for user:', this.user.display_name);
     }
 
     updateUserModal() {
@@ -688,12 +711,36 @@ class AuthSystem {
         const variantBtns = document.querySelectorAll('.variant-btn');
         const maxImages = AppState.permissions.max_images_per_request || 2;
         
+        console.log('🔧 Updating UI based on permissions:', AppState.permissions);
+        console.log('👥 User premium status:', AppState.user?.is_premium);
+        console.log('🖼️ Max images allowed:', maxImages);
+        
         variantBtns.forEach(btn => {
             const variants = parseInt(btn.dataset.variants);
+            console.log(`🎛️ Checking variant button for ${variants} images`);
+            
             if (variants > maxImages) {
                 btn.disabled = true;
-                btn.title = 'Premium feature';
+                btn.title = AppState.user?.is_premium ? 'Contact support for higher limits' : 'Premium feature - Upgrade to generate multiple images';
                 btn.classList.add('premium-required');
+                console.log(`❌ Disabled ${variants}-image button (limit: ${maxImages})`);
+                
+                // If this button is currently active, switch to the max allowed
+                if (btn.classList.contains('active')) {
+                    btn.classList.remove('active');
+                    // Find and activate the highest allowed button
+                    const allowedBtn = Array.from(variantBtns).find(b => parseInt(b.dataset.variants) <= maxImages);
+                    if (allowedBtn) {
+                        allowedBtn.classList.add('active');
+                        this.selectedVariants = parseInt(allowedBtn.dataset.variants);
+                        console.log(`✅ Switched to ${this.selectedVariants}-image option`);
+                    }
+                }
+            } else {
+                btn.disabled = false;
+                btn.title = '';
+                btn.classList.remove('premium-required');
+                console.log(`✅ Enabled ${variants}-image button`);
             }
         });
 
@@ -702,7 +749,38 @@ class AuthSystem {
         if (enhanceBtn && !AppState.permissions.can_enhance_prompts) {
             enhanceBtn.disabled = true;
             enhanceBtn.title = 'Feature not available';
+            console.log('❌ Disabled enhance button');
+        } else if (enhanceBtn) {
+            enhanceBtn.disabled = false;
+            enhanceBtn.title = '';
+            console.log('✅ Enabled enhance button');
         }
+
+        // Add visual indicators for premium features
+        this.updatePremiumVisualIndicators();
+    }
+
+    updatePremiumVisualIndicators() {
+        // Add premium badges to restricted buttons
+        const premiumRequiredBtns = document.querySelectorAll('.variant-btn.premium-required');
+        premiumRequiredBtns.forEach(btn => {
+            if (!btn.querySelector('.premium-indicator')) {
+                const indicator = document.createElement('span');
+                indicator.className = 'premium-indicator';
+                indicator.innerHTML = '<i class="fas fa-crown"></i>';
+                indicator.title = 'Premium Feature';
+                btn.appendChild(indicator);
+            }
+        });
+
+        // Remove premium indicators from enabled buttons
+        const enabledBtns = document.querySelectorAll('.variant-btn:not(.premium-required)');
+        enabledBtns.forEach(btn => {
+            const indicator = btn.querySelector('.premium-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        });
     }
 
     openHistoryImage(historyId, imageIndex) {
@@ -964,11 +1042,32 @@ class AdvAIApp {
     }
 
     selectVariants(button) {
+        // Check if button is disabled (premium required)
+        if (button.disabled || button.classList.contains('premium-required')) {
+            console.log('❌ Cannot select disabled variant button');
+            
+            // Show upgrade message
+            this.showError('This feature requires a premium account. Please upgrade to generate multiple images.');
+            return;
+        }
+        
+        const variants = parseInt(button.dataset.variants);
+        const maxImages = AppState.permissions.max_images_per_request || 2;
+        
+        // Double check permission limit
+        if (variants > maxImages) {
+            console.log(`❌ Variant ${variants} exceeds limit of ${maxImages}`);
+            this.showError(`You can generate up to ${maxImages} images per request. ${maxImages === 1 ? 'Upgrade to Premium for more!' : ''}`);
+            return;
+        }
+        
         document.querySelectorAll('.variant-btn').forEach(btn => {
             btn.classList.remove('active');
         });
         button.classList.add('active');
-        this.selectedVariants = parseInt(button.dataset.variants);
+        this.selectedVariants = variants;
+        
+        console.log(`✅ Selected ${variants} image variant`);
     }
 
     toggleCustomSize() {

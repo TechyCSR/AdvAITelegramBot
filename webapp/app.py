@@ -337,8 +337,6 @@ def auth_status():
             'message': 'Not authenticated'
         })
     
-    permissions = get_user_permissions(user)
-    
     # Get REAL premium information from database (same as /api/auth/premium)
     try:
         loop = asyncio.new_event_loop()
@@ -352,6 +350,7 @@ def auth_status():
         # Update user object with real premium status
         user.is_premium = premium_info.get('has_premium_access', False)
         user.premium_info = premium_info
+        user.premium_info['image_limit'] = image_limit  # Add image limit to premium info
         
         # Update session with new premium info
         from telegram_auth import update_user_session
@@ -377,6 +376,12 @@ def auth_status():
             'image_limit': 4 if user.auth_type == 'google' else 1,
             'expires_at': None
         }
+        # Also update user object with fallback info
+        user.is_premium = premium_status['has_premium_access']
+        user.premium_info = premium_status
+    
+    # Get permissions AFTER updating premium info
+    permissions = get_user_permissions(user)
     
     return jsonify({
         'authenticated': True,

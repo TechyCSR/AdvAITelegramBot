@@ -976,6 +976,7 @@ body {
     align-items: center;
     justify-content: center;
     box-shadow: var(--shadow-sm);
+    position: relative;
 }
 
 .variant-btn:hover {
@@ -4548,3 +4549,48 @@ body {
         font-size: 0.6875rem;
     }
 } 
+
+/* Permission-based UI */
+.premium-required {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.premium-required:hover {
+    transform: none !important;
+    background: var(--surface) !important;
+    color: var(--text-muted) !important;
+}
+
+/* Premium indicator for buttons */
+.premium-indicator {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    animation: pulse-crown 2s infinite;
+}
+
+.variant-btn {
+    position: relative;
+}
+
+@keyframes pulse-crown {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+    }
+}
