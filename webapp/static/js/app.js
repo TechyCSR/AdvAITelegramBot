@@ -907,8 +907,35 @@ class AdvAIApp {
         
         if (isInPremiumList) {
             this.showAlert(`✅ User ID ${telegramUserId} found in premium list!`);
+            
+            // Update user status to premium if found in premium list
+            this.updateUserToPremium();
+            
         } else {
             this.showAlert(`❌ User ID ${telegramUserId} not found in premium list`);
+        }
+    }
+    
+    updateUserToPremium() {
+        // Update user object to premium status
+        if (AppState.user) {
+            AppState.user.is_premium = true;
+            
+            // Update permissions for premium user
+            AppState.permissions.max_images_per_request = 4;
+            AppState.permissions.can_enhance_prompts = true;
+            
+            // Update auth system user as well
+            if (this.authSystem && this.authSystem.user) {
+                this.authSystem.user.is_premium = true;
+            }
+            
+            // Force refresh the UI to show premium features
+            if (this.authSystem && this.authSystem.updateUI) {
+                this.authSystem.updateUI();
+            }
+            
+            this.showAlert('🎉 Premium status activated! UI updated with premium features.');
         }
     }
     
