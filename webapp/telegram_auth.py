@@ -394,6 +394,12 @@ def create_user_session(user_data: Dict[str, Any], auth_type: str = 'telegram') 
     
     return user
 
+def update_user_session(user: User):
+    """Update user session with current user data (including premium info)"""
+    if session.get('authenticated'):
+        session['user'] = user.to_dict()
+        session['auth_time'] = time.time()  # Refresh session time
+
 def get_current_user() -> Optional[User]:
     """
     Get current authenticated user from session
@@ -561,12 +567,40 @@ def get_user_permissions(user: User) -> Dict[str, bool]:
             'max_images_per_request': 0
         }
     
+    # Check real premium status for accurate permissions
+    has_premium_access = False
+    max_images = 1  # Default for standard users
+    
+    try:
+        # Quick premium check
+        if user.auth_type == 'google':
+            # Google users are premium by default
+            has_premium_access = True
+            max_images = 4
+        elif hasattr(user, 'premium_info') and user.premium_info:
+            # Use cached premium info if available
+            has_premium_access = user.premium_info.get('has_premium_access', False)
+            max_images = user.premium_info.get('image_limit', 1)
+        elif user.is_premium:
+            # Fallback to user.is_premium if set
+            has_premium_access = True
+            max_images = 4
+        else:
+            # For Telegram users without cached info, assume standard
+            has_premium_access = False
+            max_images = 1
+    except Exception as e:
+        # Error checking premium status, use safe defaults
+        print(f"Error in get_user_permissions: {e}")
+        has_premium_access = user.auth_type == 'google'  # Google users are premium
+        max_images = 4 if has_premium_access else 1
+    
     return {
         'can_generate_images': True,
         'can_enhance_prompts': True,
-        'can_access_premium_models': user.is_premium,
+        'can_access_premium_models': has_premium_access,
         'can_generate_multiple_images': True,
-        'max_images_per_request': 4 if user.is_premium else 2
+        'max_images_per_request': max_images
     }
 
 def is_google_auth_available() -> bool:

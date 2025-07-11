@@ -270,15 +270,55 @@ def telegram_auth():
             logger.warning(f"Authentication failed: {error}")
             return jsonify({'error': error}), 401
         
-        # Get user permissions
+        # Load premium status from database immediately after authentication
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                premium_info = loop.run_until_complete(user.get_premium_status())
+                image_limit = loop.run_until_complete(user.get_image_limit())
+            finally:
+                loop.close()
+            
+            # Update user object with real premium status
+            user.is_premium = premium_info.get('has_premium_access', False)
+            user.premium_info = premium_info
+            
+            # Update session with new premium info
+            from telegram_auth import update_user_session
+            update_user_session(user)
+            
+            premium_status = {
+                'is_premium': premium_info.get('is_premium', False),
+                'is_admin': premium_info.get('is_admin', False),
+                'has_premium_access': premium_info.get('has_premium_access', False),
+                'remaining_days': premium_info.get('remaining_days', 0),
+                'image_limit': image_limit,
+                'expires_at': premium_info.get('expires_at')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error loading premium status during Telegram auth: {e}")
+            # Fallback to basic status
+            premium_status = {
+                'is_premium': False,
+                'is_admin': False,
+                'has_premium_access': False,
+                'remaining_days': 0,
+                'image_limit': 1,
+                'expires_at': None
+            }
+        
+        # Get user permissions (now with premium status loaded)
         permissions = get_user_permissions(user)
         
-        logger.info(f"User authenticated: {user.display_name} (ID: {user.id})")
+        logger.info(f"User authenticated: {user.display_name} (ID: {user.id}) - Premium: {premium_status['has_premium_access']}")
         
         return jsonify({
             'success': True,
             'user': user.to_dict(),
             'permissions': permissions,
+            'premium': premium_status,
             'message': f'Welcome, {user.display_name}!'
         })
         
@@ -299,18 +339,50 @@ def auth_status():
     
     permissions = get_user_permissions(user)
     
-    # Get basic premium information
-    basic_premium_info = {
-        'is_premium': user.auth_type == 'google',  # Google users are premium by default
-        'is_admin': user.is_admin() if hasattr(user, 'is_admin') else False,
-        'has_premium_access': user.auth_type == 'google' or (hasattr(user, 'is_premium') and user.is_premium)
-    }
+    # Get REAL premium information from database (same as /api/auth/premium)
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            premium_info = loop.run_until_complete(user.get_premium_status())
+            image_limit = loop.run_until_complete(user.get_image_limit())
+        finally:
+            loop.close()
+        
+        # Update user object with real premium status
+        user.is_premium = premium_info.get('has_premium_access', False)
+        user.premium_info = premium_info
+        
+        # Update session with new premium info
+        from telegram_auth import update_user_session
+        update_user_session(user)
+        
+        premium_status = {
+            'is_premium': premium_info.get('is_premium', False),
+            'is_admin': premium_info.get('is_admin', False),
+            'has_premium_access': premium_info.get('has_premium_access', False),
+            'remaining_days': premium_info.get('remaining_days', 0),
+            'image_limit': image_limit,
+            'expires_at': premium_info.get('expires_at')
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting premium status in auth_status: {e}")
+        # Fallback to basic check if database fails
+        premium_status = {
+            'is_premium': user.auth_type == 'google',
+            'is_admin': False,
+            'has_premium_access': user.auth_type == 'google',
+            'remaining_days': 0,
+            'image_limit': 4 if user.auth_type == 'google' else 1,
+            'expires_at': None
+        }
     
     return jsonify({
         'authenticated': True,
         'user': user.to_dict(),
         'permissions': permissions,
-        'premium': basic_premium_info
+        'premium': premium_status
     })
 
 @app.route('/api/auth/logout', methods=['POST'])
@@ -426,10 +498,24 @@ def auth_google_callback():
             logger.warning(f"Google authentication failed: {error}")
             return jsonify({'error': error}), 401
         
+        # Google users are premium by default - set premium status
+        premium_status = {
+            'is_premium': True,
+            'is_admin': user.is_admin(),
+            'has_premium_access': True,
+            'remaining_days': 0,  # Unlimited for Google users
+            'image_limit': 4,
+            'expires_at': None  # Never expires for Google users
+        }
+        
+        # Update user object
+        user.is_premium = True
+        user.premium_info = premium_status
+        
         # Get user permissions
         permissions = get_user_permissions(user)
         
-        logger.info(f"Google user authenticated: {user.display_name} (ID: {user.id})")
+        logger.info(f"Google user authenticated: {user.display_name} (ID: {user.id}) - Premium: True")
         
         # Check if this is a direct API call or browser redirect
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
@@ -438,6 +524,7 @@ def auth_google_callback():
                 'success': True,
                 'user': user.to_dict(),
                 'permissions': permissions,
+                'premium': premium_status,
                 'message': f'Welcome, {user.display_name}!'
             })
         else:
@@ -471,15 +558,30 @@ def google_token_auth():
             logger.warning(f"Google token authentication failed: {error}")
             return jsonify({'error': error}), 401
         
+        # Google users are premium by default - set premium status
+        premium_status = {
+            'is_premium': True,
+            'is_admin': user.is_admin(),
+            'has_premium_access': True,
+            'remaining_days': 0,  # Unlimited for Google users
+            'image_limit': 4,
+            'expires_at': None  # Never expires for Google users
+        }
+        
+        # Update user object
+        user.is_premium = True
+        user.premium_info = premium_status
+        
         # Get user permissions
         permissions = get_user_permissions(user)
         
-        logger.info(f"Google user authenticated via token: {user.display_name} (ID: {user.id})")
+        logger.info(f"Google user authenticated via token: {user.display_name} (ID: {user.id}) - Premium: True")
         
         return jsonify({
             'success': True,
             'user': user.to_dict(),
             'permissions': permissions,
+            'premium': premium_status,
             'message': f'Welcome, {user.display_name}!'
         })
         
