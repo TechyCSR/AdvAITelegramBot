@@ -299,10 +299,18 @@ def auth_status():
     
     permissions = get_user_permissions(user)
     
+    # Get basic premium information
+    basic_premium_info = {
+        'is_premium': user.auth_type == 'google',  # Google users are premium by default
+        'is_admin': user.is_admin() if hasattr(user, 'is_admin') else False,
+        'has_premium_access': user.auth_type == 'google' or (hasattr(user, 'is_premium') and user.is_premium)
+    }
+    
     return jsonify({
         'authenticated': True,
         'user': user.to_dict(),
-        'permissions': permissions
+        'permissions': permissions,
+        'premium': basic_premium_info
     })
 
 @app.route('/api/auth/logout', methods=['POST'])
@@ -315,6 +323,42 @@ def logout():
 def auth_config():
     """Get authentication configuration for frontend"""
     return jsonify(get_auth_config())
+
+@app.route('/api/auth/premium', methods=['GET'])
+@require_auth
+def get_premium_status():
+    """Get user's premium status information"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'User not authenticated'}), 401
+        
+        # Get premium status asynchronously
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            premium_info = loop.run_until_complete(user.get_premium_status())
+            available_models = loop.run_until_complete(user.get_available_models())
+            image_limit = loop.run_until_complete(user.get_image_limit())
+        finally:
+            loop.close()
+        
+        # Structure response
+        response_data = {
+            'premium_info': premium_info,
+            'available_models': {
+                'text_models': available_models[0],
+                'image_models': available_models[1]
+            },
+            'image_limit': image_limit,
+            'is_admin': user.is_admin()
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting premium status: {e}")
+        return jsonify({'error': 'Failed to get premium status'}), 500
 
 @app.route('/api/auth/google', methods=['GET'])
 def google_auth():
@@ -540,6 +584,14 @@ def generate_images_api():
         if not permissions.get('can_generate_images'):
             return jsonify({'error': 'Permission denied'}), 403
         
+        # Get user's image limit based on premium status
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            user_image_limit = loop.run_until_complete(user.get_image_limit())
+        finally:
+            loop.close()
+        
         data = request.get_json()
         
         # Validate input
@@ -553,7 +605,17 @@ def generate_images_api():
         # Get generation parameters
         style = data.get('style', 'default')
         model = data.get('model', 'flux')
-        num_images = min(int(data.get('num_images', 1)), permissions.get('max_images_per_request', 2))
+        requested_images = int(data.get('num_images', 1))
+        
+        # Enforce premium limits
+        if requested_images > user_image_limit:
+            return jsonify({
+                'error': f'Maximum {user_image_limit} images per request. {"Upgrade to Premium for more!" if user_image_limit == 1 else ""}',
+                'max_allowed': user_image_limit,
+                'upgrade_required': user_image_limit == 1
+            }), 400
+        
+        num_images = min(requested_images, user_image_limit)
         
         # Parse image size
         size = data.get('size', '1024x1024')

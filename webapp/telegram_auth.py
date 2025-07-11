@@ -26,7 +26,7 @@ except ImportError:
     GOOGLE_AUTH_AVAILABLE = False
 
 try:
-    from config import BOT_TOKEN, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+    from config import BOT_TOKEN, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ADMINS
 except ImportError:
     # Fallback for environment variables
     import os
@@ -35,6 +35,20 @@ except ImportError:
     TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+    ADMINS = [int(x) for x in os.environ.get('ADMIN_IDS', '123456789').split(',') if x.strip().isdigit()]
+
+# Import premium management functions
+try:
+    from premium_management import (
+        is_user_premium, 
+        get_premium_status_info,
+        is_admin_user,
+        get_user_image_limit,
+        get_available_models
+    )
+    PREMIUM_SYSTEM_AVAILABLE = True
+except ImportError:
+    PREMIUM_SYSTEM_AVAILABLE = False
 
 class User:
     """Represents a user with their data from either Telegram or Google"""
@@ -49,7 +63,8 @@ class User:
             self.last_name = user_data.get('last_name', '')
             self.username = user_data.get('username', '')
             self.language_code = user_data.get('language_code', 'en')
-            self.is_premium = user_data.get('is_premium', False)
+            # Note: is_premium from Telegram data is not reliable for our premium system
+            # We'll check the database for actual premium status
             self.allows_write_to_pm = user_data.get('allows_write_to_pm', False)
             self.photo_url = user_data.get('photo_url', '')
             self.email = None
@@ -60,11 +75,15 @@ class User:
             self.last_name = user_data.get('family_name', '')
             self.username = None
             self.language_code = user_data.get('locale', 'en')
-            self.is_premium = True  # Google users get premium status
+            # Google users get premium status by default
             self.allows_write_to_pm = True
             self.photo_url = user_data.get('picture', '')
             self.email = user_data.get('email', '')
             self.telegram_id = None
+        
+        # Initialize premium status (will be updated by get_premium_status)
+        self.is_premium = False
+        self.premium_info = None
         
     @property
     def full_name(self) -> str:
@@ -84,6 +103,104 @@ class User:
         else:
             return f"User {self.id}"
     
+    def get_user_id_for_premium(self) -> Optional[int]:
+        """Get the user ID to use for premium checking (only Telegram users have premium system)"""
+        if self.auth_type == 'telegram' and self.telegram_id:
+            return self.telegram_id
+        return None
+    
+    async def get_premium_status(self) -> Dict[str, Any]:
+        """Get comprehensive premium status information from database"""
+        if not PREMIUM_SYSTEM_AVAILABLE:
+            return {
+                "is_premium": self.auth_type == 'google',  # Google users are premium
+                "is_admin": False,
+                "remaining_days": 0,
+                "expires_at": None,
+                "image_limit": 4 if self.auth_type == 'google' else 1,
+                "has_premium_access": self.auth_type == 'google'
+            }
+        
+        user_id = self.get_user_id_for_premium()
+        if not user_id:
+            # Non-Telegram users (Google) get premium status
+            return {
+                "is_premium": self.auth_type == 'google',
+                "is_admin": False,
+                "remaining_days": 0,
+                "expires_at": None,
+                "image_limit": 4 if self.auth_type == 'google' else 1,
+                "has_premium_access": self.auth_type == 'google'
+            }
+        
+        try:
+            premium_info = await get_premium_status_info(user_id)
+            self.is_premium = premium_info['has_premium_access']
+            self.premium_info = premium_info
+            return premium_info
+        except Exception as e:
+            print(f"Error getting premium status for user {user_id}: {e}")
+            return {
+                "is_premium": False,
+                "is_admin": False,
+                "remaining_days": 0,
+                "expires_at": None,
+                "image_limit": 1,
+                "has_premium_access": False
+            }
+    
+    async def get_image_limit(self) -> int:
+        """Get the maximum number of images this user can generate per request"""
+        if not PREMIUM_SYSTEM_AVAILABLE:
+            return 4 if self.auth_type == 'google' else 1
+        
+        user_id = self.get_user_id_for_premium()
+        if not user_id:
+            return 4 if self.auth_type == 'google' else 1
+        
+        try:
+            return await get_user_image_limit(user_id)
+        except Exception:
+            return 1
+    
+    async def get_available_models(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+        """Get available AI models for this user"""
+        if not PREMIUM_SYSTEM_AVAILABLE:
+            # Default models for non-premium users
+            text_models = {"gpt-4o": "GPT-4o"}
+            image_models = {"dall-e3": "DALL-E 3", "flux": "Flux"}
+            if self.auth_type == 'google':
+                # Google users get all models
+                text_models.update({"gpt-4.1": "GPT-4.1", "qwen3": "Qwen3"})
+                image_models.update({"flux-pro": "Flux Pro"})
+            return text_models, image_models
+        
+        user_id = self.get_user_id_for_premium()
+        if not user_id:
+            # Non-Telegram users (Google) get all models
+            from premium_management import TEXT_MODELS, IMAGE_MODELS
+            return TEXT_MODELS, IMAGE_MODELS
+        
+        try:
+            return await get_available_models(user_id)
+        except Exception:
+            # Fallback to basic models
+            return {"gpt-4o": "GPT-4o"}, {"dall-e3": "DALL-E 3", "flux": "Flux"}
+    
+    def is_admin(self) -> bool:
+        """Check if user is an admin"""
+        if not PREMIUM_SYSTEM_AVAILABLE:
+            return False
+        
+        user_id = self.get_user_id_for_premium()
+        if not user_id:
+            return False
+        
+        try:
+            return is_admin_user(user_id)
+        except Exception:
+            return False
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert user to dictionary"""
         return {
@@ -100,7 +217,8 @@ class User:
             'full_name': self.full_name,
             'display_name': self.display_name,
             'telegram_id': getattr(self, 'telegram_id', None),
-            'google_id': getattr(self, 'google_id', None)
+            'google_id': getattr(self, 'google_id', None),
+            'premium_info': getattr(self, 'premium_info', None)
         }
 
 # Backward compatibility - alias for existing code

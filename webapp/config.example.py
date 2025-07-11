@@ -25,6 +25,13 @@ BOT_TOKEN = os.getenv('BOT_TOKEN') or "your_telegram_bot_token"
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or "your_google_client_id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or "your_google_client_secret"
 
+# Database Configuration (MongoDB - same as main bot)
+DATABASE_URL = os.getenv('DATABASE_URL') or "mongodb://localhost:27017/"
+
+# Admin Configuration (same as main bot)
+ADMIN_IDS = os.getenv('ADMIN_IDS') or "123456789,987654321"  # Comma-separated admin user IDs
+OWNER_ID = os.getenv('OWNER_ID') or "123456789"  # Bot owner user ID
+
 # Flask Secret Key for session management
 FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY') or "your-secret-key-change-this-in-production"
 

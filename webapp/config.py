@@ -23,6 +23,18 @@ BOT_TOKEN = os.getenv('BOT_TOKEN') or ""
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or ""
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or ""
 
+# Database Configuration (MongoDB - same as bot)
+DATABASE_URL = os.getenv('DATABASE_URL') or "mongodb://localhost:27017/"
+
+# Admin Configuration
+ADMINS = os.getenv('ADMIN_IDS', '123456789').split(',')
+OWNER_ID = os.getenv('OWNER_ID', '123456789')
+
+# Convert admin IDs to integers
+ADMINS = [int(admin_id.strip()) for admin_id in ADMINS if admin_id.strip().isdigit()]
+OWNER_ID = int(OWNER_ID) if OWNER_ID.isdigit() else 123456789
+ADMINS.append(OWNER_ID)  # Add owner to admins list
+
 # Alternative: Load from environment variable (recommended for production)
 if os.environ.get('POLLINATIONS_KEY'):
     POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY')
@@ -35,6 +47,9 @@ if os.environ.get('GOOGLE_CLIENT_ID'):
     
 if os.environ.get('GOOGLE_CLIENT_SECRET'):
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+
+if os.environ.get('DATABASE_URL'):
+    DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # =============================================================================
 # WEBAPP CONFIGURATION
