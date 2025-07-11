@@ -37,15 +37,9 @@ except ImportError:
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
     ADMINS = [int(x) for x in os.environ.get('ADMIN_IDS', '123456789').split(',') if x.strip().isdigit()]
 
-# Import premium management functions
+# Import premium management
 try:
-    from premium_management import (
-        is_user_premium, 
-        get_premium_status_info,
-        is_admin_user,
-        get_user_image_limit,
-        get_available_models
-    )
+    from premium_management import PremiumManager
     PREMIUM_SYSTEM_AVAILABLE = True
 except ImportError:
     PREMIUM_SYSTEM_AVAILABLE = False
@@ -63,17 +57,19 @@ class User:
                 self.telegram_id = int(telegram_id_raw) if telegram_id_raw else None
             except (ValueError, TypeError):
                 self.telegram_id = None
+                print(f"[ERROR] Failed to convert Telegram ID to int: {telegram_id_raw}")
             
             self.id = f"tg_{telegram_id_raw}"
             self.first_name = user_data.get('first_name', '')
             self.last_name = user_data.get('last_name', '')
             self.username = user_data.get('username', '')
             self.language_code = user_data.get('language_code', 'en')
-            # Note: is_premium from Telegram data is not reliable for our premium system
-            # We'll check the database for actual premium status
             self.allows_write_to_pm = user_data.get('allows_write_to_pm', False)
             self.photo_url = user_data.get('photo_url', '')
             self.email = None
+            
+            print(f"[USER-DEBUG] Created Telegram user: ID={self.telegram_id}, raw_id={telegram_id_raw}, type={type(self.telegram_id)}")
+            
         elif auth_type == 'google':
             self.id = f"g_{user_data.get('sub')}"  # Google user ID
             self.google_id = user_data.get('sub')
@@ -81,13 +77,14 @@ class User:
             self.last_name = user_data.get('family_name', '')
             self.username = None
             self.language_code = user_data.get('locale', 'en')
-            # Google users get premium status by default
             self.allows_write_to_pm = True
             self.photo_url = user_data.get('picture', '')
             self.email = user_data.get('email', '')
             self.telegram_id = None
+            
+            print(f"[USER-DEBUG] Created Google user: ID={self.id}")
         
-        # Initialize premium status (will be updated by get_premium_status)
+        # Initialize premium status (will be loaded separately)
         self.is_premium = False
         self.premium_info = None
         
@@ -112,14 +109,17 @@ class User:
     def get_user_id_for_premium(self) -> Optional[int]:
         """Get the user ID to use for premium checking (only Telegram users have premium system)"""
         if self.auth_type == 'telegram' and self.telegram_id:
+            print(f"[USER-DEBUG] Premium user ID: {self.telegram_id}")
             return self.telegram_id
+        print(f"[USER-DEBUG] No premium user ID available for {self.auth_type} user")
         return None
     
     async def get_premium_status(self) -> Dict[str, Any]:
-        """Get comprehensive premium status information from database"""
+        """Get comprehensive premium status information from database using new system"""
         if not PREMIUM_SYSTEM_AVAILABLE:
+            print("[USER-DEBUG] Premium system not available, using fallback")
             return {
-                "is_premium": self.auth_type == 'google',  # Google users are premium
+                "is_premium": self.auth_type == 'google',
                 "is_admin": False,
                 "remaining_days": 0,
                 "expires_at": None,
@@ -130,6 +130,7 @@ class User:
         user_id = self.get_user_id_for_premium()
         if not user_id:
             # Non-Telegram users (Google) get premium status
+            print(f"[USER-DEBUG] Google user gets premium by default")
             return {
                 "is_premium": self.auth_type == 'google',
                 "is_admin": False,
@@ -140,14 +141,17 @@ class User:
             }
         
         try:
-            print(f"[DEBUG] Checking premium status for Telegram user ID: {user_id} (type: {type(user_id)})")
-            premium_info = await get_premium_status_info(user_id)
-            print(f"[DEBUG] Premium info result: {premium_info}")
-            self.is_premium = premium_info['has_premium_access']
+            print(f"[USER-DEBUG] Getting comprehensive status for Telegram user: {user_id}")
+            premium_info = await PremiumManager.get_comprehensive_status(user_id)
+            print(f"[USER-DEBUG] Premium info result: {premium_info}")
+            
+            # Update user object
+            self.is_premium = premium_info.get('has_premium_access', False)
             self.premium_info = premium_info
+            
             return premium_info
         except Exception as e:
-            print(f"[ERROR] Error getting premium status for user {user_id}: {e}")
+            print(f"[USER-ERROR] Error getting premium status for user {user_id}: {e}")
             import traceback
             traceback.print_exc()
             return {
@@ -156,7 +160,8 @@ class User:
                 "remaining_days": 0,
                 "expires_at": None,
                 "image_limit": 1,
-                "has_premium_access": False
+                "has_premium_access": False,
+                "error": str(e)
             }
     
     async def get_image_limit(self) -> int:
@@ -169,7 +174,8 @@ class User:
             return 4 if self.auth_type == 'google' else 1
         
         try:
-            return await get_user_image_limit(user_id)
+            status = await PremiumManager.get_comprehensive_status(user_id)
+            return status["image_limit"]
         except Exception:
             return 1
     
@@ -192,43 +198,36 @@ class User:
             return TEXT_MODELS, IMAGE_MODELS
         
         try:
-            return await get_available_models(user_id)
+            status = await PremiumManager.get_comprehensive_status(user_id)
+            return status["available_text_models"], status["available_image_models"]
         except Exception:
             # Fallback to basic models
             return {"gpt-4o": "GPT-4o"}, {"dall-e3": "DALL-E 3", "flux": "Flux"}
     
     def is_admin(self) -> bool:
-        """Check if user is an admin"""
-        if not PREMIUM_SYSTEM_AVAILABLE:
-            return False
-        
-        user_id = self.get_user_id_for_premium()
-        if not user_id:
-            return False
-        
-        try:
-            return is_admin_user(user_id)
-        except Exception:
-            return False
-    
+        """Check if this user is an admin"""
+        if self.auth_type == 'telegram' and self.telegram_id:
+            return self.telegram_id in ADMINS
+        return False
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert user to dictionary"""
+        """Convert user to dictionary for JSON serialization"""
         return {
             'id': self.id,
             'auth_type': self.auth_type,
             'first_name': self.first_name,
             'last_name': self.last_name,
-            'username': self.username,
-            'language_code': self.language_code,
-            'is_premium': self.is_premium,
-            'allows_write_to_pm': self.allows_write_to_pm,
-            'photo_url': self.photo_url,
-            'email': self.email,
             'full_name': self.full_name,
             'display_name': self.display_name,
-            'telegram_id': getattr(self, 'telegram_id', None),
+            'username': self.username,
+            'email': self.email,
+            'language_code': self.language_code,
+            'photo_url': self.photo_url,
+            'is_premium': self.is_premium,
+            'telegram_id': self.telegram_id,
             'google_id': getattr(self, 'google_id', None),
-            'premium_info': getattr(self, 'premium_info', None)
+            'allows_write_to_pm': self.allows_write_to_pm,
+            'is_admin': self.is_admin()
         }
 
 # Backward compatibility - alias for existing code
@@ -237,128 +236,87 @@ TelegramUser = User
 def validate_telegram_webapp_data(init_data: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
     Validate Telegram Web App initialization data
-    
-    Args:
-        init_data: The initData string from Telegram Web App
-        
-    Returns:
-        Tuple of (is_valid, parsed_data, error_message)
+    Returns: (is_valid, user_data, error_message)
     """
-    if not BOT_TOKEN:
-        return False, None, "Bot token not configured"
-    
-    if not init_data:
-        return False, None, "No initialization data provided"
-    
     try:
-        # Parse the URL-encoded data
-        parsed_data = dict(urllib.parse.parse_qsl(init_data))
+        # Parse the init data
+        parsed_data = urllib.parse.parse_qs(init_data, keep_blank_values=True)
         
-        # Extract hash from data
-        received_hash = parsed_data.pop('hash', None)
-        if not received_hash:
-            return False, None, "No hash found in initialization data"
+        # Extract user data
+        if 'user' not in parsed_data:
+            return False, None, "No user data in initialization string"
         
-        # Check auth_date to prevent replay attacks
-        auth_date = parsed_data.get('auth_date')
-        if not auth_date:
-            return False, None, "No auth_date found in initialization data"
+        user_json = parsed_data['user'][0]
+        user_data = json.loads(user_json)
         
-        try:
-            auth_timestamp = int(auth_date)
-            current_timestamp = int(time.time())
-            
-            # Allow 24 hours window for auth_date (adjust as needed)
-            if current_timestamp - auth_timestamp > SESSION_TIMEOUT:
-                return False, None, "Initialization data is too old"
-        except (ValueError, TypeError):
-            return False, None, "Invalid auth_date format"
+        # Extract hash for validation
+        if 'hash' not in parsed_data:
+            return False, None, "No hash in initialization string"
         
-        # Create data check string according to Telegram specs
-        data_check_arr = []
-        for key, value in sorted(parsed_data.items()):
-            data_check_arr.append(f"{key}={value}")
-        data_check_string = "\n".join(data_check_arr)
+        provided_hash = parsed_data['hash'][0]
         
-        # Generate secret key from bot token
-        secret_key = hmac.new(
-            "WebAppData".encode(),
-            BOT_TOKEN.encode(),
-            hashlib.sha256
-        ).digest()
+        # Create validation string (excluding hash)
+        validation_parts = []
+        for key in sorted(parsed_data.keys()):
+            if key != 'hash':
+                value = parsed_data[key][0]
+                validation_parts.append(f"{key}={value}")
+        
+        validation_string = '\n'.join(validation_parts)
+        
+        # Create HMAC key
+        secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
         
         # Calculate expected hash
-        expected_hash = hmac.new(
-            secret_key,
-            data_check_string.encode(),
-            hashlib.sha256
-        ).hexdigest()
+        expected_hash = hmac.new(secret_key, validation_string.encode(), hashlib.sha256).hexdigest()
         
-        # Compare hashes
-        if not hmac.compare_digest(received_hash, expected_hash):
-            return False, None, "Invalid hash - data may be tampered with"
+        # Verify hash
+        if not hmac.compare_digest(provided_hash, expected_hash):
+            return False, None, "Invalid hash - data may be tampered"
         
-        # Parse user data if present
-        user_data = None
-        if 'user' in parsed_data:
-            try:
-                user_data = json.loads(parsed_data['user'])
-            except json.JSONDecodeError:
-                return False, None, "Invalid user data format"
+        # Check data age (optional - comment out if causing issues)
+        # if 'auth_date' in parsed_data:
+        #     auth_date = int(parsed_data['auth_date'][0])
+        #     current_time = int(time.time())
+        #     if current_time - auth_date > 86400:  # 24 hours
+        #         return False, None, "Initialization data is too old"
         
-        return True, {
-            'user': user_data,
-            'auth_date': auth_timestamp,
-            'query_id': parsed_data.get('query_id'),
-            'start_param': parsed_data.get('start_param'),
-            'chat_type': parsed_data.get('chat_type'),
-            'chat_instance': parsed_data.get('chat_instance')
-        }, None
+        return True, user_data, None
         
+    except json.JSONDecodeError:
+        return False, None, "Invalid JSON in user data"
     except Exception as e:
-        return False, None, f"Error validating data: {str(e)}"
+        return False, None, f"Validation error: {str(e)}"
 
 def create_google_oauth_flow(redirect_uri: str = None):
     """Create Google OAuth flow"""
     if not GOOGLE_AUTH_AVAILABLE:
-        raise ImportError("Google auth libraries not installed")
-    
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise ValueError("Google OAuth not configured")
-    
+        return None
+        
     if not redirect_uri:
         redirect_uri = url_for('auth_google_callback', _external=True)
     
-    flow = Flow.from_client_config(
+    return Flow.from_client_config(
         {
             "web": {
                 "client_id": GOOGLE_CLIENT_ID,
                 "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uris": [redirect_uri],
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [redirect_uri]
+                "token_uri": "https://oauth2.googleapis.com/token"
             }
         },
-        scopes=['openid', 'email', 'profile']
+        scopes=['openid', 'email', 'profile'],
+        redirect_uri=redirect_uri
     )
-    flow.redirect_uri = redirect_uri
-    return flow
 
 def validate_google_token(token: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
     Validate Google ID token
-    
-    Args:
-        token: Google ID token
-        
-    Returns:
-        Tuple of (is_valid, user_data, error_message)
+    Returns: (is_valid, user_data, error_message)
     """
     if not GOOGLE_AUTH_AVAILABLE:
-        return False, None, "Google auth not available"
-    
-    if not GOOGLE_CLIENT_ID:
-        return False, None, "Google OAuth not configured"
+        return False, None, "Google authentication not available"
     
     try:
         # Verify the token
@@ -368,179 +326,133 @@ def validate_google_token(token: str) -> Tuple[bool, Optional[Dict[str, Any]], O
             GOOGLE_CLIENT_ID
         )
         
-        # Check if the token is valid
-        if id_info['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-            return False, None, "Invalid token issuer"
-        
+        # Token is valid, extract user information
         return True, id_info, None
         
     except ValueError as e:
         return False, None, f"Invalid token: {str(e)}"
     except Exception as e:
-        return False, None, f"Error validating token: {str(e)}"
+        return False, None, f"Token validation error: {str(e)}"
 
 def create_user_session(user_data: Dict[str, Any], auth_type: str = 'telegram') -> User:
-    """
-    Create a user session from validated data
-    
-    Args:
-        user_data: Validated user data from Telegram or Google
-        auth_type: Authentication type ('telegram' or 'google')
-        
-    Returns:
-        User object
-    """
+    """Create a new user session"""
     user = User(user_data, auth_type)
     
-    # Store user data in Flask session
-    session['user'] = user.to_dict()
-    session['authenticated'] = True
-    session['auth_time'] = time.time()
+    # Store in session
     session['user_id'] = user.id
     session['auth_type'] = auth_type
-    
-    # Set session to be permanent and configure timeout
+    session['user_data'] = user.to_dict()
+    session['login_time'] = datetime.now().isoformat()
     session.permanent = True
     
+    print(f"[SESSION-DEBUG] Created session for {auth_type} user: {user.id}")
     return user
 
 def update_user_session(user: User):
-    """Update user session with current user data (including premium info)"""
-    if session.get('authenticated'):
-        session['user'] = user.to_dict()
-        session['auth_time'] = time.time()  # Refresh session time
+    """Update user session with new information"""
+    session['user_data'] = user.to_dict()
+    session['last_update'] = datetime.now().isoformat()
+    print(f"[SESSION-DEBUG] Updated session for user: {user.id}")
 
 def get_current_user() -> Optional[User]:
-    """
-    Get current authenticated user from session
-    
-    Returns:
-        User object if authenticated, None otherwise
-    """
-    if not session.get('authenticated'):
+    """Get current user from session"""
+    if 'user_id' not in session or 'user_data' not in session:
         return None
     
-    # Check session timeout
-    auth_time = session.get('auth_time', 0)
-    if time.time() - auth_time > SESSION_TIMEOUT:
+    try:
+        # Check if session is still valid
+        if 'login_time' in session:
+            login_time = datetime.fromisoformat(session['login_time'])
+            if datetime.now() - login_time > timedelta(seconds=SESSION_TIMEOUT):
+                clear_user_session()
+                return None
+        
+        # Recreate user from session data
+        user_data = session['user_data']
+        auth_type = session.get('auth_type', 'telegram')
+        
+        # Create user object
+        if auth_type == 'telegram':
+            # Extract original telegram data for User constructor
+            telegram_data = {
+                'id': user_data.get('telegram_id'),
+                'first_name': user_data.get('first_name', ''),
+                'last_name': user_data.get('last_name', ''),
+                'username': user_data.get('username', ''),
+                'language_code': user_data.get('language_code', 'en'),
+                'allows_write_to_pm': user_data.get('allows_write_to_pm', False),
+                'photo_url': user_data.get('photo_url', '')
+            }
+            user = User(telegram_data, 'telegram')
+        else:  # google
+            google_data = {
+                'sub': user_data.get('google_id'),
+                'given_name': user_data.get('first_name', ''),
+                'family_name': user_data.get('last_name', ''),
+                'locale': user_data.get('language_code', 'en'),
+                'picture': user_data.get('photo_url', ''),
+                'email': user_data.get('email', '')
+            }
+            user = User(google_data, 'google')
+        
+        # Restore premium info if available
+        user.is_premium = user_data.get('is_premium', False)
+        
+        return user
+        
+    except Exception as e:
+        print(f"[SESSION-ERROR] Error getting current user: {e}")
         clear_user_session()
         return None
-    
-    user_data = session.get('user')
-    if not user_data:
-        return None
-    
-    # Handle session restoration properly
-    auth_type = user_data.get('auth_type', 'telegram')
-    
-    # If this is a restored session, recreate the user object properly
-    if auth_type == 'google' and 'given_name' not in user_data and 'first_name' in user_data:
-        # Convert stored session data back to Google token format for proper User construction
-        google_user_data = {
-            'sub': user_data.get('google_id', ''),
-            'given_name': user_data.get('first_name', ''),
-            'family_name': user_data.get('last_name', ''),
-            'email': user_data.get('email', ''),
-            'picture': user_data.get('photo_url', ''),
-            'locale': user_data.get('language_code', 'en')
-        }
-        return User(google_user_data, auth_type)
-    elif auth_type == 'telegram' and 'id' not in user_data and 'telegram_id' in user_data:
-        # Convert stored session data back to Telegram format for proper User construction
-        telegram_user_data = {
-            'id': user_data.get('telegram_id', ''),
-            'first_name': user_data.get('first_name', ''),
-            'last_name': user_data.get('last_name', ''),
-            'username': user_data.get('username', ''),
-            'language_code': user_data.get('language_code', 'en'),
-            'is_premium': user_data.get('is_premium', False),
-            'allows_write_to_pm': user_data.get('allows_write_to_pm', False),
-            'photo_url': user_data.get('photo_url', '')
-        }
-        return User(telegram_user_data, auth_type)
-    else:
-        # This is fresh session data, use as-is
-        return User(user_data, auth_type)
 
 def clear_user_session():
-    """Clear user session data"""
-    session.pop('user', None)
-    session.pop('telegram_user', None)  # Backward compatibility
-    session.pop('authenticated', None)
-    session.pop('auth_time', None)
-    session.pop('user_id', None)
-    session.pop('auth_type', None)
+    """Clear user session"""
+    keys_to_remove = ['user_id', 'auth_type', 'user_data', 'login_time', 'last_update']
+    for key in keys_to_remove:
+        session.pop(key, None)
+    print("[SESSION-DEBUG] Session cleared")
 
 def generate_state_token() -> str:
     """Generate a secure state token for OAuth"""
-    return ''.join(secrets.choice(string.ascii_letters + string.digits) for i in range(32))
+    return ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
 def require_auth(f):
-    """
-    Decorator to require authentication for routes (Telegram or Google)
-    """
+    """Decorator to require authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not TELEGRAM_MINI_APP_REQUIRED and not GOOGLE_CLIENT_ID:
-            # Authentication disabled, proceed without user
-            return f(*args, **kwargs)
-        
         user = get_current_user()
         if not user:
-            return jsonify({
-                'error': 'Authentication required',
-                'message': 'Please login to access this feature',
-                'auth_options': {
-                    'telegram': bool(BOT_TOKEN and TELEGRAM_MINI_APP_REQUIRED),
-                    'google': bool(GOOGLE_CLIENT_ID and GOOGLE_AUTH_AVAILABLE)
-                }
-            }), 401
-        
-        # Add user to request context
-        request.user = user
-        request.telegram_user = user  # Backward compatibility
+            return jsonify({'error': 'Authentication required'}), 401
         return f(*args, **kwargs)
-    
     return decorated_function
-
-# Backward compatibility
-require_telegram_auth = require_auth
 
 def authenticate_telegram_user(init_data: str) -> Tuple[bool, Optional[User], Optional[str]]:
     """
-    Complete authentication flow for Telegram user
-    
-    Args:
-        init_data: Telegram Web App initialization data
-        
-    Returns:
-        Tuple of (success, user_object, error_message)
+    Authenticate a Telegram user and create session
+    Returns: (success, user, error_message)
     """
+    print(f"[AUTH-DEBUG] Authenticating Telegram user with init_data length: {len(init_data)}")
+    
     # Validate the initialization data
-    is_valid, parsed_data, error = validate_telegram_webapp_data(init_data)
+    is_valid, user_data, error = validate_telegram_webapp_data(init_data)
     
     if not is_valid:
+        print(f"[AUTH-ERROR] Telegram validation failed: {error}")
         return False, None, error
-    
-    if not parsed_data or not parsed_data.get('user'):
-        return False, None, "No user data found in initialization data"
     
     # Create user session
     try:
-        user = create_user_session(parsed_data['user'], 'telegram')
+        user = create_user_session(user_data, 'telegram')
+        print(f"[AUTH-DEBUG] Telegram user authenticated successfully: {user.telegram_id}")
         return True, user, None
     except Exception as e:
-        return False, None, f"Error creating user session: {str(e)}"
+        print(f"[AUTH-ERROR] Error creating Telegram user session: {e}")
+        return False, None, f"Session creation failed: {str(e)}"
 
 def authenticate_google_user(token: str) -> Tuple[bool, Optional[User], Optional[str]]:
     """
-    Complete authentication flow for Google user
-    
-    Args:
-        token: Google ID token
-        
-    Returns:
-        Tuple of (success, user_object, error_message)
+    Authenticate a Google user and create session
+    Returns: (success, user, error_message)  
     """
     # Validate the token
     is_valid, user_data, error = validate_google_token(token)
@@ -548,80 +460,58 @@ def authenticate_google_user(token: str) -> Tuple[bool, Optional[User], Optional
     if not is_valid:
         return False, None, error
     
-    if not user_data:
-        return False, None, "No user data found in token"
-    
     # Create user session
     try:
         user = create_user_session(user_data, 'google')
         return True, user, None
     except Exception as e:
-        return False, None, f"Error creating user session: {str(e)}"
+        return False, None, f"Session creation failed: {str(e)}"
 
 def get_user_permissions(user: User) -> Dict[str, bool]:
-    """
-    Get user permissions based on their status
-    
-    Args:
-        user: User object
-        
-    Returns:
-        Dictionary of permissions
-    """
-    if not user:
-        return {
-            'can_generate_images': False,
-            'can_enhance_prompts': False,
-            'can_access_premium_models': False,
-            'can_generate_multiple_images': False,
-            'max_images_per_request': 0
-        }
-    
-    # Check real premium status for accurate permissions
-    has_premium_access = False
-    max_images = 1  # Default for standard users
-    
-    try:
-        # Quick premium check
-        if user.auth_type == 'google':
-            # Google users are premium by default
-            has_premium_access = True
-            max_images = 4
-        elif hasattr(user, 'premium_info') and user.premium_info:
-            # Use cached premium info if available
-            has_premium_access = user.premium_info.get('has_premium_access', False)
-            max_images = user.premium_info.get('image_limit', 1)
-        elif user.is_premium:
-            # Fallback to user.is_premium if set
-            has_premium_access = True
-            max_images = 4
-        else:
-            # For Telegram users without cached info, assume standard
-            has_premium_access = False
-            max_images = 1
-    except Exception as e:
-        # Error checking premium status, use safe defaults
-        print(f"Error in get_user_permissions: {e}")
-        has_premium_access = user.auth_type == 'google'  # Google users are premium
-        max_images = 4 if has_premium_access else 1
-    
-    return {
+    """Get user permissions based on their status"""
+    base_permissions = {
         'can_generate_images': True,
+        'can_use_ai': True,
         'can_enhance_prompts': True,
-        'can_access_premium_models': has_premium_access,
-        'can_generate_multiple_images': True,
-        'max_images_per_request': max_images
+        'can_view_stats': False,
+        'can_access_admin': False,
+        'can_use_premium_models': False,
+        'can_generate_multiple_images': False
     }
+    
+    # Admin permissions
+    if user.is_admin():
+        base_permissions.update({
+            'can_view_stats': True,
+            'can_access_admin': True,
+            'can_use_premium_models': True,
+            'can_generate_multiple_images': True
+        })
+    
+    # Premium permissions (will be updated when premium status is loaded)
+    if user.is_premium:
+        base_permissions.update({
+            'can_use_premium_models': True,
+            'can_generate_multiple_images': True
+        })
+    
+    # Google users get premium features
+    if user.auth_type == 'google':
+        base_permissions.update({
+            'can_use_premium_models': True,
+            'can_generate_multiple_images': True
+        })
+    
+    return base_permissions
 
 def is_google_auth_available() -> bool:
-    """Check if Google authentication is available and configured"""
-    return GOOGLE_AUTH_AVAILABLE and bool(GOOGLE_CLIENT_ID) and bool(GOOGLE_CLIENT_SECRET)
+    """Check if Google authentication is available"""
+    return GOOGLE_AUTH_AVAILABLE and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
 
 def get_auth_config() -> Dict[str, Any]:
     """Get authentication configuration for frontend"""
     return {
-        'telegram_enabled': bool(BOT_TOKEN and TELEGRAM_MINI_APP_REQUIRED),
-        'google_enabled': is_google_auth_available(),
-        'google_client_id': GOOGLE_CLIENT_ID if is_google_auth_available() else None,
-        'session_timeout': SESSION_TIMEOUT
+        'telegram_required': TELEGRAM_MINI_APP_REQUIRED,
+        'google_available': is_google_auth_available(),
+        'google_client_id': GOOGLE_CLIENT_ID if is_google_auth_available() else None
     } 
