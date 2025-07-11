@@ -40,12 +40,21 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
     Checks if a user is premium. Returns (is_premium, remaining_days, expires_at).
     Same logic as the bot's implementation.
     """
+    print(f"[DEBUG] is_user_premium called with user_id: {user_id} (type: {type(user_id)})")
+    
     if not isinstance(user_id, int):
+        print(f"[DEBUG] user_id is not int, returning False")
         return False, 0, None
         
     try:
-        user_record = get_premium_users_collection().find_one({"user_id": user_id, "is_premium": True})
+        collection = get_premium_users_collection()
+        print(f"[DEBUG] Got premium users collection: {collection}")
+        
+        user_record = collection.find_one({"user_id": user_id, "is_premium": True})
+        print(f"[DEBUG] Database query result for user {user_id}: {user_record}")
+        
         if not user_record:
+            print(f"[DEBUG] No premium record found for user {user_id}")
             return False, 0, None
 
         expires_at = user_record.get("premium_expires_at")
@@ -54,6 +63,8 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
             return False, 0, None
 
         now = datetime.datetime.now(datetime.timezone.utc)
+        print(f"[DEBUG] Current time: {now}, expires_at: {expires_at}")
+        
         if expires_at > now:
             remaining_time = expires_at - now
             # Calculate remaining_days, ensuring it's at least 1 if there's any positive time left.
@@ -62,14 +73,19 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
                 remaining_days = 1  # If less than a day but positive, count as 1 day remaining.
             elif remaining_time.days < 0:  # Should be caught by expires_at > now, but as a safeguard
                 remaining_days = 0
+            print(f"[DEBUG] User {user_id} is premium with {remaining_days} days remaining")
             return True, remaining_days, expires_at
         else:
             # Premium has expired, mark it in DB
+            print(f"[DEBUG] User {user_id} premium has expired")
             if user_record.get("is_premium", False):
                 await remove_premium_status(user_id)
             return False, 0, expires_at
     except Exception as e:
         logger.error(f"Error checking premium status for user {user_id}: {e}")
+        print(f"[ERROR] Exception in is_user_premium: {e}")
+        import traceback
+        traceback.print_exc()
         return False, 0, None
 
 async def add_premium_status(user_id: int, admin_id: int, days: int) -> bool:

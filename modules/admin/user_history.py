@@ -198,7 +198,18 @@ async def show_history_search_panel(client: Client, callback_query: CallbackQuer
                 
                 # Format last active time
                 if isinstance(last_active, datetime):
-                    time_diff = datetime.now() - last_active
+                    # Ensure both datetimes are timezone-aware for comparison
+                    now = datetime.now()
+                    
+                    # If last_active is timezone-aware but now is naive, make now timezone-aware
+                    if last_active.tzinfo is not None and now.tzinfo is None:
+                        now = now.replace(tzinfo=datetime.timezone.utc)
+                    # If now is timezone-aware but last_active is naive, make last_active timezone-aware
+                    elif now.tzinfo is not None and last_active.tzinfo is None:
+                        last_active = last_active.replace(tzinfo=datetime.timezone.utc)
+                    # If both are naive, that's fine for comparison
+                    
+                    time_diff = now - last_active
                     if time_diff < timedelta(minutes=60):
                         last_active_str = f"{int(time_diff.total_seconds() / 60)}m ago"
                     elif time_diff < timedelta(hours=24):

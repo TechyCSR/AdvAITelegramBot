@@ -57,8 +57,14 @@ class User:
         self.auth_type = auth_type  # 'telegram' or 'google'
         
         if auth_type == 'telegram':
-            self.id = f"tg_{user_data.get('id')}"
-            self.telegram_id = user_data.get('id')
+            # Convert telegram ID to integer for database compatibility
+            telegram_id_raw = user_data.get('id')
+            try:
+                self.telegram_id = int(telegram_id_raw) if telegram_id_raw else None
+            except (ValueError, TypeError):
+                self.telegram_id = None
+            
+            self.id = f"tg_{telegram_id_raw}"
             self.first_name = user_data.get('first_name', '')
             self.last_name = user_data.get('last_name', '')
             self.username = user_data.get('username', '')
@@ -134,12 +140,16 @@ class User:
             }
         
         try:
+            print(f"[DEBUG] Checking premium status for Telegram user ID: {user_id} (type: {type(user_id)})")
             premium_info = await get_premium_status_info(user_id)
+            print(f"[DEBUG] Premium info result: {premium_info}")
             self.is_premium = premium_info['has_premium_access']
             self.premium_info = premium_info
             return premium_info
         except Exception as e:
-            print(f"Error getting premium status for user {user_id}: {e}")
+            print(f"[ERROR] Error getting premium status for user {user_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "is_premium": False,
                 "is_admin": False,

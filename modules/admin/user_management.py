@@ -154,7 +154,17 @@ async def get_users_list(limit: int = 10, offset: int = 0, filter_type: str = "r
             # Calculate days since last activity
             last_activity = user.get('last_activity')
             if isinstance(last_activity, datetime.datetime):
-                delta = datetime.datetime.now() - last_activity
+                # Ensure both datetimes are compatible for comparison
+                now = datetime.datetime.now()
+                
+                # If last_activity is timezone-aware but now is naive, make now timezone-aware
+                if last_activity.tzinfo is not None and now.tzinfo is None:
+                    now = now.replace(tzinfo=datetime.timezone.utc)
+                # If now is timezone-aware but last_activity is naive, make last_activity timezone-aware
+                elif now.tzinfo is not None and last_activity.tzinfo is None:
+                    last_activity = last_activity.replace(tzinfo=datetime.timezone.utc)
+                
+                delta = now - last_activity
                 user['days_since_activity'] = delta.days
         
         # Cache the result

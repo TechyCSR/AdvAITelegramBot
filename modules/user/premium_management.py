@@ -71,7 +71,13 @@ async def is_user_premium(user_id: int) -> Tuple[bool, int, Optional[datetime.da
         print(f"Error: User {user_id} has invalid premium_expires_at: {expires_at}")
         return False, 0, None
 
+    # Ensure both datetimes are timezone-aware for comparison
     now = datetime.datetime.now(datetime.timezone.utc)
+    
+    # If expires_at is naive (no timezone), assume it's UTC
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+    
     if expires_at > now:
         remaining_time = expires_at - now
         # Calculate remaining_days, ensuring it's at least 1 if there's any positive time left.
@@ -103,17 +109,33 @@ async def daily_premium_check(client_for_notification=None):
     now = datetime.datetime.now(datetime.timezone.utc)
     
     # Find users whose premium has expired but are still marked as premium
+    # Use a broader query first, then filter with proper timezone handling
     expired_users_docs = list(get_premium_users_collection().find({
-        "is_premium": True,
-        "premium_expires_at": {"$lte": now}
+        "is_premium": True
     }))
     
     count = 0
     if not expired_users_docs:
+        print("No premium users found.")
+        return count
+
+    # Filter users with expired premium using proper timezone handling
+    actual_expired_users = []
+    for user_record in expired_users_docs:
+        expires_at = user_record.get("premium_expires_at")
+        if expires_at:
+            # Ensure expires_at is timezone-aware for comparison
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+            
+            if expires_at <= now:
+                actual_expired_users.append(user_record)
+
+    if not actual_expired_users:
         print("No expired premium users found needing update.")
         return count
 
-    for user_record in expired_users_docs:
+    for user_record in actual_expired_users:
         user_id = user_record["user_id"]
         print(f"Processing expired premium for user_id: {user_id}")
         if await remove_premium_status(user_id):
