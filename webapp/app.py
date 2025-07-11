@@ -255,7 +255,7 @@ def clean_prompt(prompt: str, style: str = 'default') -> str:
 
 @app.route('/api/auth/telegram', methods=['POST'])
 def telegram_auth():
-    """Authenticate with Telegram Web App"""
+    """Authenticate user with Telegram Web App data"""
     try:
         data = request.get_json()
         init_data = data.get('initData', '').strip()
@@ -263,68 +263,67 @@ def telegram_auth():
         if not init_data:
             return jsonify({'error': 'No initialization data provided'}), 400
         
-        print(f"[APP-DEBUG] Telegram auth attempt with data length: {len(init_data)}")
-        
         # Authenticate user
         success, user, error = authenticate_telegram_user(init_data)
         
         if not success:
-            print(f"[APP-ERROR] Authentication failed: {error}")
+            logger.warning(f"Authentication failed: {error}")
             return jsonify({'error': error}), 401
         
-        print(f"[APP-DEBUG] User authenticated: {user.display_name} (ID: {user.telegram_id})")
-        
-        # Load premium status using new system
+        # Load premium status from database immediately after authentication
         try:
-            print(f"[APP-DEBUG] Loading premium status for user: {user.telegram_id}")
-            
-            # Run async function in event loop
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 premium_info = loop.run_until_complete(user.get_premium_status())
+                image_limit = loop.run_until_complete(user.get_image_limit())
             finally:
                 loop.close()
-                
-            print(f"[APP-DEBUG] Premium status loaded: {premium_info}")
             
             # Update user object with real premium status
             user.is_premium = premium_info.get('has_premium_access', False)
             user.premium_info = premium_info
             
             # Update session with new premium info
+            from telegram_auth import update_user_session
             update_user_session(user)
             
+            premium_status = {
+                'is_premium': premium_info.get('is_premium', False),
+                'is_admin': premium_info.get('is_admin', False),
+                'has_premium_access': premium_info.get('has_premium_access', False),
+                'remaining_days': premium_info.get('remaining_days', 0),
+                'image_limit': image_limit,
+                'expires_at': premium_info.get('expires_at')
+            }
+            
         except Exception as e:
-            print(f"[APP-ERROR] Error loading premium status: {e}")
-            # Continue with default status
-            premium_info = {
+            logger.error(f"Error loading premium status during Telegram auth: {e}")
+            # Fallback to basic status
+            premium_status = {
                 'is_premium': False,
-                'is_admin': user.is_admin(),
-                'has_premium_access': user.is_admin(),
+                'is_admin': False,
+                'has_premium_access': False,
                 'remaining_days': 0,
                 'image_limit': 1,
-                'expires_at': None,
-                'error': str(e)
+                'expires_at': None
             }
         
-        # Get user permissions
+        # Get user permissions (now with premium status loaded)
         permissions = get_user_permissions(user)
         
-        print(f"[APP-DEBUG] Final result - Premium: {premium_info.get('has_premium_access', False)}, Admin: {premium_info.get('is_admin', False)}")
+        logger.info(f"User authenticated: {user.display_name} (ID: {user.id}) - Premium: {premium_status['has_premium_access']}")
         
         return jsonify({
             'success': True,
             'user': user.to_dict(),
             'permissions': permissions,
-            'premium': premium_info,
+            'premium': premium_status,
             'message': f'Welcome, {user.display_name}!'
         })
         
     except Exception as e:
-        print(f"[APP-ERROR] Error in Telegram authentication: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error in Telegram authentication: {e}")
         return jsonify({'error': 'Authentication failed'}), 500
 
 @app.route('/api/auth/status', methods=['GET'])
@@ -338,49 +337,52 @@ def auth_status():
             'message': 'Not authenticated'
         })
     
-    print(f"[APP-DEBUG] Auth status check for user: {user.id}")
-    
     permissions = get_user_permissions(user)
     
-    # Get REAL premium information from database using new system
+    # Get REAL premium information from database (same as /api/auth/premium)
     try:
-        print(f"[APP-DEBUG] Getting fresh premium status for auth status")
-        
-        # Run async function in event loop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             premium_info = loop.run_until_complete(user.get_premium_status())
+            image_limit = loop.run_until_complete(user.get_image_limit())
         finally:
             loop.close()
-            
-        print(f"[APP-DEBUG] Fresh premium status: {premium_info}")
         
         # Update user object with real premium status
         user.is_premium = premium_info.get('has_premium_access', False)
         user.premium_info = premium_info
         
         # Update session with new premium info
+        from telegram_auth import update_user_session
         update_user_session(user)
         
+        premium_status = {
+            'is_premium': premium_info.get('is_premium', False),
+            'is_admin': premium_info.get('is_admin', False),
+            'has_premium_access': premium_info.get('has_premium_access', False),
+            'remaining_days': premium_info.get('remaining_days', 0),
+            'image_limit': image_limit,
+            'expires_at': premium_info.get('expires_at')
+        }
+        
     except Exception as e:
-        print(f"[APP-ERROR] Error getting premium status in auth_status: {e}")
+        logger.error(f"Error getting premium status in auth_status: {e}")
         # Fallback to basic check if database fails
-        premium_info = {
+        premium_status = {
             'is_premium': user.auth_type == 'google',
-            'is_admin': user.is_admin(),
-            'has_premium_access': user.auth_type == 'google' or user.is_admin(),
+            'is_admin': False,
+            'has_premium_access': user.auth_type == 'google',
             'remaining_days': 0,
             'image_limit': 4 if user.auth_type == 'google' else 1,
-            'expires_at': None,
-            'error': str(e)
+            'expires_at': None
         }
     
     return jsonify({
         'authenticated': True,
         'user': user.to_dict(),
         'permissions': permissions,
-        'premium': premium_info
+        'premium': premium_status
     })
 
 @app.route('/api/auth/logout', methods=['POST'])
@@ -403,9 +405,7 @@ def get_premium_status():
         if not user:
             return jsonify({'error': 'User not authenticated'}), 401
         
-        print(f"[APP-DEBUG] Premium status request for user: {user.id}")
-        
-        # Get premium status using new system
+        # Get premium status asynchronously
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -414,8 +414,6 @@ def get_premium_status():
             image_limit = loop.run_until_complete(user.get_image_limit())
         finally:
             loop.close()
-        
-        print(f"[APP-DEBUG] Premium API response: {premium_info}")
         
         # Structure response
         response_data = {
@@ -431,9 +429,7 @@ def get_premium_status():
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"[APP-ERROR] Error getting premium status: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error getting premium status: {e}")
         return jsonify({'error': 'Failed to get premium status'}), 500
 
 @app.route('/api/auth/google', methods=['GET'])
@@ -790,144 +786,79 @@ def health_check():
 @app.route('/api/debug/premium', methods=['GET'])
 @require_auth
 def debug_premium():
-    """Comprehensive debug endpoint for premium status issues"""
+    """Debug premium system (temporary endpoint)"""
     try:
         user = get_current_user()
         if not user:
             return jsonify({'error': 'User not authenticated'}), 401
         
-        import traceback
+        # Check if premium system is available
+        from telegram_auth import PREMIUM_SYSTEM_AVAILABLE
         
         debug_info = {
-            'timestamp': datetime.now().isoformat(),
-            'user_info': {
-                'id': user.id,
-                'auth_type': user.auth_type,
-                'telegram_id': getattr(user, 'telegram_id', None),
-                'telegram_id_type': type(getattr(user, 'telegram_id', None)).__name__,
-                'display_name': user.display_name,
-                'is_premium_cached': user.is_premium,
-                'premium_info_cached': getattr(user, 'premium_info', None),
-                'is_admin': user.is_admin(),
-                'user_id_for_premium': user.get_user_id_for_premium()
-            },
-            'session_info': {
-                'session_keys': list(session.keys()),
-                'session_user_data': session.get('user_data', {}),
-                'login_time': session.get('login_time'),
-                'last_update': session.get('last_update'),
-                'auth_type': session.get('auth_type')
-            },
-            'config_info': {
-                'admins_list': ADMINS,
-                'telegram_mini_app_required': TELEGRAM_MINI_APP_REQUIRED
-            }
+            'user_auth_type': user.auth_type,
+            'user_telegram_id': getattr(user, 'telegram_id', None),
+            'user_telegram_id_type': type(getattr(user, 'telegram_id', None)).__name__,
+            'premium_system_available': PREMIUM_SYSTEM_AVAILABLE,
+            'user_id_for_premium': user.get_user_id_for_premium(),
         }
         
-        # Database connection and premium collection tests
+                # Test database connection
         try:
-            from premium_management import PremiumManager, get_premium_users_collection
+            from database_service import webapp_db_service
+            db_test = webapp_db_service.test_connection()
+            debug_info['database_connection'] = db_test
             
-            # Test database connection
-            collection = get_premium_users_collection()
-            debug_info['database_info'] = {
-                'connected': True,
-                'collection_available': True,
-                'collection_name': getattr(collection, 'name', 'premium_users')
-            }
+            # Test premium collection access
+            from database_service import get_premium_users_collection
+            premium_collection = get_premium_users_collection()
             
             # Get count of premium users
-            premium_count = collection.count_documents({"is_premium": True})
-            debug_info['premium_users_count'] = premium_count
+            premium_count = premium_collection.count_documents({"is_premium": True})
+            debug_info['total_premium_users'] = premium_count
             
-            # Show all premium users (for debugging)
-            all_premium = list(collection.find({"is_premium": True}))
-            debug_info['all_premium_users'] = {
-                'count': len(all_premium),
-                'user_ids': [u.get('user_id') for u in all_premium],
-                'user_id_types': [type(u.get('user_id')).__name__ for u in all_premium]
-            }
-            
-        except Exception as db_e:
-            debug_info['database_error'] = {
-                'error': str(db_e),
-                'traceback': traceback.format_exc()
-            }
+            # If this is a Telegram user, check if there's ANY record for this user
+            if user.auth_type == 'telegram' and user.telegram_id:
+                any_record = premium_collection.find_one({"user_id": user.telegram_id})
+                debug_info['user_record_in_db'] = any_record is not None
+                if any_record:
+                    debug_info['user_record_details'] = {
+                        'user_id': any_record.get('user_id'),
+                        'is_premium': any_record.get('is_premium'),
+                        'premium_expires_at': str(any_record.get('premium_expires_at')),
+                        'premium_since': str(any_record.get('premium_since'))
+                    }
+                
+        except Exception as e:
+            debug_info['database_error'] = str(e)
+            import traceback
+            debug_info['database_traceback'] = traceback.format_exc()
         
-        # Premium system tests for Telegram users
+        # Try to check premium status with detailed logging
         if user.auth_type == 'telegram' and user.telegram_id:
             try:
-                # Raw database query test
-                collection = get_premium_users_collection()
-                raw_query = {"user_id": user.telegram_id, "is_premium": True}
-                raw_result = collection.find_one(raw_query)
+                from premium_management import is_user_premium
+                debug_info['import_success'] = True
                 
-                debug_info['raw_database_query'] = {
-                    'query': raw_query,
-                    'result_found': raw_result is not None,
-                    'result': raw_result
-                }
-                
-                # Test with different user ID types
-                str_query = {"user_id": str(user.telegram_id), "is_premium": True}
-                str_result = collection.find_one(str_query)
-                
-                debug_info['string_id_query'] = {
-                    'query': str_query,
-                    'result_found': str_result is not None,
-                    'result': str_result
-                }
-                
-                # Premium Manager comprehensive test
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
-                    comprehensive_status = loop.run_until_complete(PremiumManager.get_comprehensive_status(user.telegram_id))
-                    debug_info['premium_manager_comprehensive'] = comprehensive_status
+                    premium_result = loop.run_until_complete(is_user_premium(user.telegram_id))
+                    debug_info['premium_check_result'] = premium_result
                 finally:
                     loop.close()
-                
-                # Direct premium check
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    is_prem, days, expires = loop.run_until_complete(PremiumManager.is_user_premium_simple(user.telegram_id))
-                    debug_info['direct_premium_check'] = {
-                        'is_premium': is_prem,
-                        'remaining_days': days,
-                        'expires_at': expires.isoformat() if expires else None
-                    }
-                finally:
-                    loop.close()
-                
-                # Admin check
-                debug_info['admin_check'] = {
-                    'user_telegram_id': user.telegram_id,
-                    'admins_list': ADMINS,
-                    'is_admin': user.telegram_id in ADMINS,
-                    'premium_manager_admin_check': PremiumManager.is_admin_user(user.telegram_id)
-                }
-                
-            except Exception as prem_e:
-                debug_info['premium_check_error'] = {
-                    'error': str(prem_e),
-                    'traceback': traceback.format_exc()
-                }
-        else:
-            debug_info['premium_note'] = {
-                'message': 'Not a Telegram user or no telegram_id available',
-                'auth_type': user.auth_type,
-                'has_google_premium': user.auth_type == 'google'
-            }
+            except ImportError as e:
+                debug_info['import_error'] = str(e)
+            except Exception as e:
+                debug_info['premium_check_error'] = str(e)
+                import traceback
+                debug_info['premium_check_traceback'] = traceback.format_exc()
         
         return jsonify(debug_info)
         
     except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+        logger.error(f"Error in debug premium: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
 @require_auth
