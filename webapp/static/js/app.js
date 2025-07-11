@@ -878,17 +878,6 @@ class AdvAIApp {
             
             if (data.success) {
                 this.premium_user_ids = data.premium_user_ids;
-                
-                // Show popup that premium list loaded
-                this.showAlert(`Premium list loaded successfully! Found ${data.total_count} premium users.`);
-                
-                // Show premium user list in popup
-                const userListText = this.premium_user_ids.length > 0 
-                    ? `Premium User IDs: ${this.premium_user_ids.join(', ')}`
-                    : 'No premium users found';
-                    
-                this.showAlert(`Premium Users: ${userListText}`);
-                
             } else {
                 this.showAlert(`Failed to load premium list: ${data.error}`);
             }
@@ -906,13 +895,8 @@ class AdvAIApp {
         const isInPremiumList = this.premium_user_ids.includes(telegramUserId);
         
         if (isInPremiumList) {
-            this.showAlert(`✅ User ID ${telegramUserId} found in premium list!`);
-            
             // Update user status to premium if found in premium list
             this.updateUserToPremium();
-            
-        } else {
-            this.showAlert(`❌ User ID ${telegramUserId} not found in premium list`);
         }
     }
     
@@ -934,8 +918,6 @@ class AdvAIApp {
             if (this.authSystem && this.authSystem.updateUI) {
                 this.authSystem.updateUI();
             }
-            
-            this.showAlert('🎉 Premium status activated! UI updated with premium features.');
         }
     }
     
