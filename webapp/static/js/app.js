@@ -886,7 +886,7 @@ class AdvAIApp {
         }
     }
     
-    checkTelegramUserInPremiumList(telegramUserId) {
+    async checkTelegramUserInPremiumList(telegramUserId) {
         // Only check for Telegram users, not Google users
         if (!telegramUserId || typeof telegramUserId !== 'number') {
             return;
@@ -896,27 +896,60 @@ class AdvAIApp {
         
         if (isInPremiumList) {
             // Update user status to premium if found in premium list
-            this.updateUserToPremium();
+            await this.updateUserToPremium();
         }
     }
     
-    updateUserToPremium() {
+    async updateUserToPremium() {
         // Update user object to premium status
         if (AppState.user) {
-            AppState.user.is_premium = true;
-            
-            // Update permissions for premium user
-            AppState.permissions.max_images_per_request = 4;
-            AppState.permissions.can_enhance_prompts = true;
-            
-            // Update auth system user as well
-            if (this.authSystem && this.authSystem.user) {
-                this.authSystem.user.is_premium = true;
-            }
-            
-            // Force refresh the UI to show premium features
-            if (this.authSystem && this.authSystem.updateUI) {
-                this.authSystem.updateUI();
+            try {
+                // Call backend to update session with premium status
+                const response = await fetch('/api/auth/update-premium', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        is_premium: true
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update frontend state with backend response
+                    AppState.user = data.user;
+                    AppState.permissions = data.permissions;
+                    
+                    // Update auth system user as well
+                    if (this.authSystem && this.authSystem.user) {
+                        this.authSystem.user = data.user;
+                    }
+                    
+                    // Force refresh the UI to show premium features
+                    if (this.authSystem && this.authSystem.updateUI) {
+                        this.authSystem.updateUI();
+                    }
+                } else {
+                    console.error('Failed to update premium status:', data.error);
+                }
+            } catch (error) {
+                console.error('Error updating premium status:', error);
+                
+                // Fallback to frontend-only update
+                AppState.user.is_premium = true;
+                AppState.permissions.max_images_per_request = 4;
+                AppState.permissions.can_enhance_prompts = true;
+                
+                if (this.authSystem && this.authSystem.user) {
+                    this.authSystem.user.is_premium = true;
+                }
+                
+                if (this.authSystem && this.authSystem.updateUI) {
+                    this.authSystem.updateUI();
+                }
             }
         }
     }

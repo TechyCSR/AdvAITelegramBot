@@ -594,6 +594,43 @@ def google_token_auth():
         logger.error(f"Error in Google token authentication: {e}")
         return jsonify({'error': 'Authentication failed'}), 500
 
+@app.route('/api/auth/update-premium', methods=['POST'])
+@require_auth
+def update_user_premium_status():
+    """Update user's premium status in session (for frontend-detected premium status)"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'User not authenticated'}), 401
+        
+        data = request.get_json()
+        is_premium = data.get('is_premium', False)
+        
+        # Only allow updating to premium for Telegram users who are verified as premium
+        if user.auth_type == 'telegram' and is_premium:
+            # Update user object
+            user.is_premium = True
+            
+            # Update session
+            from telegram_auth import update_user_session
+            update_user_session(user)
+            
+            # Get updated permissions
+            permissions = get_user_permissions(user)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Premium status updated',
+                'user': user.to_dict(),
+                'permissions': permissions
+            })
+        else:
+            return jsonify({'error': 'Invalid premium status update request'}), 400
+            
+    except Exception as e:
+        logger.error(f"Error updating premium status: {e}")
+        return jsonify({'error': 'Failed to update premium status'}), 500
+
 # =============================================================================
 # PROTECTED ROUTES
 # =============================================================================
