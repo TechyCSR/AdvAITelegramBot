@@ -42,6 +42,9 @@ from telegram_auth import (
     TelegramUser  # Backward compatibility alias
 )
 
+# Import Telegram logging system
+from telegram_logging import log_image_generation, log_error, log_user_activity
+
 # Import g4f directly
 import g4f
 from g4f.client import Client as GPTClient, AsyncClient
@@ -314,6 +317,12 @@ def telegram_auth():
         
         logger.info(f"User authenticated: {user.display_name} (ID: {user.id}) - Premium: {premium_status['has_premium_access']}")
         
+        # Log user authentication to Telegram channel
+        try:
+            log_user_activity(user, "Authentication", f"Telegram auth - Premium: {premium_status['has_premium_access']}")
+        except Exception as log_error_ex:
+            logger.error(f"Failed to log user authentication: {str(log_error_ex)}")
+        
         return jsonify({
             'success': True,
             'user': user.to_dict(),
@@ -522,6 +531,12 @@ def auth_google_callback():
         
         logger.info(f"Google user authenticated: {user.display_name} (ID: {user.id}) - Premium: True")
         
+        # Log Google authentication to Telegram channel
+        try:
+            log_user_activity(user, "Authentication", f"Google OAuth - Premium: True")
+        except Exception as log_error_ex:
+            logger.error(f"Failed to log Google authentication: {str(log_error_ex)}")
+        
         # Check if this is a direct API call or browser redirect
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
             # API call - return JSON
@@ -581,6 +596,12 @@ def google_token_auth():
         permissions = get_user_permissions(user)
         
         logger.info(f"Google user authenticated via token: {user.display_name} (ID: {user.id}) - Premium: True")
+        
+        # Log Google token authentication to Telegram channel
+        try:
+            log_user_activity(user, "Authentication", f"Google Token - Premium: True")
+        except Exception as log_error_ex:
+            logger.error(f"Failed to log Google token authentication: {str(log_error_ex)}")
         
         return jsonify({
             'success': True,
@@ -703,6 +724,12 @@ def enhance_prompt():
             
             logger.info(f"Enhanced prompt for user {user.id}: {original_prompt[:50]}... -> {enhanced[:50]}...")
             
+            # Log prompt enhancement to Telegram channel
+            try:
+                log_user_activity(user, "PromptEnhancement", f"Original: {original_prompt[:100]}... -> Enhanced: {enhanced[:100]}...")
+            except Exception as log_error_ex:
+                logger.error(f"Failed to log prompt enhancement: {str(log_error_ex)}")
+            
             return jsonify({
                 'original_prompt': original_prompt,
                 'enhanced_prompt': enhanced,
@@ -775,6 +802,12 @@ def generate_images_api():
             )
             
             if error or not image_urls:
+                # Log error to Telegram channel
+                try:
+                    log_error("ImageGeneration", error or 'Failed to generate images', user.id, f"Prompt: {prompt[:100]}")
+                except Exception as log_error_ex:
+                    logger.error(f"Failed to log image generation error: {str(log_error_ex)}")
+                
                 return jsonify({
                     'error': error or 'Failed to generate images',
                     'success': False
@@ -782,6 +815,19 @@ def generate_images_api():
             
             # Log successful generation
             logger.info(f"Successfully generated {len(image_urls)} images for user {user.id}")
+            
+            # Log to Telegram channel (async)
+            generation_data = {
+                'size': f"{width}x{height}",
+                'model': model,
+                'count': len(image_urls)
+            }
+            
+            # Run logging in background to avoid blocking the response
+            try:
+                log_image_generation(user, prompt, style, image_urls, generation_data)
+            except Exception as log_error_ex:
+                logger.error(f"Failed to log image generation: {str(log_error_ex)}")
             
             return jsonify({
                 'success': True,

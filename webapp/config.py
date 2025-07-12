@@ -19,6 +19,10 @@ FLASK_DEBUG = os.getenv('FLASK_DEBUG') or ""
 # Telegram Bot Configuration for Mini App Authentication
 BOT_TOKEN = os.getenv('BOT_TOKEN') or ""
 
+# Telegram Log Channel for WebApp Activity
+# Use either the channel username (@advchatgptlogs) or numeric ID (-1002842298904)
+LOG_CHANNEL = os.getenv('LOG_CHANNEL') or "-1002842298904"
+
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or ""
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or ""

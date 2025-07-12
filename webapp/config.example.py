@@ -21,6 +21,9 @@ POLLINATIONS_KEY = os.getenv('POLLINATIONS_KEY') or "your_pollinations_api_key_h
 # Telegram Bot Token for Mini App Authentication
 BOT_TOKEN = os.getenv('BOT_TOKEN') or "your_telegram_bot_token"
 
+# Telegram Log Channel for WebApp Activity Logging
+LOG_CHANNEL = os.getenv('LOG_CHANNEL')  # Your log channel (@username or numeric ID)
+
 # Google OAuth Configuration (for non-Telegram users)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or "your_google_client_id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or "your_google_client_secret"
