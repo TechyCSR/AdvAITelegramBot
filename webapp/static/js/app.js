@@ -27,22 +27,22 @@ class AuthSystem {
 
 
     async initialize() {
-        console.log('🚀 Initializing Authentication System...');
+        // console.log('🚀 Initializing Authentication System...');
         
         // Wait for Telegram WebApp to load if present
         await new Promise(resolve => setTimeout(resolve, 150));
         
         // Simple and reliable Telegram detection
         const isTelegramEnvironment = this.detectTelegramEnvironment();
-        console.log(`📱 Environment: ${isTelegramEnvironment ? 'TELEGRAM' : 'BROWSER'}`);
+        // console.log(`📱 Environment: ${isTelegramEnvironment ? 'TELEGRAM' : 'BROWSER'}`);
         
         if (isTelegramEnvironment) {
-            console.log('🔄 Starting Telegram auto-login...');
+            // console.log('🔄 Starting Telegram auto-login...');
             // Hide any loading overlay immediately
             this.hideAllOverlays();
             return await this.handleTelegramAuth();
         } else {
-            console.log('🌐 Starting Browser auth...');
+            // console.log('🌐 Starting Browser auth...');
             return await this.handleBrowserAuth();
         }
     }
@@ -54,14 +54,14 @@ class AuthSystem {
         const hasInitData = hasWebApp && Telegram.WebApp.initData && Telegram.WebApp.initData.length > 0;
         const hasTelegramUA = navigator.userAgent.includes('Telegram');
         
-        console.log('🔍 Telegram Detection:', {
-            hasTelegramScript,
-            hasWebApp,
-            hasInitData,
-            initDataLength: hasInitData ? Telegram.WebApp.initData.length : 0,
-            hasTelegramUA,
-            userAgent: navigator.userAgent.substring(0, 100) + '...'
-        });
+        // console.log('🔍 Telegram Detection:', {
+        //     hasTelegramScript,
+        //     hasWebApp,
+        //     hasInitData,
+        //     initDataLength: hasInitData ? Telegram.WebApp.initData.length : 0,
+        //     hasTelegramUA,
+        //     userAgent: navigator.userAgent.substring(0, 100) + '...'
+        // });
         
         // Simple rule: If we have Telegram script AND (init data OR Telegram user agent), it's Telegram
         return hasTelegramScript && (hasInitData || hasTelegramUA);
@@ -71,7 +71,7 @@ class AuthSystem {
         const authOverlay = document.getElementById('authOverlay');
         if (authOverlay) {
             authOverlay.style.display = 'none';
-            console.log('✅ Auth overlay hidden');
+            // console.log('✅ Auth overlay hidden');
         }
     }
 
@@ -92,7 +92,7 @@ class AuthSystem {
 
             // Parse the user JSON data
             const userData = JSON.parse(userDataString);
-            console.log('Current Telegram user data:', userData);
+            // console.log('Current Telegram user data:', userData);
             return userData;
         } catch (error) {
             console.error('Error parsing current Telegram user data:', error);
@@ -125,11 +125,11 @@ class AuthSystem {
                 this.webApp.close();
             });
             
-            console.log('📋 Telegram Data:', {
-                hasInitData: !!this.initData,
-                dataLength: this.initData ? this.initData.length : 0,
-                platform: this.webApp.platform
-            });
+            // // console.log('📋 Telegram Data:', {
+            //     hasInitData: !!this.initData,
+            //     dataLength: this.initData ? this.initData.length : 0,
+            //     platform: this.webApp.platform
+            // });
             
             // Check existing session but validate current user matches
             const existingAuth = await this.checkAuthStatus();
@@ -141,11 +141,11 @@ class AuthSystem {
                     const currentUserId = currentTelegramUser.id;
                     
                     if (storedUserId === currentUserId) {
-                        console.log('✅ Already authenticated from session with matching user');
+                        // console.log('✅ Already authenticated from session with matching user');
                         return true;
                     } else {
-                        console.log('⚠️ Session user mismatch - clearing session and re-authenticating');
-                        console.log(`Stored: ${storedUserId}, Current: ${currentUserId}`);
+                        // console.log('⚠️ Session user mismatch - clearing session and re-authenticating');
+                        // console.log(`Stored: ${storedUserId}, Current: ${currentUserId}`);
                         // Clear session without page reload to continue with fresh auth
                         await fetch('/api/auth/logout', {
                             method: 'POST',
@@ -160,7 +160,7 @@ class AuthSystem {
                         // Continue to fresh authentication below
                     }
                 } else {
-                    console.log('✅ Already authenticated from session (non-Telegram user)');
+                    // console.log('✅ Already authenticated from session (non-Telegram user)');
                     return true;
                 }
             }
@@ -182,7 +182,7 @@ class AuthSystem {
             // Check existing session first
             const existingAuth = await this.checkAuthStatus();
             if (existingAuth) {
-                console.log('✅ Already authenticated from session');
+                // console.log('✅ Already authenticated from session');
                 this.hideAllOverlays();
                 return true;
             }
@@ -198,7 +198,7 @@ class AuthSystem {
 
     async loadAuthConfig() {
         try {
-            console.log('Loading auth config...');
+            // console.log('Loading auth config...');
             const response = await fetch('/api/auth/config');
             
             if (!response.ok) {
@@ -206,7 +206,7 @@ class AuthSystem {
             }
             
             this.authConfig = await response.json();
-            console.log('Auth config loaded successfully:', this.authConfig);
+            // console.log('Auth config loaded successfully:', this.authConfig);
         } catch (error) {
             console.error('Failed to load auth config:', error);
             // Default fallback config - assume both are disabled for safety
@@ -215,18 +215,18 @@ class AuthSystem {
                 google_enabled: false,
                 google_client_id: null
             };
-            console.log('Using fallback auth config:', this.authConfig);
+            // console.log('Using fallback auth config:', this.authConfig);
         }
     }
 
     async doTelegramAuth() {
         if (!this.initData || this.initData.length === 0) {
-            console.warn('⚠️ No Telegram init data - showing login options');
+            // console.warn('⚠️ No Telegram init data - showing login options');
             return this.showLoginOptions();
         }
 
         try {
-            console.log('🔐 Authenticating with Telegram...');
+            // console.log('🔐 Authenticating with Telegram...');
             
             const response = await fetch('/api/auth/telegram', {
                 method: 'POST',
@@ -236,10 +236,10 @@ class AuthSystem {
             });
 
             const data = await response.json();
-            console.log('📡 Auth response:', { status: response.status, success: data.success });
+            // console.log('📡 Auth response:', { status: response.status, success: data.success });
 
             if (response.ok && data.success) {
-                console.log('✅ Telegram auth successful!');
+                // console.log('✅ Telegram auth successful!');
                 
                 // Set authentication state
                 this.authenticated = true;
@@ -275,7 +275,7 @@ class AuthSystem {
     }
 
     showLoginOptions() {
-        console.log('🔑 Showing login options...');
+        // console.log('🔑 Showing login options...');
         
         const authOverlay = document.getElementById('authOverlay');
         if (authOverlay) {
@@ -307,16 +307,16 @@ class AuthSystem {
     async authenticateGoogle() {
         try {
             if (!this.authConfig || !this.authConfig.google_enabled) {
-                console.log('Google authentication not enabled in config');
+                // console.log('Google authentication not enabled in config');
                 return;
             }
 
-            console.log('Starting Google authentication setup...');
+            // console.log('Starting Google authentication setup...');
             showAuthStatus('Initializing Google login...');
 
             // Load Google Sign-In library
             await this.loadGoogleSignIn();
-            console.log('Google Sign-In library loaded');
+            // console.log('Google Sign-In library loaded');
 
             // Check if google_client_id is available
             if (!this.authConfig.google_client_id) {
@@ -328,7 +328,7 @@ class AuthSystem {
                 client_id: this.authConfig.google_client_id,
                 callback: this.handleGoogleCredentialResponse.bind(this)
             });
-            console.log('Google Sign-In initialized');
+            // console.log('Google Sign-In initialized');
 
             // Wait a moment for DOM to be ready
             setTimeout(() => {
@@ -344,13 +344,13 @@ class AuthSystem {
                             text: 'continue_with'
                         }
                     );
-                    console.log('Google Sign-In button rendered');
+                    // console.log('Google Sign-In button rendered');
 
                     // Also show One Tap if available (but don't block if it fails)
                     try {
                         google.accounts.id.prompt();
                     } catch (promptError) {
-                        console.log('One Tap prompt not available:', promptError);
+                        // console.log('One Tap prompt not available:', promptError);
                     }
                 } else {
                     console.error('Google Sign-In button container not found');
@@ -427,12 +427,12 @@ class AuthSystem {
                 AppState.authenticated = true;
                 AppState.permissions = data.permissions;
                 
-                console.log('Google authentication successful:', this.user);
-                console.log('🔍 Google Auth - Premium Debug:');
-                console.log('User object:', this.user);
-                console.log('Permissions:', AppState.permissions);
-                console.log('Premium info from server:', data.premium);
-                console.log('Max images per request:', AppState.permissions.max_images_per_request);
+                // console.log('Google authentication successful:', this.user);
+                // console.log('🔍 Google Auth - Premium Debug:');
+                // console.log('User object:', this.user);
+
+                // console.log('Premium info from server:', data.premium);
+                // console.log('Max images per request:', AppState.permissions.max_images_per_request);
                 
                 this.hideAuthOverlay();
                 this.updateUI();
@@ -450,7 +450,7 @@ class AuthSystem {
     }
 
     showAuthenticationOptions() {
-        console.log('Showing authentication options...', this.authConfig);
+        // console.log('Showing authentication options...', this.authConfig);
         
         const authOverlay = document.getElementById('authOverlay');
         if (!authOverlay) {
@@ -548,33 +548,33 @@ class AuthSystem {
 
         const authContent = document.querySelector('.auth-content');
         if (authContent) {
-            console.log('Updating auth content with options HTML...');
+            // console.log('Updating auth content with options HTML...');
             authContent.innerHTML = optionsHtml;
-            console.log('Auth content updated successfully with options');
+            // console.log('Auth content updated successfully with options');
         } else {
             console.error('Auth content container not found');
         }
 
         // Ensure overlay is visible
         authOverlay.style.display = 'flex';
-        console.log('Auth overlay made visible');
+        // console.log('Auth overlay made visible');
 
         // Initialize Google Sign-In if enabled
         if (this.authConfig && this.authConfig.google_enabled) {
-            console.log('Initializing Google Sign-In...');
+            // console.log('Initializing Google Sign-In...');
             setTimeout(() => this.authenticateGoogle(), 500); // Small delay to ensure DOM is updated
         }
     }
 
     async checkAuthStatus() {
         try {
-            console.log('Checking authentication status...');
+            // console.log('Checking authentication status...');
             const response = await fetch('/api/auth/status', {
                 credentials: 'include'
             });
             const data = await response.json();
             
-            console.log('Auth status response:', data);
+            // console.log('Auth status response:', data);
             
             if (data.authenticated) {
                 this.authenticated = true;
@@ -584,11 +584,11 @@ class AuthSystem {
                 AppState.permissions = data.permissions;
                 
                 // Debug premium status
-                console.log('🔍 Premium Debug Info:');
-                console.log('User object:', this.user);
-                console.log('Permissions:', AppState.permissions);
-                console.log('Premium info from server:', data.premium);
-                console.log('Max images per request:', AppState.permissions.max_images_per_request);
+                // console.log('🔍 Premium Debug Info:');
+                // console.log('User object:', this.user);
+                // console.log('Permissions:', AppState.permissions);
+                // console.log('Premium info from server:', data.premium);
+                // console.log('Max images per request:', AppState.permissions.max_images_per_request);
                 
                 this.hideAuthOverlay();
                 this.updateUI();
@@ -603,7 +603,7 @@ class AuthSystem {
                 
                 return true;
             }
-            console.log('User is not authenticated');
+            // console.log('User is not authenticated');
             return false;
         } catch (error) {
             console.error('Auth status check failed:', error);
@@ -635,7 +635,7 @@ class AuthSystem {
         if (app && app.showSuccess) {
             app.showSuccess(message);
         } else {
-            console.log('Success:', message);
+            // console.log('Success:', message);
         }
     }
 
@@ -643,7 +643,7 @@ class AuthSystem {
         console.error('❌ Auth error:', message);
         
         // Show authentication options as fallback
-        console.log('🔄 Showing auth options as fallback...');
+        // console.log('🔄 Showing auth options as fallback...');
         return this.showLoginOptions();
     }
 
@@ -681,7 +681,7 @@ class AuthSystem {
         // Update UI based on permissions
         this.updatePermissionBasedUI();
         
-        console.log('🎯 UI update completed for user:', this.user.display_name);
+        // console.log('🎯 UI update completed for user:', this.user.display_name);
     }
 
     updateUserModal() {
@@ -720,19 +720,18 @@ class AuthSystem {
         const variantBtns = document.querySelectorAll('.variant-btn');
         const maxImages = AppState.permissions.max_images_per_request || 2;
         
-        console.log('🔧 Updating UI based on permissions:', AppState.permissions);
-        console.log('👥 User premium status:', AppState.user?.is_premium);
-        console.log('🖼️ Max images allowed:', maxImages);
+        // console.log('🔧 Updating UI based on permissions:', AppState.permissions);
+        // console.log('👥 User premium status:', AppState.user?.is_premium);
         
         variantBtns.forEach(btn => {
             const variants = parseInt(btn.dataset.variants);
-            console.log(`🎛️ Checking variant button for ${variants} images`);
+            // console.log(`🎛️ Checking variant button for ${variants} images`);
             
             if (variants > maxImages) {
                 btn.disabled = true;
                 btn.title = AppState.user?.is_premium ? 'Contact support for higher limits' : 'Premium feature - Upgrade to generate multiple images';
                 btn.classList.add('premium-required');
-                console.log(`❌ Disabled ${variants}-image button (limit: ${maxImages})`);
+                // console.log(`❌ Disabled ${variants}-image button (limit: ${maxImages})`);
                 
                 // If this button is currently active, switch to the max allowed
                 if (btn.classList.contains('active')) {
@@ -742,14 +741,14 @@ class AuthSystem {
                     if (allowedBtn) {
                         allowedBtn.classList.add('active');
                         this.selectedVariants = parseInt(allowedBtn.dataset.variants);
-                        console.log(`✅ Switched to ${this.selectedVariants}-image option`);
+                        // console.log(`✅ Switched to ${this.selectedVariants}-image option`);
                     }
                 }
             } else {
                 btn.disabled = false;
                 btn.title = '';
                 btn.classList.remove('premium-required');
-                console.log(`✅ Enabled ${variants}-image button`);
+                // console.log(`✅ Enabled ${variants}-image button`);
             }
         });
 
@@ -758,11 +757,11 @@ class AuthSystem {
         if (enhanceBtn && !AppState.permissions.can_enhance_prompts) {
             enhanceBtn.disabled = true;
             enhanceBtn.title = 'Feature not available';
-            console.log('❌ Disabled enhance button');
+            // console.log('❌ Disabled enhance button');
         } else if (enhanceBtn) {
             enhanceBtn.disabled = false;
             enhanceBtn.title = '';
-            console.log('✅ Enabled enhance button');
+            // console.log('✅ Enabled enhance button');
         }
 
         // Add visual indicators for premium features
@@ -823,7 +822,7 @@ function hideAuthStatus() {
     const authStatus = document.getElementById('authStatus');
     if (authStatus) {
         authStatus.style.display = 'none';
-        console.log('Auth status hidden');
+        // console.log('Auth status hidden');
     }
 }
 
@@ -835,7 +834,7 @@ function showAuthStatus(message, isError = false) {
             `<div class="loading-spinner"></div><span>${message}</span>`;
         authStatus.className = `auth-status ${isError ? 'error' : ''}`;
         authStatus.style.display = 'flex';
-        console.log('Auth status shown:', message);
+        // console.log('Auth status shown:', message);
     }
 }
 
@@ -1058,7 +1057,7 @@ class AdvAIApp {
         const retryAuth = document.getElementById('retryAuth');
         if (retryAuth) {
             retryAuth.addEventListener('click', () => {
-                console.log('🔄 Retry authentication clicked');
+                // console.log('🔄 Retry authentication clicked');
                 // Simply reinitialize the auth system
                 this.authSystem.initialize();
             });
@@ -1149,7 +1148,7 @@ class AdvAIApp {
     selectVariants(button) {
         // Check if button is disabled (premium required)
         if (button.disabled || button.classList.contains('premium-required')) {
-            console.log('❌ Cannot select disabled variant button');
+            // console.log('❌ Cannot select disabled variant button');
             
             // Show upgrade message
             this.showError('This feature requires a premium account. Please upgrade to generate multiple images.');
@@ -1161,7 +1160,7 @@ class AdvAIApp {
         
         // Double check permission limit
         if (variants > maxImages) {
-            console.log(`❌ Variant ${variants} exceeds limit of ${maxImages}`);
+            // console.log(`❌ Variant ${variants} exceeds limit of ${maxImages}`);
             this.showError(`You can generate up to ${maxImages} images per request. ${maxImages === 1 ? 'Upgrade to Premium for more!' : ''}`);
             return;
         }
@@ -1172,7 +1171,7 @@ class AdvAIApp {
         button.classList.add('active');
         this.selectedVariants = variants;
         
-        console.log(`✅ Selected ${variants} image variant`);
+        // console.log(`✅ Selected ${variants} image variant`);
     }
 
     toggleCustomSize() {
@@ -1649,10 +1648,10 @@ class AdvAIApp {
 
     async downloadImage(imageUrl, index) {
         const isInTelegram = this.isInTelegram();
-        console.log('Download Image - isInTelegram:', isInTelegram, 'URL:', imageUrl);
-        console.log('Telegram check - window.Telegram:', !!window.Telegram);
-        console.log('WebApp:', !!(window.Telegram && window.Telegram.WebApp));
-        console.log('InitData:', !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData));
+        // console.log('Download Image - isInTelegram:', isInTelegram, 'URL:', imageUrl);
+        // console.log('Telegram check - window.Telegram:', !!window.Telegram);
+        // console.log('WebApp:', !!(window.Telegram && window.Telegram.WebApp));
+        // console.log('InitData:', !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData));
         
         if (isInTelegram) {
             // In Telegram: Open in new tab
@@ -1772,7 +1771,7 @@ class AdvAIApp {
                 });
                 this.showNotification('Image shared successfully!', 'success');
             } catch (error) {
-                console.log('Share failed:', error);
+                // console.log('Share failed:', error);
                 this.copyToClipboard(imageUrl);
             }
         } else {
@@ -2025,7 +2024,7 @@ class AdvAIApp {
         if (this.authSystem.webApp) {
             this.authSystem.webApp.showAlert(message);
         } else {
-            console.log('Success:', message);
+            // console.log('Success:', message);
         }
     }
 
@@ -2238,7 +2237,7 @@ class AdvAIApp {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded, initializing app...');
+    // console.log('DOM Content Loaded, initializing app...');
     
     // Create global app instance
     window.app = new AdvAIApp();
@@ -2258,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (authOverlay && authOverlay.style.display !== 'none' && 
                     authStatus && authStatus.style.display !== 'none') {
-                    console.log('🔄 Fallback: Forcing authentication options display');
+                    // console.log('🔄 Fallback: Forcing authentication options display');
                     window.authSystem.showLoginOptions();
                 }
             }
