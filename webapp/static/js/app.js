@@ -1106,6 +1106,11 @@ class AdvAIApp {
         
         // Floating navigation button
         this.initializeFloatingNav();
+        
+        // Set initial floating nav visibility
+        if (this.updateFloatingNavVisibility) {
+            this.updateFloatingNavVisibility();
+        }
     }
 
     switchTab(tabName) {
@@ -1122,6 +1127,11 @@ class AdvAIApp {
         // Load history if switching to history tab
         if (tabName === 'history') {
             this.renderHistory();
+        }
+
+        // Update floating navigation button visibility
+        if (this.updateFloatingNavVisibility) {
+            this.updateFloatingNavVisibility();
         }
     }
 
@@ -2087,16 +2097,31 @@ class AdvAIApp {
         const floatingBtn = document.getElementById('floatingNavBtn');
         if (!floatingBtn) return;
 
-        // Show/hide floating button based on scroll position
-        window.addEventListener('scroll', () => {
+        // Function to check if generate tab is active
+        const isGenerateTabActive = () => {
+            const generateTab = document.getElementById('generate');
+            return generateTab && generateTab.classList.contains('active');
+        };
+
+        // Show/hide floating button based on scroll position and active tab
+        const updateFloatingButtonVisibility = () => {
             const generateBtn = document.getElementById('generateBtn');
-            if (generateBtn) {
+            if (generateBtn && isGenerateTabActive()) {
                 const rect = generateBtn.getBoundingClientRect();
                 const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
                 
                 floatingBtn.classList.toggle('visible', !isVisible);
+            } else {
+                // Hide button if not on generate tab
+                floatingBtn.classList.remove('visible');
             }
-        });
+        };
+
+        // Update visibility on scroll
+        window.addEventListener('scroll', updateFloatingButtonVisibility);
+
+        // Update visibility when tab changes (call this function when switching tabs)
+        this.updateFloatingNavVisibility = updateFloatingButtonVisibility;
 
         // Click to scroll to generate button
         floatingBtn.addEventListener('click', () => {
