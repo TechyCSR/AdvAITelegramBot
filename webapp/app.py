@@ -670,7 +670,7 @@ def enhance_prompt():
         if not original_prompt:
             return jsonify({'error': 'Prompt is required'}), 400
         
-        if len(original_prompt) > 500:
+        if len(original_prompt) > 700:
             return jsonify({'error': 'Prompt is too long'}), 400
         
         # AI prompt enhancement
@@ -685,7 +685,7 @@ def enhance_prompt():
         - Adds lighting, mood, and atmosphere details
         - Keeps the core concept intact
         - Is suitable for AI image generation
-        - Is no more than 500 characters
+        - Keep it detailed and comprehensive
         
         Enhanced prompt:"""
         
@@ -697,9 +697,9 @@ def enhance_prompt():
             if enhanced.startswith('"') and enhanced.endswith('"'):
                 enhanced = enhanced[1:-1]
             
-            # Ensure it's not too long
-            if len(enhanced) > 500:
-                enhanced = enhanced[:497] + "..."
+            # Only trim if longer than 700 characters
+            if len(enhanced) > 700:
+                enhanced = enhanced[:697] + "..."
             
             logger.info(f"Enhanced prompt for user {user.id}: {original_prompt[:50]}... -> {enhanced[:50]}...")
             
