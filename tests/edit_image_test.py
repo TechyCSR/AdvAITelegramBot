@@ -1,20 +1,17 @@
-from g4f.client import Client
-from g4f.Provider import PollinationsImage
-import base64
+import asyncio
+from g4f.client import AsyncClient
+from g4f.Provider import PollinationsAI
 
-client = Client(
-    image_provider=PollinationsImage
-)
+async def main():
+    client = AsyncClient(image_provider=PollinationsAI)
 
-response = client.images.create_variation(
-    image=open("/home/csr/Documents/Git Projects/AdvAITelegramBot-6/generated_images/1747214000_e807590f-a3cb-4d62-9eea-298c754853e7.jpg", "rb"),
-    model="dall-e-3",
-    # Add any other necessary parameters
-)
+    response = await client.images.create_variation(
+        image=open("./generated_images/1749042674_create+a+variation+of+this+image_5047378b1f6674cd.jpeg", "rb"),
+        model="flux",
+        # prompt="add a lion to the right side of the given image",
+    )
 
-image_url = response.data[0].url
+    image_url = response.data[0].url
+    print(f"Generated image URL: {image_url}")
 
-with open("image.png", "wb") as f:
-    f.write(base64.b64decode(image_url))
-
-print(f"Generated image URL: {image_url}")
+asyncio.run(main())
