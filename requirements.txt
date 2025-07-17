@@ -32,8 +32,8 @@ uvloop>=0.17.0; platform_system != "Windows"  # High-performance event loop (non
 orjson>=3.9.5  # Faster JSON serialization/deserialization
 
 # Video generation dependencies
-google-cloud-storage>=2.14.0  # For handling video storage in GCS
-google-generativeai>=0.3.2  # Google's Generative AI SDK for video generation
-google-cloud-core>=2.4.1  # Core Google Cloud dependencies
-google-auth>=2.27.0  # Google authentication library for service accounts
-google-auth-oauthlib>=1.2.0  # OAuth 2.0 authentication support
+google-cloud-storage # For handling video storage in GCS
+google-generativeai # Google's Generative AI SDK for video generation
+google-cloud-core # Core Google Cloud dependencies
+google-auth # Google authentication library for service accounts
+google-auth-oauthlib # OAuth 2.0 authentication support
