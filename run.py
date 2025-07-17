@@ -45,6 +45,7 @@ from modules.user.file_to_text import handle_file_upload, handle_file_question
 from modules.interaction.interaction_system import start_interaction_system, set_last_interaction
 from modules.core.database import get_user_interactions_collection
 import re
+from modules.video.video_handlers import video_command_handler, addt_command_handler, removet_command_handler, token_command_handler, video_callback_handler, vtoken_command_handler
 
 
 
@@ -489,6 +490,31 @@ def create_bot_instance(bot_token, bot_index=1):
             await update.reply_text(premium_message, parse_mode=ParseMode.HTML) # Assuming HTML in premium message
 
         await channel_log(bot, update, "/start")
+
+    # --- VIDEO COMMAND ---
+    @advAiBot.on_message(filters.command("video"))
+    async def handle_video_command(client, message):
+        await video_command_handler(client, message)
+
+    @advAiBot.on_message(filters.command("addt") & filters.user(config.ADMINS))
+    async def handle_addt_command(client, message):
+        await addt_command_handler(client, message)
+
+    @advAiBot.on_message(filters.command("removet") & filters.user(config.ADMINS))
+    async def handle_removet_command(client, message):
+        await removet_command_handler(client, message)
+
+    @advAiBot.on_message(filters.command("token"))
+    async def handle_token_command(client, message):
+        await token_command_handler(client, message)
+
+    @advAiBot.on_message(filters.command("vtoken") & filters.user(config.ADMINS))
+    async def handle_vtoken_command(client, message):
+        await vtoken_command_handler(client, message)
+
+    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("check_tokens_") or query.data == "show_plans"))
+    async def handle_video_callbacks(client, callback_query):
+        await video_callback_handler(client, callback_query)
 
     # --- HELP COMMAND ---
     @advAiBot.on_message(filters.command("help"))
