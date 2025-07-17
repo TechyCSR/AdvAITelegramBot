@@ -1,7 +1,7 @@
 import asyncio
 import time
-from google import genai
-from google.genai.types import GenerateVideosConfig
+from google.generativeai import genai  # Fixed import statement
+from google.generativeai.types import GenerateVideosConfig
 from google.cloud import storage
 from database import user_db
 from threading import Lock
