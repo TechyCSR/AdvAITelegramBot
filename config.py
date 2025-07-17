@@ -27,7 +27,11 @@ MULTIPLE_BOTS = os.environ.get('MULTIPLE_BOTS') or os.getenv("MULTIPLE_BOTS") or
 MULTIPLE_BOTS = MULTIPLE_BOTS.lower() in ["true", "1", "yes", "y"]
 NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS') or os.getenv("NUM_OF_BOTS") or "1")
 POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY') or os.getenv("POLLINATIONS_KEY") or "POLLINATIONS_KEY"
-
+video_gen = True  # Set to True to enable video generation feature
+# Set up environment variables for Google GenAI
+GOOGLE_CLOUD_PROJECT = os.getenv('GOOGLE_CLOUD_PROJECT') or os.getenv("GOOGLE_CLOUD_PROJECT") or "GOOGLE_CLOUD_PROJECT"
+GOOGLE_CLOUD_LOCATION = os.getenv('GOOGLE_CLOUD_LOCATION') or os.getenv("GOOGLE_CLOUD_LOCATION") or "global"
+GOOGLE_GENAI_USE_VERTEXAI = os.getenv('GOOGLE_GENAI_USE_VERTEXAI') or os.getenv("GOOGLE_GENAI_USE_VERTEXAI") or "True"
 
 print("MULTIPLE BOTS RUNNING: ", MULTIPLE_BOTS)
 print("\nNUM OF BOTS: ", NUM_OF_BOTS)
