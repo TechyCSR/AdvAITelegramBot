@@ -1,6 +1,6 @@
 import asyncio
 import time
-import google.generativeai as genai
+from google import genai
 from google.genai.types import GenerateVideosConfig
 from google.cloud import storage
 from database import user_db

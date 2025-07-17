@@ -31,9 +31,9 @@ psutil>=5.9.5  # System statistics for admin panel
 uvloop>=0.17.0; platform_system != "Windows"  # High-performance event loop (non-Windows)
 orjson>=3.9.5  # Faster JSON serialization/deserialization
 
-# Video generation dependencies
-google-cloud-storage # For handling video storage in GCS
-google-generativeai # Google's Generative AI SDK for video generation
-google-cloud-core # Core Google Cloud dependencies
-google-auth # Google authentication library for service accounts
-google-auth-oauthlib # OAuth 2.0 authentication support
+# Video generation and Google GenAI dependencies
+google-genai>=0.3.0
+google-cloud-storage>=2.16.0
+google-auth>=2.29.0
+protobuf>=4.25.3
+grpcio>=1.62.2
