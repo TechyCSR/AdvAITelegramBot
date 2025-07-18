@@ -46,6 +46,7 @@ from modules.interaction.interaction_system import start_interaction_system, set
 from modules.core.database import get_user_interactions_collection
 import re
 from modules.video.video_handlers import video_command_handler, addt_command_handler, removet_command_handler, token_command_handler, video_callback_handler, vtoken_command_handler
+from modules.video.video_generation import start_queue_processor
 
 
 
@@ -447,6 +448,12 @@ def create_bot_instance(bot_token, bot_index=1):
         if not scheduler_tasks.get('premium_scheduler_task') or scheduler_tasks['premium_scheduler_task'].done():
             scheduler_tasks['premium_scheduler_task'] = asyncio.create_task(premium_check_scheduler(bot)) # Pass bot client
             logger.info(f"Bot {bot_index}: Started daily premium check scheduler task")
+        
+        # Start video generation queue processor
+        if not scheduler_tasks.get('video_queue_processor_task'):
+            start_queue_processor()
+            scheduler_tasks['video_queue_processor_task'] = True  # Mark as started
+            logger.info(f"Bot {bot_index}: Started video generation queue processor")
 
         if not hasattr(advAiBot, "_restart_checked"):
             logger.info(f"Bot {bot_index}: Checking for restart and update markers on first command")
@@ -512,7 +519,25 @@ def create_bot_instance(bot_token, bot_index=1):
     async def handle_vtoken_command(client, message):
         await vtoken_command_handler(client, message)
 
-    @advAiBot.on_callback_query(filters.create(lambda _, __, query: query.data.startswith("check_tokens_") or query.data == "show_plans"))
+    @advAiBot.on_callback_query(filters.create(lambda _, __, query: 
+        query.data.startswith("check_tokens_") or 
+        query.data == "show_plans" or
+        query.data.startswith("select_quality_") or
+        query.data.startswith("aspect_ratio_") or
+        query.data == "quality_comparison" or
+        query.data.startswith("cancel_video_") or
+        query.data.startswith("user_requests_") or
+        query.data.startswith("video_analytics_") or
+        query.data == "new_video_generation" or
+        query.data.startswith("enhance_prompt_") or
+        query.data.startswith("generate_similar_") or
+        query.data.startswith("save_video_") or
+        query.data.startswith("use_enhanced_") or
+        query.data.startswith("generate_video_") or
+        query.data.startswith("user_analytics_") or
+        query.data == "video_help" or
+        query.data == "back_to_menu"
+    ))
     async def handle_video_callbacks(client, callback_query):
         await video_callback_handler(client, callback_query)
 
