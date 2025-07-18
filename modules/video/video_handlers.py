@@ -498,6 +498,50 @@ async def video_callback_handler(client, callback_query: CallbackQuery):
             # Show main menu
             await show_main_video_menu(callback_query)
             
+        elif data.startswith("generate_similar_"):
+            prompt = data.replace("generate_similar_", "")
+            await callback_query.answer(f"Use /video {prompt} to generate a similar video!", show_alert=True)
+            
+        elif data.startswith("save_video_"):
+            request_id = data.replace("save_video_", "")
+            await callback_query.answer("Video saved to your gallery! (Feature coming soon)", show_alert=True)
+            
+        elif data.startswith("use_enhanced_"):
+            enhanced_prompt = data.replace("use_enhanced_", "")
+            await callback_query.answer(f"Use /video {enhanced_prompt} to generate with enhanced prompt!", show_alert=True)
+            
+        elif data.startswith("generate_video_"):
+            prompt = data.replace("generate_video_", "")
+            await callback_query.answer(f"Use /video {prompt} to generate this video!", show_alert=True)
+            
+        elif data.startswith("user_analytics_"):
+            user_id_param = data.replace("user_analytics_", "")
+            await callback_query.answer("User analytics feature coming soon!", show_alert=True)
+            
+        elif data == "video_help":
+            help_text = (
+                "<b>🎬 Video Generation Help</b>\n\n"
+                "<b>Commands:</b>\n"
+                "• <code>/video &lt;prompt&gt;</code> - Generate a video\n"
+                "• <code>/token</code> - Check your balance\n\n"
+                "<b>Cost:</b> 10 tokens per video\n\n"
+                "<b>Tips:</b>\n"
+                "• Use descriptive prompts\n"
+                "• Include lighting and mood\n"
+                "• Specify camera angles\n"
+                "• Keep prompts under 500 characters\n\n"
+                "<b>Examples:</b>\n"
+                "• <i>A serene lake at sunset with mountains</i>\n"
+                "• <i>Futuristic city with flying cars at night</i>"
+            )
+            await callback_query.message.edit_text(
+                help_text,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_menu")]
+                ]),
+                parse_mode=ParseMode.HTML
+            )
+            
         else:
             await callback_query.answer("Unknown action", show_alert=True)
             
