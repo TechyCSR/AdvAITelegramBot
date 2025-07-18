@@ -12,6 +12,7 @@ from google.cloud import storage
 from database import user_db
 from threading import Lock
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,15 +20,13 @@ logger = logging.getLogger(__name__)
 
 # Configurable pricing and settings
 TOKEN_PRICE_RS = 9  # Rs 9 for 10 tokens
-TOKENS_PER_VIDEO = 10
+TOKENS_PER_VIDEO = 10  # All videos cost 10 tokens now
 VIDEO_LENGTH_SECONDS = 8
 MAX_CONCURRENT_GENERATIONS = 3
 MAX_QUEUE_SIZE = 50
 
 class VideoQuality(Enum):
-    STANDARD = "standard"
-    HD = "hd"
-    PREMIUM = "premium"
+    PREMIUM = "premium"  # Only Premium quality now
 
 class VideoStatus(Enum):
     QUEUED = "queued"
@@ -57,11 +56,9 @@ class VideoRequest:
         if self.created_at is None:
             self.created_at = datetime.now()
 
-# Enhanced token costs based on quality
+# Enhanced token costs - all videos cost 10 tokens now
 QUALITY_TOKEN_COSTS = {
-    VideoQuality.STANDARD: 10,
-    VideoQuality.HD: 15,
-    VideoQuality.PREMIUM: 25
+    VideoQuality.PREMIUM: 10
 }
 
 # Global video generation queue and tracking
@@ -94,12 +91,22 @@ async def get_user_tokens(user_id: int) -> int:
 async def add_user_tokens(user_id: int, tokens: int) -> bool:
     """Add tokens to user's balance."""
     try:
+        if not isinstance(user_id, int) or not isinstance(tokens, int):
+            logger.error(f"Invalid parameters: user_id={user_id}, tokens={tokens}")
+            return False
+            
+        if tokens <= 0:
+            logger.error(f"Cannot add non-positive tokens: {tokens}")
+            return False
+            
         users_collection = user_db.get_user_collection()
         user = users_collection.find_one({"user_id": user_id})
         if not user:
             users_collection.insert_one({"user_id": user_id, "video_tokens": tokens})
         else:
             users_collection.update_one({"user_id": user_id}, {"$inc": {"video_tokens": tokens}})
+        
+        logger.info(f"Added {tokens} tokens to user {user_id}")
         return True
     except Exception as e:
         logger.error(f"Error adding tokens for user {user_id}: {e}")
@@ -108,14 +115,27 @@ async def add_user_tokens(user_id: int, tokens: int) -> bool:
 async def remove_user_tokens(user_id: int, tokens: int) -> bool:
     """Remove tokens from user's balance."""
     try:
+        if not isinstance(user_id, int) or not isinstance(tokens, int):
+            logger.error(f"Invalid parameters: user_id={user_id}, tokens={tokens}")
+            return False
+            
+        if tokens <= 0:
+            logger.error(f"Cannot remove non-positive tokens: {tokens}")
+            return False
+            
         users_collection = user_db.get_user_collection()
         user = users_collection.find_one({"user_id": user_id})
         if not user:
             users_collection.insert_one({"user_id": user_id, "video_tokens": 0})
             return False
-        if user.get("video_tokens", 0) < tokens:
+            
+        current_tokens = user.get("video_tokens", 0)
+        if current_tokens < tokens:
+            logger.warning(f"User {user_id} has insufficient tokens: {current_tokens} < {tokens}")
             return False
+            
         users_collection.update_one({"user_id": user_id}, {"$inc": {"video_tokens": -tokens}})
+        logger.info(f"Removed {tokens} tokens from user {user_id}")
         return True
     except Exception as e:
         logger.error(f"Error removing tokens for user {user_id}: {e}")
@@ -124,6 +144,9 @@ async def remove_user_tokens(user_id: int, tokens: int) -> bool:
 async def enhance_prompt_with_ai(prompt: str) -> str:
     """Enhance user prompt with AI to improve video quality."""
     try:
+        if not prompt or not isinstance(prompt, str):
+            return prompt
+            
         enhancement_prompt = f"""
         Enhance this video generation prompt to be more descriptive and cinematic while keeping the core idea:
         
@@ -187,29 +210,33 @@ async def get_user_active_requests(user_id: int) -> List[VideoRequest]:
 
 async def cancel_request(request_id: str, user_id: int) -> bool:
     """Cancel a video generation request."""
-    async with queue_lock:
-        # Check queue first
-        for i, req in enumerate(video_queue):
-            if req.request_id == request_id and req.user_id == user_id:
-                req.status = VideoStatus.CANCELLED
-                video_queue.pop(i)
-                # Refund tokens
-                token_cost = QUALITY_TOKEN_COSTS[req.quality]
-                await add_user_tokens(user_id, token_cost)
-                logger.info(f"Cancelled queued request {request_id}")
-                return True
+    try:
+        async with queue_lock:
+            # Check queue first
+            for i, req in enumerate(video_queue):
+                if req.request_id == request_id and req.user_id == user_id:
+                    req.status = VideoStatus.CANCELLED
+                    video_queue.pop(i)
+                    # Refund tokens
+                    token_cost = QUALITY_TOKEN_COSTS[req.quality]
+                    await add_user_tokens(user_id, token_cost)
+                    logger.info(f"Cancelled queued request {request_id}")
+                    return True
+            
+            # Check active generations
+            if request_id in active_generations:
+                req = active_generations[request_id]
+                if req.user_id == user_id:
+                    req.status = VideoStatus.CANCELLED
+                    # Note: Active generations can't be easily cancelled, 
+                    # but we mark them as cancelled for UI purposes
+                    logger.info(f"Marked active request {request_id} as cancelled")
+                    return True
         
-        # Check active generations
-        if request_id in active_generations:
-            req = active_generations[request_id]
-            if req.user_id == user_id:
-                req.status = VideoStatus.CANCELLED
-                # Note: Active generations can't be easily cancelled, 
-                # but we mark them as cancelled for UI purposes
-                logger.info(f"Marked active request {request_id} as cancelled")
-                return True
-    
-    return False
+        return False
+    except Exception as e:
+        logger.error(f"Error cancelling request {request_id}: {e}")
+        return False
 
 async def process_video_queue():
     """Background task to process the video generation queue."""
@@ -244,25 +271,18 @@ async def generate_video_internal(request: VideoRequest):
         request.status = VideoStatus.PROCESSING
         request.started_at = datetime.now()
         
-        # Enhance prompt if requested
-        if request.quality in [VideoQuality.HD, VideoQuality.PREMIUM]:
-            request.enhanced_prompt = await enhance_prompt_with_ai(request.prompt)
-            final_prompt = request.enhanced_prompt
-        else:
-            final_prompt = request.prompt
+        # Always enhance prompt for Premium quality
+        request.enhanced_prompt = await enhance_prompt_with_ai(request.prompt)
+        final_prompt = request.enhanced_prompt if request.enhanced_prompt else request.prompt
         
         client = genai.Client()
         start_time = time.time()
         
-        # Configure generation based on quality
+        # Configure generation
         config_params = {
             "aspect_ratio": request.aspect_ratio,
             "output_gcs_uri": "gs://techycsr/test_vdo_output"
         }
-        
-        if request.quality == VideoQuality.PREMIUM:
-            # Premium quality settings (when available)
-            pass
         
         operation = client.models.generate_videos(
             model="veo-3.0-generate-preview",
@@ -273,13 +293,17 @@ async def generate_video_internal(request: VideoRequest):
         # Monitor progress
         while not operation.done:
             await asyncio.sleep(15)
-            operation = client.operations.get(operation)
-            # Update progress (simplified - real progress would need operation details)
-            request.progress = min(request.progress + 10, 90)
+            try:
+                operation = client.operations.get(operation)
+                # Update progress (simplified - real progress would need operation details)
+                request.progress = min(request.progress + 10, 90)
+            except Exception as e:
+                logger.warning(f"Error checking operation status: {e}")
+                continue
         
         request.generation_time = time.time() - start_time
         
-        if operation.response:
+        if operation.response and hasattr(operation.result, 'generated_videos') and operation.result.generated_videos:
             video_uri = operation.result.generated_videos[0].video.uri
             
             # Download video
@@ -287,6 +311,10 @@ async def generate_video_internal(request: VideoRequest):
             match = re.match(r'gs://([^/]+)/(.+)', video_uri)
             if match:
                 bucket_name, blob_name = match.groups()
+                
+                # Ensure directory exists
+                os.makedirs('generated_images', exist_ok=True)
+                
                 storage_client = storage.Client()
                 bucket = storage_client.bucket(bucket_name)
                 blob = bucket.blob(blob_name)
@@ -303,7 +331,7 @@ async def generate_video_internal(request: VideoRequest):
             else:
                 raise Exception("Failed to parse GCS URI")
         else:
-            raise Exception("Video generation failed - no response")
+            raise Exception("Video generation failed - no response or empty result")
             
     except Exception as e:
         request.status = VideoStatus.FAILED
@@ -312,7 +340,11 @@ async def generate_video_internal(request: VideoRequest):
         
         # Refund tokens on failure
         token_cost = QUALITY_TOKEN_COSTS[request.quality]
-        await add_user_tokens(request.user_id, token_cost)
+        refund_success = await add_user_tokens(request.user_id, token_cost)
+        if refund_success:
+            logger.info(f"Refunded {token_cost} tokens to user {request.user_id} for failed request")
+        else:
+            logger.error(f"Failed to refund tokens to user {request.user_id} for failed request")
         
         logger.error(f"Video generation failed for request {request.request_id}: {e}")
     
@@ -324,11 +356,23 @@ async def generate_video_internal(request: VideoRequest):
 async def create_video_request(
     user_id: int, 
     prompt: str, 
-    quality: VideoQuality = VideoQuality.STANDARD,
+    quality: VideoQuality = VideoQuality.PREMIUM,
     aspect_ratio: str = "16:9"
 ) -> Tuple[Optional[str], Optional[str]]:
     """Create a new video generation request."""
     try:
+        # Validate inputs
+        if not isinstance(user_id, int):
+            return None, "Invalid user ID"
+            
+        if not prompt or not isinstance(prompt, str) or len(prompt.strip()) < 3:
+            return None, "Invalid prompt. Must be at least 3 characters."
+            
+        if len(prompt) > 500:
+            return None, "Prompt too long. Maximum 500 characters."
+            
+        prompt = prompt.strip()
+        
         # Check if user has enough tokens
         token_cost = QUALITY_TOKEN_COSTS[quality]
         user_tokens = await get_user_tokens(user_id)
@@ -365,34 +409,38 @@ async def create_video_request(
 
 async def get_request_status(request_id: str) -> Optional[Dict[str, Any]]:
     """Get the status of a video generation request."""
-    # Check active generations first
-    if request_id in active_generations:
-        request = active_generations[request_id]
-        return {
-            "request_id": request.request_id,
-            "status": request.status.value,
-            "progress": request.progress,
-            "queue_position": 0,  # Currently processing
-            "estimated_time": max(0, 120 - (time.time() - request.started_at.timestamp())) if request.started_at else 120,
-            "quality": request.quality.value,
-            "enhanced_prompt": request.enhanced_prompt
-        }
-    
-    # Check queue
-    async with queue_lock:
-        for i, request in enumerate(video_queue):
-            if request.request_id == request_id:
-                return {
-                    "request_id": request.request_id,
-                    "status": request.status.value,
-                    "progress": 0,
-                    "queue_position": i + 1,
-                    "estimated_time": (i + 1) * 120 + len(active_generations) * 60,
-                    "quality": request.quality.value,
-                    "enhanced_prompt": None
-                }
-    
-    return None
+    try:
+        # Check active generations first
+        if request_id in active_generations:
+            request = active_generations[request_id]
+            return {
+                "request_id": request.request_id,
+                "status": request.status.value,
+                "progress": request.progress,
+                "queue_position": 0,  # Currently processing
+                "estimated_time": max(0, 120 - (time.time() - request.started_at.timestamp())) if request.started_at else 120,
+                "quality": request.quality.value,
+                "enhanced_prompt": request.enhanced_prompt
+            }
+        
+        # Check queue
+        async with queue_lock:
+            for i, request in enumerate(video_queue):
+                if request.request_id == request_id:
+                    return {
+                        "request_id": request.request_id,
+                        "status": request.status.value,
+                        "progress": 0,
+                        "queue_position": i + 1,
+                        "estimated_time": (i + 1) * 120 + len(active_generations) * 60,
+                        "quality": request.quality.value,
+                        "enhanced_prompt": None
+                    }
+        
+        return None
+    except Exception as e:
+        logger.error(f"Error getting request status for {request_id}: {e}")
+        return None
 
 # Legacy function for backwards compatibility
 async def generate_video_for_user(user_id: int, prompt: str, output_gcs_uri: str) -> Tuple[Optional[str], Any]:
