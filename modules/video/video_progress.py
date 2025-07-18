@@ -154,34 +154,10 @@ class InteractiveVideoProgress:
         self.update_count = 0
         self.is_cancelled = False
         
-    async def show_queue_status(self, position: int, estimated_time: int):
-        """Show queue position and estimated wait time."""
-        wait_emoji = ["⏳", "⌛", "⏰", "🕐"][self.animator.animation_frame % 4]
-        
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_video_{self.request_id}"),
-                InlineKeyboardButton("🔄 Refresh", callback_data=f"refresh_status_{self.request_id}")
-            ]
-        ])
-        
-        text = (
-            f"<b>{wait_emoji} Video Request Queued</b>\n\n"
-            f"<code>{self.prompt[:60]}{'...' if len(self.prompt) > 60 else ''}</code>\n\n"
-            f"<b>📍 Queue Position:</b> <code>#{position}</code>\n"
-            f"<b>⏱️ Estimated Wait:</b> <code>{estimated_time // 60}m {estimated_time % 60}s</code>\n\n"
-            f"<i>💡 Your video will start processing soon!</i>"
-        )
-        
-        try:
-            await self.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-        except (FloodWait, MessageNotModified):
-            pass
-        
-        self.animator.update_animation()
+
     
     async def show_progress(self, progress: int, stage_info: Dict[str, Any]):
-        """Show enhanced progress with animations and tips."""
+        """Show enhanced progress with animations and tips - with better error handling."""
         try:
             self.animator.update_animation()
             current_stage = self.animator.get_current_stage(progress)
@@ -202,35 +178,47 @@ class InteractiveVideoProgress:
                 self.last_tip_index = (self.last_tip_index + 1) % len(tips)
             current_tip = tips[self.last_tip_index]
             
-            # Enhanced progress message
+            # Enhanced progress message with percentage focus
             text = (
                 f"<b>{animated_emoji} {current_stage['name']}</b>\n"
                 f"<i>{current_stage['description']}</i>\n\n"
-                f"<code>{self.prompt[:50]}{'...' if len(self.prompt) > 50 else ''}</code>\n\n"
+                f"<b>📝 Prompt:</b> <code>{self.prompt[:80]}{'...' if len(self.prompt) > 80 else ''}</code>\n\n"
                 f"<code>[{progress_bar}]</code> <b>{progress}%</b>\n\n"
                 f"<b>⏱️ Time:</b> <code>{elapsed}s elapsed, ~{remaining}s remaining</code>\n"
                 f"<b>💡 Tip:</b> <i>{current_tip}</i>\n\n"
-                f"<b>🎯 Status:</b> <code>{stage_info.get('status', 'Processing')}</code>"
+                f"<b>🎯 Status:</b> <code>Generating your amazing video...</code>"
             )
             
-            # Add interactive buttons
+            # Add progress button that shows completion percentage
             keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_video_{self.request_id}"),
-                    InlineKeyboardButton("📊 Stats", callback_data=f"video_stats_{self.request_id}")
-                ]
+                [InlineKeyboardButton(f"📊 {progress}% Completed", callback_data=f"progress_check_{self.request_id}")],
+                [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_video_{self.request_id}")]
             ])
             
-            await self.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-            self.update_count += 1
+            # Try to edit the message with better error handling
+            try:
+                await self.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+                self.update_count += 1
+            except MessageNotModified:
+                # Content is the same, just update the button percentage
+                try:
+                    new_keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"📊 {progress}% Completed", callback_data=f"progress_check_{self.request_id}")],
+                        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_video_{self.request_id}")]
+                    ])
+                    await self.message.edit_reply_markup(reply_markup=new_keyboard)
+                    self.update_count += 1
+                except Exception as e:
+                    # If we can't update anything, just continue
+                    print(f"Progress keyboard update error: {e}")
+            except Exception as e:
+                print(f"Progress message update error: {e}")
             
         except FloodWait as e:
             await asyncio.sleep(e.value)
-        except MessageNotModified:
-            pass
         except Exception as e:
             print(f"Progress update error: {e}")
-    
+
     async def show_completion(self, local_path: str, generation_time: float, enhanced_prompt: Optional[str] = None):
         """Show completion message with download options."""
         completion_emojis = ["🎉", "✅", "🏆", "🌟"]
@@ -238,31 +226,28 @@ class InteractiveVideoProgress:
         
         text = (
             f"<b>{emoji} Video Generation Complete!</b>\n\n"
-            f"<code>{self.prompt[:60]}{'...' if len(self.prompt) > 60 else ''}</code>\n\n"
+            f"<b>📝 Prompt:</b> <code>{self.prompt[:80]}{'...' if len(self.prompt) > 80 else ''}</code>\n\n"
+            f"<b>📊 Progress:</b> <code>100%</code> ✅\n"
             f"<b>⏱️ Generation Time:</b> <code>{generation_time:.1f}s</code>\n"
-            f"<b>📁 File:</b> <code>Ready for download</code>\n"
+            f"<b>📁 Status:</b> <code>Ready for delivery</code>\n\n"
+            f"<i>🎬 Your masterpiece is ready!</i>"
         )
         
-        if enhanced_prompt:
-            text += f"<b>✨ Enhanced Prompt:</b>\n<i>{enhanced_prompt[:100]}{'...' if len(enhanced_prompt) > 100 else ''}</i>\n"
-        
-        text += "\n<i>🎬 Your masterpiece is ready!</i>"
-        
         keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🔄 Generate Another", callback_data="new_video_generation"),
-                InlineKeyboardButton("📊 Analytics", callback_data=f"video_analytics_{self.request_id}")
-            ],
-            [
-                InlineKeyboardButton("💳 Buy More Tokens", callback_data="show_plans")
-            ]
+            [InlineKeyboardButton("✅ 100% Completed", callback_data=f"progress_check_{self.request_id}")]
         ])
         
         try:
             await self.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        except MessageNotModified:
+            # Try to update just the keyboard
+            try:
+                await self.message.edit_reply_markup(reply_markup=keyboard)
+            except Exception as e:
+                print(f"Completion keyboard update error: {e}")
         except Exception as e:
             print(f"Completion update error: {e}")
-    
+
     async def show_error(self, error_message: str):
         """Show error message with retry options."""
         error_emojis = ["❌", "😞", "💔", "😔"]
@@ -270,19 +255,14 @@ class InteractiveVideoProgress:
         
         text = (
             f"<b>{emoji} Generation Failed</b>\n\n"
-            f"<code>{self.prompt[:60]}{'...' if len(self.prompt) > 60 else ''}</code>\n\n"
+            f"<b>📝 Prompt:</b> <code>{self.prompt[:80]}{'...' if len(self.prompt) > 80 else ''}</code>\n\n"
             f"<b>❗ Error:</b> <code>{error_message}</code>\n\n"
             f"<i>💡 Don't worry! Your tokens have been refunded.</i>"
         )
         
         keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_video_{self.prompt}"),
-                InlineKeyboardButton("✏️ Edit Prompt", callback_data="new_video_generation")
-            ],
-            [
-                InlineKeyboardButton("🆘 Get Help", callback_data="video_help")
-            ]
+            [InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_video_{self.prompt}")],
+            [InlineKeyboardButton("🆘 Get Help", callback_data="video_help")]
         ])
         
         try:
@@ -296,7 +276,7 @@ async def create_interactive_progress(client: Client, message: Message, prompt: 
 
 async def update_video_progress_enhanced(client: Client, message: Message, prompt: str, request_id: str, status_callback=None):
     """
-    Enhanced video progress tracking with real-time updates and interactivity.
+    Enhanced video progress tracking with real-time percentage updates and modern UI.
     """
     progress_tracker = await create_interactive_progress(client, message, prompt, request_id)
     
@@ -307,7 +287,7 @@ async def update_video_progress_enhanced(client: Client, message: Message, promp
         last_progress = 0
         consecutive_same_progress = 0
         max_updates = 100  # Prevent infinite loops
-        update_interval = 2.0  # Base update interval
+        update_interval = 3.0  # Standard update interval
         
         for update_count in range(max_updates):
             # Get current status
@@ -319,16 +299,10 @@ async def update_video_progress_enhanced(client: Client, message: Message, promp
             current_status = status["status"]
             progress = status.get("progress", 0)
             
-            # Handle different states
-            if current_status == "queued":
-                queue_pos = status.get("queue_position", 1)
-                estimated_time = status.get("estimated_time", 120)
-                await progress_tracker.show_queue_status(queue_pos, estimated_time)
-                update_interval = 5.0  # Slower updates for queue
-                
-            elif current_status == "processing":
+            # Handle different states - simplified, no queue
+            if current_status == "processing":
                 await progress_tracker.show_progress(progress, status)
-                update_interval = 2.0 if progress < 50 else 3.0  # Adaptive interval
+                update_interval = 3.0  # Consistent update interval
                 
             elif current_status == "completed":
                 # Get additional completion info if available
@@ -349,11 +323,11 @@ async def update_video_progress_enhanced(client: Client, message: Message, promp
             # Detect stuck progress
             if progress == last_progress:
                 consecutive_same_progress += 1
-                if consecutive_same_progress > 10:  # If stuck for too long
-                    update_interval = min(update_interval * 1.2, 10.0)  # Slow down updates
+                if consecutive_same_progress > 8:  # If stuck for too long
+                    update_interval = min(update_interval * 1.1, 5.0)  # Slightly slow down updates
             else:
                 consecutive_same_progress = 0
-                update_interval = 2.0  # Reset to normal speed
+                update_interval = 3.0  # Reset to normal speed
             
             last_progress = progress
             

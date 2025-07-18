@@ -11,11 +11,11 @@ from pyrogram.errors import MessageTooLong
 
 from modules.video.video_generation import (
     get_user_tokens, add_user_tokens, remove_user_tokens, 
-    create_video_request, get_request_status, cancel_request,
+    generate_video_direct, get_request_status, cancel_request,
     get_user_active_requests, VideoQuality, QUALITY_TOKEN_COSTS,
     TOKENS_PER_VIDEO, enhance_prompt_with_ai
 )
-from modules.video.video_progress import update_video_progress_enhanced, create_interactive_progress
+# Removed video progress imports since we're using direct generation
 from config import LOG_CHANNEL, ADMINS
 import logging
 
@@ -85,22 +85,22 @@ class VideoGenerationUI:
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
-    def create_user_dashboard_keyboard(user_id: int) -> InlineKeyboardMarkup:
-        """Create user dashboard with quick actions."""
-        return InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🎬 New Video", callback_data="new_video_generation"),
-                InlineKeyboardButton("📊 My Requests", callback_data=f"user_requests_{user_id}")
-            ],
-            [
-                InlineKeyboardButton("💳 Token Balance", callback_data=f"check_tokens_{user_id}"),
-                InlineKeyboardButton("🛒 Buy Tokens", callback_data="show_plans")
-            ],
-            [
-                InlineKeyboardButton("📈 Analytics", callback_data=f"user_analytics_{user_id}"),
-                InlineKeyboardButton("❓ Help", callback_data="video_help")
-            ]
+    def create_user_dashboard_keyboard(user_id: int, show_new_video: bool = True) -> InlineKeyboardMarkup:
+        """Create user dashboard with quick actions - simplified."""
+        keyboard_rows = []
+        
+        # First row - just token balance and buy tokens
+        keyboard_rows.append([
+            InlineKeyboardButton("💳 Token Balance", callback_data=f"check_tokens_{user_id}"),
+            InlineKeyboardButton("🛒 Buy Tokens", callback_data="show_plans")
         ])
+        
+        # Second row - just help
+        keyboard_rows.append([
+            InlineKeyboardButton("❓ Help", callback_data="video_help")
+        ])
+        
+        return InlineKeyboardMarkup(keyboard_rows)
 
 async def video_command_handler(client, message: Message):
     """Enhanced video generation command handler with modern UI."""
@@ -168,26 +168,20 @@ async def video_command_handler(client, message: Message):
         )
 
 async def show_video_generation_menu(client, message: Message):
-    """Show the main video generation menu."""
+    """Show the main video generation menu - simplified."""
     try:
         user_id = message.from_user.id
         tokens = await get_user_tokens(user_id)
         
-        # Get user's active requests
-        active_requests = await get_user_active_requests(user_id)
-        active_count = len(active_requests)
-        
         menu_text = (
-            "<b>🎬 Advanced Video Generation Studio</b>\n\n"
-            f"<b>💎 Your Balance:</b> <code>{tokens} tokens</code>\n"
-            f"<b>🎯 Active Requests:</b> <code>{active_count}/3</code>\n\n"
+            "<b>🎬 AI Video Generation Studio</b>\n\n"
+            f"<b>💎 Your Balance:</b> <code>{tokens} tokens</code>\n\n"
             
             "<b>🚀 Features:</b>\n"
             "• Premium quality videos (10 tokens each)\n"
             "• AI prompt enhancement\n"
             "• Real-time progress tracking\n"
-            "• Queue management\n"
-            "• Custom aspect ratios\n\n"
+            "• Multiple aspect ratios\n\n"
             
             "<b>💡 How to create:</b>\n"
             "<code>/video your creative prompt here</code>\n\n"
@@ -199,7 +193,7 @@ async def show_video_generation_menu(client, message: Message):
             "• <i>Astronaut walking on Mars surface</i>"
         )
         
-        keyboard = VideoGenerationUI.create_user_dashboard_keyboard(user_id)
+        keyboard = VideoGenerationUI.create_user_dashboard_keyboard(user_id, show_new_video=False)
         
         await message.reply_text(menu_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
         
@@ -207,120 +201,118 @@ async def show_video_generation_menu(client, message: Message):
         logger.error(f"Error showing video generation menu: {e}")
         await message.reply_text("❌ Error loading menu. Please try again.")
 
-async def show_quality_selection(client, message: Message, prompt: str):
-    """Show quality selection interface - simplified for Premium only."""
-    try:
-        user_id = message.from_user.id
-        tokens = await get_user_tokens(user_id)
-        
-        quality_text = (
-            f"<b>🎯 Video Generation</b>\n\n"
-            f"<b>Prompt:</b> <code>{prompt[:100]}{'...' if len(prompt) > 100 else ''}</code>\n\n"
-            f"<b>💎 Your Tokens:</b> <code>{tokens}</code>\n\n"
-            f"<b>🏆 Premium Quality - 10 tokens</b>\n"
-            f"✅ 8-second video\n"
-            f"✅ Advanced AI enhancement\n"
-            f"✅ Premium processing\n"
-            f"✅ Priority queue\n\n"
-            f"<i>Ready to generate your video?</i>"
-        )
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎬 Generate Video", callback_data=f"generate_video_{prompt[:50]}")],
-            [InlineKeyboardButton("💳 Buy More Tokens", callback_data="show_plans")]
-        ])
-        
-        try:
-            await message.reply_text(quality_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-        except MessageTooLong:
-            # Truncate prompt if too long
-            short_prompt = prompt[:50] + "..." if len(prompt) > 50 else prompt
-            quality_text = quality_text.replace(prompt[:100], short_prompt)
-            await message.reply_text(quality_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    
-    except Exception as e:
-        logger.error(f"Error showing quality selection: {e}")
-        await message.reply_text("❌ Error loading quality selection. Please try again.")
 
-async def show_quality_comparison(callback_query: CallbackQuery):
-    """Show detailed quality comparison - simplified for Premium only."""
-    try:
-        quality = VideoQuality.PREMIUM
-        desc = QUALITY_DESCRIPTIONS[quality]
-        
-        comparison_text = (
-            f"<b>🏆 Premium Quality Video Generation</b>\n\n"
-            f"<b>{desc['name']}</b>\n"
-            f"<i>{desc['description']}</i>\n\n"
-            f"<b>Cost:</b> {desc['cost']} tokens per video\n\n"
-            f"<b>Features:</b>\n"
-        )
-        
-        for feature in desc['features']:
-            comparison_text += f"  ✅ {feature}\n"
-        
-        comparison_text += (
-            f"\n<b>🎬 What you get:</b>\n"
-            f"• High-quality 8-second videos\n"
-            f"• AI-enhanced prompts for better results\n"
-            f"• Multiple aspect ratio options\n"
-            f"• Fast processing with priority queue\n"
-            f"• Professional-grade output\n\n"
-            f"<i>All videos are generated with premium quality!</i>"
-        )
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_menu")]
-        ])
-        
-        await callback_query.message.edit_text(
-            comparison_text, 
-            reply_markup=keyboard, 
-            parse_mode=ParseMode.HTML
-        )
-    
-    except Exception as e:
-        logger.error(f"Error showing quality comparison: {e}")
-        await callback_query.answer("Error loading quality comparison.", show_alert=True)
 
 async def process_video_generation(client, message: Message, prompt: str, quality: VideoQuality, aspect_ratio: str = "16:9"):
-    """Process video generation with enhanced features."""
+    """Process video generation with direct generation - no queue system."""
     try:
         user_id = message.from_user.id
         
-        # Create video request
-        request_id, error = await create_video_request(user_id, prompt, quality, aspect_ratio)
-        
-        if error:
-            await message.reply_text(
-                f"<b>❌ Request Failed</b>\n\n"
-                f"<code>{error}</code>\n\n"
-                f"<i>Please try again or contact support.</i>",
-                parse_mode=ParseMode.HTML
-            )
-            return
-        
-        # Show initial status
+        # Show initial status with direct generation approach - no request ID
         status_msg = await message.reply_text(
-            "<b>🎬 Processing Video Request...</b>\n\n"
-            f"<code>Request ID: {request_id}</code>\n"
-            f"<i>Initializing generation system...</i>",
+            "<b>🎬 Starting Video Generation...</b>\n\n"
+            f"<b>📝 Prompt:</b> <code>{prompt[:120]}{'...' if len(prompt) > 120 else ''}</code>\n\n"
+            f"<b>Progress:</b> <code>0%</code> - Initializing...\n\n"
+            f"<i>🚀 Creating your amazing video...</i>",
             parse_mode=ParseMode.HTML
         )
         
-        # Start enhanced progress tracking
+        # Start direct video generation
         try:
-            await update_video_progress_enhanced(client, status_msg, prompt, request_id)
+            # Start generation in background and track progress
+            import asyncio
+            generation_task = asyncio.create_task(
+                generate_video_direct(user_id, prompt, quality, aspect_ratio)
+            )
             
-            # After completion, get final status
-            final_status = await get_request_status(request_id)
+            # Create a temporary request ID for progress tracking
+            temp_request_id = f"temp_{user_id}_{int(time.time())}"
             
-            if final_status and final_status["status"] == "completed":
-                # Send the actual video file
-                await send_completed_video(client, message, request_id, prompt, quality)
+            # Track progress while generation is running
+            progress = 0
+            while not generation_task.done():
+                try:
+                    # Update progress display
+                    progress = min(progress + 5, 95)
+                    
+                    # Determine current stage
+                    if progress < 20:
+                        stage = "Initializing AI systems"
+                        emoji = "🚀"
+                    elif progress < 40:
+                        stage = "Processing your prompt"
+                        emoji = "🧠"
+                    elif progress < 60:
+                        stage = "Generating video content"
+                        emoji = "🎨"
+                    elif progress < 80:
+                        stage = "Adding final touches"
+                        emoji = "✨"
+                    else:
+                        stage = "Almost ready"
+                        emoji = "🎬"
+                    
+                    progress_text = (
+                        f"<b>{emoji} {stage}</b>\n\n"
+                        f"<b>📝 Prompt:</b> <code>{prompt[:100]}{'...' if len(prompt) > 100 else ''}</code>\n\n"
+                        f"<b>Progress:</b> <code>{progress}%</code>\n\n"
+                        f"<i>Creating your amazing video...</i>"
+                    )
+                    
+                    keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"📊 {progress}% Completed", callback_data=f"progress_info_{progress}")]
+                    ])
+                    
+                    try:
+                        await status_msg.edit_text(progress_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+                    except Exception as e:
+                        # If edit fails, just continue
+                        pass
+                    
+                    # Wait before next update
+                    await asyncio.sleep(3)
+                    
+                except Exception as e:
+                    logger.error(f"Error updating progress: {e}")
+                    await asyncio.sleep(2)
+            
+            # Get the result
+            video_path, error, progress_data = await generation_task
+            
+            if error:
+                # Generation failed
+                await status_msg.edit_text(
+                    f"<b>❌ Video Generation Failed</b>\n\n"
+                    f"<b>📝 Prompt:</b> <code>{prompt[:100]}{'...' if len(prompt) > 100 else ''}</code>\n\n"
+                    f"<b>❗ Error:</b> <code>{error}</code>\n\n"
+                    f"<i>💡 Your tokens have been refunded. Please try again.</i>",
+                    parse_mode=ParseMode.HTML
+                )
+                return
+            
+            if video_path and os.path.exists(video_path):
+                # Generation successful - update status to completion
+                await status_msg.edit_text(
+                    f"<b>🎉 Video Generation Complete!</b>\n\n"
+                    f"<b>📝 Prompt:</b> <code>{prompt[:100]}{'...' if len(prompt) > 100 else ''}</code>\n\n"
+                    f"<b>📊 Progress:</b> <code>100%</code> ✅\n\n"
+                    f"<i>🎬 Delivering your masterpiece...</i>",
+                    parse_mode=ParseMode.HTML
+                )
+                
+                # Send the completed video
+                await send_completed_video_direct(client, message, video_path, prompt, quality)
+                
+            else:
+                await status_msg.edit_text(
+                    f"<b>❌ Video File Error</b>\n\n"
+                    f"<b>📝 Prompt:</b> <code>{prompt[:100]}{'...' if len(prompt) > 100 else ''}</code>\n\n"
+                    f"<i>Video was generated but file could not be found. Your tokens have been refunded.</i>",
+                    parse_mode=ParseMode.HTML
+                )
                 
         except Exception as e:
-            logger.error(f"Error in video generation process: {e}")
+            logger.error(f"Error in direct video generation process: {e}")
             await status_msg.edit_text(
                 f"<b>❌ Processing Error</b>\n\n"
                 f"<code>{str(e)}</code>\n\n"
@@ -336,59 +328,53 @@ async def process_video_generation(client, message: Message, prompt: str, qualit
             parse_mode=ParseMode.HTML
         )
 
-async def send_completed_video(client, original_message: Message, request_id: str, prompt: str, quality: VideoQuality):
-    """Send completed video with analytics and options."""
+async def send_completed_video_direct(client, original_message: Message, video_path: str, prompt: str, quality: VideoQuality):
+    """Send completed video directly with simplified options."""
     try:
-        # Find the video file
         user_id = original_message.from_user.id
-        video_path = f'generated_images/generated_video_{user_id}_{request_id}.mp4'
         
-        if not os.path.exists(video_path):
-            await original_message.reply_text(
-                "<b>❌ Video File Not Found</b>\n\n"
-                "<i>The generated video could not be located. Please try again.</i>",
-                parse_mode=ParseMode.HTML
-            )
-            return
-        
-        # Create caption with details
+        # Create caption with details - trim if too long for Telegram - no request ID
         quality_desc = QUALITY_DESCRIPTIONS[quality]
         
-        caption = (
+        # Calculate maximum prompt length (Telegram caption limit is 1024 chars)
+        base_caption = (
             f"<b>🎬 Video Generated Successfully!</b>\n\n"
-            f"<b>📝 Prompt:</b> <code>{prompt[:150]}{'...' if len(prompt) > 150 else ''}</code>\n"
-            f"<b>🏆 Quality:</b> {quality_desc['name']}\n"
-            f"<b>💰 Tokens Used:</b> {quality_desc['cost']}\n"
-            f"<b>🎯 Request ID:</b> <code>{request_id}</code>\n\n"
+            f"<b>📝 Prompt:</b> "
+        )
+        end_caption = (
+            f"\n<b>🏆 Quality:</b> {quality_desc['name']}\n"
+            f"<b>💰 Tokens Used:</b> {quality_desc['cost']}\n\n"
             f"<i>✨ Enjoy your AI-generated masterpiece!</i>"
         )
         
-        # Enhanced keyboard with more options
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🔄 Generate Similar", callback_data=f"generate_similar_{prompt[:50]}"),
-                InlineKeyboardButton("✨ Enhance Prompt", callback_data=f"enhance_prompt_{prompt[:50]}")
-            ],
-            [
-                InlineKeyboardButton("📊 Video Analytics", callback_data=f"video_analytics_{request_id}"),
-                InlineKeyboardButton("💾 Save to Gallery", callback_data=f"save_video_{request_id}")
-            ],
-            [
-                InlineKeyboardButton("🎬 New Video", callback_data="new_video_generation"),
-                InlineKeyboardButton("💳 Buy More Tokens", callback_data="show_plans")
-            ]
-        ])
+        # Calculate available space for prompt
+        available_space = 1024 - len(base_caption) - len(end_caption) - 20  # 20 chars buffer
+        
+        # Trim prompt if necessary
+        if len(prompt) > available_space:
+            trimmed_prompt = prompt[:available_space-3] + "..."
+        else:
+            trimmed_prompt = prompt
+        
+        caption = base_caption + f"<code>{trimmed_prompt}</code>" + end_caption
+        
+        # # Simplified keyboard - just generate similar and buy tokens
+        # keyboard = InlineKeyboardMarkup([
+        #     [
+        #         InlineKeyboardButton("🔄 Generate Similar", callback_data=f"generate_similar_{prompt[:50]}"),
+        #         InlineKeyboardButton("💳 Buy More Tokens", callback_data="show_plans")
+        #     ]
+        # ])
         
         # Send video
         await original_message.reply_video(
             video_path, 
             caption=caption, 
-            reply_markup=keyboard,
             parse_mode=ParseMode.HTML
         )
         
-        # Log to channel
-        await log_video_generation(client, original_message, request_id, prompt, quality)
+        # Log to channel (simplified without request_id)
+        await log_video_generation_direct(client, original_message, prompt, quality)
         
         # Clean up local file
         try:
@@ -405,8 +391,8 @@ async def send_completed_video(client, original_message: Message, request_id: st
             parse_mode=ParseMode.HTML
         )
 
-async def log_video_generation(client, message: Message, request_id: str, prompt: str, quality: VideoQuality):
-    """Enhanced logging to channel."""
+async def log_video_generation_direct(client, message: Message, prompt: str, quality: VideoQuality):
+    """Enhanced logging to channel - simplified."""
     try:
         user = message.from_user
         user_mention = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>" if user else f"User {user.id}"
@@ -414,109 +400,66 @@ async def log_video_generation(client, message: Message, request_id: str, prompt
         log_caption = (
             f"#VideoGenerated #Quality_{quality.value.upper()}\n\n"
             f"<b>👤 User:</b> {user_mention} (ID: <code>{user.id}</code>)\n"
-            f"<b>🎯 Request ID:</b> <code>{request_id}</code>\n"
             f"<b>🏆 Quality:</b> {QUALITY_DESCRIPTIONS[quality]['name']}\n"
             f"<b>💰 Tokens Used:</b> <code>{QUALITY_DESCRIPTIONS[quality]['cost']}</code>\n"
             f"<b>📝 Prompt:</b> <code>{prompt[:200]}{'...' if len(prompt) > 200 else ''}</code>\n"
             f"<b>🕐 Time:</b> <code>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</code>"
         )
         
-        video_path = f'generated_images/generated_video_{user.id}_{request_id}.mp4'
-        
-        if os.path.exists(video_path):
-            await client.send_video(
-                chat_id=LOG_CHANNEL,
-                video=video_path,
-                caption=log_caption,
-                parse_mode=ParseMode.HTML
-            )
-        else:
-            await client.send_message(
-                chat_id=LOG_CHANNEL,
-                text=log_caption + "\n\n<i>❗ Video file not found for logging</i>",
-                parse_mode=ParseMode.HTML
-            )
+        await client.send_message(
+            chat_id=LOG_CHANNEL,
+            text=log_caption,
+            parse_mode=ParseMode.HTML
+        )
             
     except Exception as e:
         logger.error(f"Failed to log video generation: {e}")
 
 # Enhanced callback handlers
 async def video_callback_handler(client, callback_query: CallbackQuery):
-    """Enhanced callback handler for video generation interactions."""
+    """Enhanced callback handler for video generation interactions - simplified."""
     data = callback_query.data
     user_id = callback_query.from_user.id
     
     try:
+        if data.startswith("progress_info_"):
+            progress = data.replace("progress_info_", "")
+            await callback_query.answer(f"🎬 Your video is {progress}% completed. Please keep patience, we're working on it!", show_alert=True)
+            return
+        
+        if data.startswith("progress_check_"):
+            request_id = data.replace("progress_check_", "")
+            
+            # Get current status
+            status = await get_request_status(request_id)
+            
+            if status:
+                progress = status.get("progress", 0)
+                current_status = status["status"]
+                
+                if current_status == "completed":
+                    await callback_query.answer("🎉 Your video is 100% complete and ready!", show_alert=True)
+                elif current_status == "processing":
+                    await callback_query.answer(f"⏳ Your video is {progress}% completed. Please keep patience, we're working on it!", show_alert=True)
+                elif current_status == "failed":
+                    await callback_query.answer("❌ Video generation failed. Your tokens have been refunded.", show_alert=True)
+                else:
+                    await callback_query.answer(f"📊 Current progress: {progress}%. Please wait...", show_alert=True)
+            else:
+                await callback_query.answer("❌ Unable to check progress. Please try again.", show_alert=True)
+            return
+        
         await callback_query.answer()  # Always answer the callback first
         
-        if data.startswith("select_quality_"):
-            quality_str = data.replace("select_quality_", "")
-            quality = VideoQuality(quality_str)
-            
-            # Show aspect ratio selection
-            await show_aspect_ratio_selection(callback_query, quality)
-            
-        elif data.startswith("aspect_ratio_"):
-            aspect_ratio = data.replace("aspect_ratio_", "")
-            # Here we would need to get the stored prompt and quality
-            # For now, ask user to restart the process
-            await callback_query.answer("Please use /video command with your prompt to start generation", show_alert=True)
-            
-        elif data == "quality_comparison":
-            await show_quality_comparison(callback_query)
-            
-        elif data.startswith("check_tokens_"):
+        if data.startswith("check_tokens_"):
             await show_token_balance(callback_query)
             
         elif data == "show_plans":
             await show_enhanced_plans(callback_query)
-            
-        elif data.startswith("cancel_video_"):
-            request_id = data.replace("cancel_video_", "")
-            success = await cancel_request(request_id, user_id)
-            
-            if success:
-                await callback_query.answer("✅ Video generation cancelled and tokens refunded!", show_alert=True)
-            else:
-                await callback_query.answer("❌ Could not cancel request", show_alert=True)
                 
-        elif data.startswith("user_requests_"):
-            await show_user_requests(callback_query)
-            
-        elif data.startswith("video_analytics_"):
-            request_id = data.replace("video_analytics_", "")
-            await show_video_analytics(callback_query, request_id)
-            
-        elif data == "new_video_generation":
-            await callback_query.answer("Use /video <your prompt> to create a new video!", show_alert=False)
-            
-        elif data.startswith("enhance_prompt_"):
-            original_prompt = data.replace("enhance_prompt_", "")
-            await show_prompt_enhancement(callback_query, original_prompt)
-            
-        elif data == "back_to_menu":
-            # Show main menu
-            await show_main_video_menu(callback_query)
-            
         elif data.startswith("generate_similar_"):
             prompt = data.replace("generate_similar_", "")
             await callback_query.answer(f"Use /video {prompt} to generate a similar video!", show_alert=True)
-            
-        elif data.startswith("save_video_"):
-            request_id = data.replace("save_video_", "")
-            await callback_query.answer("Video saved to your gallery! (Feature coming soon)", show_alert=True)
-            
-        elif data.startswith("use_enhanced_"):
-            enhanced_prompt = data.replace("use_enhanced_", "")
-            await callback_query.answer(f"Use /video {enhanced_prompt} to generate with enhanced prompt!", show_alert=True)
-            
-        elif data.startswith("generate_video_"):
-            prompt = data.replace("generate_video_", "")
-            await callback_query.answer(f"Use /video {prompt} to generate this video!", show_alert=True)
-            
-        elif data.startswith("user_analytics_"):
-            user_id_param = data.replace("user_analytics_", "")
-            await callback_query.answer("User analytics feature coming soon!", show_alert=True)
             
         elif data == "video_help":
             help_text = (
@@ -542,6 +485,10 @@ async def video_callback_handler(client, callback_query: CallbackQuery):
                 parse_mode=ParseMode.HTML
             )
             
+        elif data == "back_to_menu":
+            # Show main menu
+            await show_main_video_menu(callback_query)
+            
         else:
             await callback_query.answer("Unknown action", show_alert=True)
             
@@ -549,25 +496,7 @@ async def video_callback_handler(client, callback_query: CallbackQuery):
         logger.error(f"Error handling callback: {e}")
         await callback_query.answer("An error occurred. Please try again.", show_alert=True)
 
-async def show_aspect_ratio_selection(callback_query: CallbackQuery, quality: VideoQuality):
-    """Show aspect ratio selection."""
-    try:
-        quality_desc = QUALITY_DESCRIPTIONS[quality]
-        
-        text = (
-            f"<b>📐 Select Aspect Ratio</b>\n\n"
-            f"<b>Selected Quality:</b> {quality_desc['name']}\n"
-            f"<b>Cost:</b> {quality_desc['cost']} tokens\n\n"
-            f"<b>Choose aspect ratio for your video:</b>"
-        )
-        
-        keyboard = VideoGenerationUI.create_aspect_ratio_keyboard()
-        
-        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    
-    except Exception as e:
-        logger.error(f"Error showing aspect ratio selection: {e}")
-        await callback_query.answer("Error loading aspect ratio selection.", show_alert=True)
+
 
 async def show_token_balance(callback_query: CallbackQuery):
     """Show enhanced token balance information."""
@@ -643,120 +572,25 @@ async def show_enhanced_plans(callback_query: CallbackQuery):
         logger.error(f"Error showing enhanced plans: {e}")
         await callback_query.answer("Error loading plans.", show_alert=True)
 
-async def show_user_requests(callback_query: CallbackQuery):
-    """Show user's active and recent requests."""
-    try:
-        user_id = callback_query.from_user.id
-        active_requests = await get_user_active_requests(user_id)
-        
-        if not active_requests:
-            text = (
-                "<b>📊 Your Video Requests</b>\n\n"
-                "<i>No active requests found.</i>\n\n"
-                "Create your first video with /video command!"
-            )
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🎬 Create Video", callback_data="new_video_generation")]
-            ])
-        else:
-            text = f"<b>📊 Your Active Requests ({len(active_requests)})</b>\n\n"
-            
-            for i, req in enumerate(active_requests[:5], 1):  # Show max 5
-                status_emoji = {
-                    "queued": "⏳",
-                    "processing": "🎬", 
-                    "completed": "✅",
-                    "failed": "❌",
-                    "cancelled": "🚫"
-                }.get(req.status.value, "❓")
-                
-                text += (
-                    f"<b>{i}. {status_emoji} {req.status.value.title()}</b>\n"
-                    f"<code>{req.prompt[:50]}{'...' if len(req.prompt) > 50 else ''}</code>\n"
-                    f"Quality: {req.quality.value.title()}\n\n"
-                )
-            
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Refresh", callback_data=f"user_requests_{user_id}")],
-                [InlineKeyboardButton("🔙 Back", callback_data="back_to_menu")]
-            ])
-        
-        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    
-    except Exception as e:
-        logger.error(f"Error showing user requests: {e}")
-        await callback_query.answer("Error loading user requests.", show_alert=True)
 
-async def show_video_analytics(callback_query: CallbackQuery, request_id: str):
-    """Show analytics for a specific video generation."""
-    try:
-        # This would be enhanced with actual analytics data
-        analytics_text = (
-            f"<b>📈 Video Analytics</b>\n\n"
-            f"<b>🎯 Request ID:</b> <code>{request_id}</code>\n"
-            f"<b>📊 Status:</b> Completed ✅\n"
-            f"<b>⏱️ Generation Time:</b> 2.3 minutes\n"
-            f"<b>🏆 Quality:</b> Premium\n"
-            f"<b>📐 Aspect Ratio:</b> 16:9\n"
-            f"<b>💰 Tokens Used:</b> 10\n"
-            f"<b>🔄 Views:</b> 1\n\n"
-            f"<i>💡 Detailed analytics coming soon!</i>"
-        )
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_menu")]
-        ])
-        
-        await callback_query.message.edit_text(analytics_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-    
-    except Exception as e:
-        logger.error(f"Error showing video analytics: {e}")
-        await callback_query.answer("Error loading analytics.", show_alert=True)
 
-async def show_prompt_enhancement(callback_query: CallbackQuery, original_prompt: str):
-    """Show prompt enhancement suggestions."""
-    try:
-        enhanced = await enhance_prompt_with_ai(original_prompt)
-        
-        enhancement_text = (
-            f"<b>✨ AI Prompt Enhancement</b>\n\n"
-            f"<b>Original:</b>\n<code>{original_prompt}</code>\n\n"
-            f"<b>Enhanced:</b>\n<code>{enhanced}</code>\n\n"
-            f"<i>💡 Enhanced prompts often produce better videos!</i>"
-        )
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎬 Use Enhanced Prompt", callback_data=f"use_enhanced_{enhanced[:50]}")],
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_menu")]
-        ])
-        
-        await callback_query.message.edit_text(enhancement_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
-        
-    except Exception as e:
-        logger.error(f"Error showing prompt enhancement: {e}")
-        await callback_query.answer("Failed to enhance prompt. Please try again.", show_alert=True)
+
 
 async def show_main_video_menu(callback_query: CallbackQuery):
-    """Show the main video generation menu."""
+    """Show the main video generation menu - simplified."""
     try:
         user_id = callback_query.from_user.id
         tokens = await get_user_tokens(user_id)
         
-        # Get user's active requests
-        active_requests = await get_user_active_requests(user_id)
-        active_count = len(active_requests)
-        
         menu_text = (
-            "<b>🎬 Advanced Video Generation Studio</b>\n\n"
-            f"<b>💎 Your Balance:</b> <code>{tokens} tokens</code>\n"
-            f"<b>🎯 Active Requests:</b> <code>{active_count}/3</code>\n\n"
+            "<b>🎬 AI Video Generation Studio</b>\n\n"
+            f"<b>💎 Your Balance:</b> <code>{tokens} tokens</code>\n\n"
             
             "<b>🚀 Features:</b>\n"
             "• Premium quality videos (10 tokens each)\n"
             "• AI prompt enhancement\n"
             "• Real-time progress tracking\n"
-            "• Queue management\n"
-            "• Custom aspect ratios\n\n"
+            "• Multiple aspect ratios\n\n"
             
             "<b>💡 How to create:</b>\n"
             "<code>/video your creative prompt here</code>\n\n"
@@ -768,9 +602,16 @@ async def show_main_video_menu(callback_query: CallbackQuery):
             "• <i>Astronaut walking on Mars surface</i>"
         )
         
-        keyboard = VideoGenerationUI.create_user_dashboard_keyboard(user_id)
+        keyboard = VideoGenerationUI.create_user_dashboard_keyboard(user_id, show_new_video=False)
         
-        await callback_query.message.edit_text(menu_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        try:
+            await callback_query.message.edit_text(menu_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        except Exception as e:
+            if "MESSAGE_NOT_MODIFIED" in str(e):
+                # Message content is the same, just answer the callback
+                pass
+            else:
+                raise e
         
     except Exception as e:
         logger.error(f"Error showing main video menu: {e}")

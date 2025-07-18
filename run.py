@@ -522,19 +522,9 @@ def create_bot_instance(bot_token, bot_index=1):
     @advAiBot.on_callback_query(filters.create(lambda _, __, query: 
         query.data.startswith("check_tokens_") or 
         query.data == "show_plans" or
-        query.data.startswith("select_quality_") or
-        query.data.startswith("aspect_ratio_") or
-        query.data == "quality_comparison" or
-        query.data.startswith("cancel_video_") or
-        query.data.startswith("user_requests_") or
-        query.data.startswith("video_analytics_") or
-        query.data == "new_video_generation" or
-        query.data.startswith("enhance_prompt_") or
         query.data.startswith("generate_similar_") or
-        query.data.startswith("save_video_") or
-        query.data.startswith("use_enhanced_") or
-        query.data.startswith("generate_video_") or
-        query.data.startswith("user_analytics_") or
+        query.data.startswith("progress_check_") or
+        query.data.startswith("progress_info_") or
         query.data == "video_help" or
         query.data == "back_to_menu"
     ))
