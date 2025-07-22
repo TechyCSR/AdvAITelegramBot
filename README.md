@@ -149,228 +149,123 @@ MULTI_BOT = True                        # Enable multi-bot support (one process 
 
 ## 🏗️ System Architecture
 
-The AdvAI Telegram Bot employs a sophisticated, multi-service architecture designed for scalability, reliability, and maintainability.
+A simple, user-friendly architecture that powers all the bot's amazing features.
 
 ```mermaid
-graph TB
-    %% External Services
-    subgraph "External APIs"
-        TG[Telegram Bot API]
-        OPENAI[OpenAI GPT-4o]
-        POLL[Pollinations AI]
-        DEEPINFRA[DeepInfra Chat]
-        GOOGLE[Google OAuth]
+graph TD
+    %% Users
+    USER[👤 Users] 
+    
+    %% User Interfaces - Simplified
+    subgraph "📱 How Users Interact"
+        TELEGRAM[💬 Telegram Chat]
+        WEBAPP[🌐 Web App]  
+        INLINE[⚡ Inline Mode]
     end
-
-    %% User Interfaces
-    subgraph "User Interfaces"
-        TGBOT[Telegram Bot Interface]
-        WEBAPP[Web Application]
-        MINIAPP[Telegram Mini App]
-        INLINE[Inline Mode]
+    
+    %% Main System
+    subgraph "🤖 Main Bot System"
+        BOT[🧠 AI Bot Brain]
+        QUEUE[📋 Request Handler]
     end
-
-    %% Core Bot Services
-    subgraph "Core Bot System"
-        MAIN[Main Bot Process]
-        subgraph "Request Processing"
-            QUEUE[Request Queue System]
-            ASYNC[Async Task Manager]
-            RATELIMIT[Rate Limiting]
-        end
-        subgraph "Service Container"
-            SC[Service Container]
-            DI[Dependency Injection]
-        end
+    
+    %% AI Services - Main Categories Only
+    subgraph "🎯 AI Services"
+        TEXTAI[💭 Text AI<br/>Chat & Responses]
+        IMAGEAI[🎨 Image AI<br/>Generate & Analyze]
+        VOICEAI[🔊 Voice AI<br/>Speech Processing]
+        VIDEOAI[🎬 Video AI<br/>Video Creation]
     end
-
-    %% AI Services Layer
-    subgraph "AI Processing Layer"
-        subgraph "Text AI Services"
-            AIRES[AI Response Handler]
-            CHAT[Chat Management]
-            TRANSLATE[Translation Service]
-            LANG[Language Detection]
-        end
-        subgraph "Image AI Services"
-            IMGGEN[Image Generation]
-            AUTOIMGGEN[Auto Image Detection]
-            INLINEIMG[Inline Image Gen]
-            IMG2TEXT[Image to Text]
-            VISION[Vision Analysis]
-        end
-        subgraph "Audio AI Services"
-            TTS[Text-to-Speech]
-            STT[Speech-to-Text]
-            VOICE[Voice Processing]
-        end
-        subgraph "Video AI Services"
-            VIDEOGEN[Video Generation]
-            VIDEOQUEUE[Video Queue]
-            VIDEOHANDLER[Video Handlers]
-        end
+    
+    %% Core Features
+    subgraph "⚙️ Core Features"
+        USERS[👥 User Management]
+        GROUPS[🏢 Group Features]
+        ADMIN[👑 Admin Tools]
     end
-
-    %% Business Logic Layer
-    subgraph "Business Logic"
-        subgraph "User Management"
-            USERMGMT[User Management]
-            PREMIUM[Premium Management]
-            BANS[Ban Management]
-            SETTINGS[User Settings]
-        end
-        subgraph "Group Management"
-            GROUPSET[Group Settings]
-            GROUPPERM[Group Permissions]
-            GROUPINFO[Group Information]
-        end
-        subgraph "Admin Tools"
-            ADMINCMD[Admin Commands]
-            STATS[Statistics]
-            LOGS[Logging System]
-            MAINTENANCE[Maintenance Mode]
-        end
-        subgraph "Content Management"
-            FEEDBACK[Feedback System]
-            RATING[Rating System]
-            FILEHANDLER[File Processing]
-        end
+    
+    %% External AI Providers
+    subgraph "🌐 AI Providers"
+        GPT[🧠 OpenAI GPT-4o]
+        POLLINATIONS[🎨 Pollinations AI]
+        DEEPINFRA[⚡ DeepInfra]
     end
-
-    %% Data Layer
-    subgraph "Data Persistence"
-        subgraph "MongoDB Collections"
-            USERDB[(User Database)]
-            HISTORYDB[(Chat History)]
-            IMAGEDB[(Image Storage)]
-            STATSDB[(Statistics DB)]
-            FEEDBACKDB[(Feedback DB)]
-            INTERACTIONDB[(User Interactions)]
-        end
-        subgraph "File Storage"
-            GENIMAGES[Generated Images]
-            SESSIONS[Session Files]
-            LOGS_FILES[Log Files]
-            CACHE[Translation Cache]
-        end
+    
+    %% Database
+    subgraph "💾 Data Storage"
+        MONGODB[(🗄️ MongoDB Database)]
+        FILES[📁 Generated Files]
     end
-
-    %% Web Services
-    subgraph "Web Application Layer"
-        subgraph "Flask Web Server"
-            FLASK[Flask Application]
-            AUTH[Authentication Service]
-            WEBAPI[Web API Endpoints]
-        end
-        subgraph "Frontend"
-            HTML[HTML Templates]
-            CSS[Static Assets]
-            JS[JavaScript]
-        end
-    end
-
-    %% Deployment & Infrastructure
-    subgraph "Infrastructure"
-        subgraph "Runtime Environment"
-            PYTHON[Python Runtime]
-            VENV[Virtual Environment]
-            MULTIPROC[Multi-Processing]
-        end
-        subgraph "Deployment Options"
-            DOCKER[Docker Container]
-            SYSTEMD[Systemd Service]
-            VERCEL[Vercel Deployment]
-        end
-    end
-
-    %% Connections - User Interfaces
-    TGBOT --> TG
-    WEBAPP --> GOOGLE
-    MINIAPP --> TG
-    INLINE --> TG
-
-    %% Connections - Main Flow
-    TGBOT --> MAIN
-    WEBAPP --> FLASK
-    MINIAPP --> FLASK
-    INLINE --> MAIN
-
-    %% Connections - Core Processing
-    MAIN --> QUEUE
-    MAIN --> SC
-    QUEUE --> ASYNC
-    QUEUE --> RATELIMIT
-    SC --> DI
-
-    %% Connections - AI Services
-    MAIN --> AIRES
-    MAIN --> IMGGEN
-    MAIN --> TTS
-    MAIN --> VIDEOGEN
-
-    AIRES --> OPENAI
-    AIRES --> DEEPINFRA
-    AIRES --> AUTOIMGGEN
-
-    IMGGEN --> POLL
-    INLINEIMG --> POLL
-    IMG2TEXT --> OPENAI
-    VISION --> OPENAI
-
-    TTS --> OPENAI
-    STT --> OPENAI
-
-    VIDEOGEN --> POLL
-
-    %% Connections - Business Logic
-    MAIN --> USERMGMT
-    MAIN --> GROUPSET
-    MAIN --> ADMINCMD
-    MAIN --> FEEDBACK
-
-    FLASK --> AUTH
-    FLASK --> WEBAPI
-    AUTH --> USERMGMT
-    AUTH --> PREMIUM
-
-    %% Connections - Data Layer
-    AIRES --> HISTORYDB
-    USERMGMT --> USERDB
-    IMGGEN --> IMAGEDB
-    STATS --> STATSDB
-    FEEDBACK --> FEEDBACKDB
-    MAIN --> INTERACTIONDB
-
-    IMGGEN --> GENIMAGES
-    MAIN --> SESSIONS
-    LOGS --> LOGS_FILES
-    TRANSLATE --> CACHE
-
-    %% Connections - Infrastructure
-    MAIN --> PYTHON
-    FLASK --> PYTHON
-    PYTHON --> VENV
-    MAIN --> MULTIPROC
-
-    %% Styling
-    classDef external fill:#ff6b6b,stroke:#d63031,stroke-width:2px,color:#fff
-    classDef interface fill:#74b9ff,stroke:#0984e3,stroke-width:2px,color:#fff
-    classDef core fill:#55a3ff,stroke:#2d3436,stroke-width:2px,color:#fff
-    classDef ai fill:#fd79a8,stroke:#e84393,stroke-width:2px,color:#fff
-    classDef business fill:#fdcb6e,stroke:#e17055,stroke-width:2px,color:#333
-    classDef data fill:#6c5ce7,stroke:#5f3dc4,stroke-width:2px,color:#fff
-    classDef web fill:#00b894,stroke:#00cec9,stroke-width:2px,color:#fff
-    classDef infra fill:#636e72,stroke:#2d3436,stroke-width:2px,color:#fff
-
-    class TG,OPENAI,POLL,DEEPINFRA,GOOGLE external
-    class TGBOT,WEBAPP,MINIAPP,INLINE interface
-    class MAIN,QUEUE,ASYNC,RATELIMIT,SC,DI core
-    class AIRES,CHAT,TRANSLATE,LANG,IMGGEN,AUTOIMGGEN,INLINEIMG,IMG2TEXT,VISION,TTS,STT,VOICE,VIDEOGEN,VIDEOQUEUE,VIDEOHANDLER ai
-    class USERMGMT,PREMIUM,BANS,SETTINGS,GROUPSET,GROUPPERM,GROUPINFO,ADMINCMD,STATS,LOGS,MAINTENANCE,FEEDBACK,RATING,FILEHANDLER business
-    class USERDB,HISTORYDB,IMAGEDB,STATSDB,FEEDBACKDB,INTERACTIONDB,GENIMAGES,SESSIONS,LOGS_FILES,CACHE data
-    class FLASK,AUTH,WEBAPI,HTML,CSS,JS web
-    class PYTHON,VENV,MULTIPROC,DOCKER,SYSTEMD,VERCEL infra
+    
+    %% Simple Connections
+    USER --> TELEGRAM
+    USER --> WEBAPP
+    USER --> INLINE
+    
+    TELEGRAM --> BOT
+    WEBAPP --> BOT
+    INLINE --> BOT
+    
+    BOT --> QUEUE
+    QUEUE --> TEXTAI
+    QUEUE --> IMAGEAI
+    QUEUE --> VOICEAI
+    QUEUE --> VIDEOAI
+    
+    BOT --> USERS
+    BOT --> GROUPS
+    BOT --> ADMIN
+    
+    TEXTAI --> GPT
+    TEXTAI --> DEEPINFRA
+    IMAGEAI --> POLLINATIONS
+    IMAGEAI --> GPT
+    VOICEAI --> GPT
+    VIDEOAI --> POLLINATIONS
+    
+    BOT --> MONGODB
+    IMAGEAI --> FILES
+    VOICEAI --> FILES
+    VIDEOAI --> FILES
+    
+    %% Clean Styling with High Contrast
+    classDef user fill:#2E3440,stroke:#88C0D0,stroke-width:3px,color:#ECEFF4
+    classDef interface fill:#5E81AC,stroke:#81A1C1,stroke-width:3px,color:#ECEFF4
+    classDef system fill:#8FBCBB,stroke:#88C0D0,stroke-width:3px,color:#2E3440
+    classDef ai fill:#EBCB8B,stroke:#D08770,stroke-width:3px,color:#2E3440
+    classDef features fill:#A3BE8C,stroke:#B48EAD,stroke-width:3px,color:#2E3440
+    classDef external fill:#BF616A,stroke:#D08770,stroke-width:3px,color:#ECEFF4
+    classDef data fill:#B48EAD,stroke:#5E81AC,stroke-width:3px,color:#ECEFF4
+    
+    class USER user
+    class TELEGRAM,WEBAPP,INLINE interface
+    class BOT,QUEUE system
+    class TEXTAI,IMAGEAI,VOICEAI,VIDEOAI ai
+    class USERS,GROUPS,ADMIN features
+    class GPT,POLLINATIONS,DEEPINFRA external
+    class MONGODB,FILES data
 ```
+
+
+#### **🎯 Main Components**
+
+| Component | What It Does | Example |
+|-----------|-------------|---------|
+| 💭 **Text AI** | Smart conversations and responses | *"Tell me about space"* → Detailed explanation |
+| 🎨 **Image AI** | Creates and analyzes images | *"/img sunset beach"* → Beautiful beach sunset image |
+| 🔊 **Voice AI** | Speech-to-text and text-to-speech | Voice message → Text transcription |
+| 🎬 **Video AI** | AI-powered video generation | Text prompt → Generated video |
+| 👥 **User Management** | Handles accounts, settings, premium | User preferences, premium features |
+| 🏢 **Group Features** | Group chat functionality | Group settings, permissions |
+| 👑 **Admin Tools** | Bot management and monitoring | Statistics, user management |
+
+#### **💡 Key Benefits**
+- **⚡ Fast**: Smart request handling prevents delays
+- **🧠 Intelligent**: Multiple AI models for best results  
+- **📱 Accessible**: Works on Telegram, web, and inline mode
+- **🔒 Secure**: User data protected in MongoDB database
+- **🎯 Reliable**: Queue system handles high traffic
+- **🌍 Global**: Multi-language support for everyone
 
 ## 🛠️ Setup Guide
 
