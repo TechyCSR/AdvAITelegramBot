@@ -147,14 +147,230 @@ MULTI_BOT = True                        # Enable multi-bot support (one process 
 - **Code/Prompt Snippets:**
   - Code and image generation snippets are always delivered unbroken, using HTML formatting for reliability.
 
-## 🧠 Architecture
+## 🏗️ System Architecture
 
-The bot employs a modern, modular architecture with several key design patterns:
+The AdvAI Telegram Bot employs a sophisticated, multi-service architecture designed for scalability, reliability, and maintainability.
 
-- **💉 Service Container**: Centralized dependency injection for clean, testable code
-- **🔄 Singleton Database Service**: Efficient MongoDB connection pooling
-- **📊 Model-View Pattern**: Separation of data and presentation layers
-- **🔄 Async Processing**: Non-blocking operations for inline queries and image generation
+```mermaid
+graph TB
+    %% External Services
+    subgraph "External APIs"
+        TG[Telegram Bot API]
+        OPENAI[OpenAI GPT-4o]
+        POLL[Pollinations AI]
+        DEEPINFRA[DeepInfra Chat]
+        GOOGLE[Google OAuth]
+    end
+
+    %% User Interfaces
+    subgraph "User Interfaces"
+        TGBOT[Telegram Bot Interface]
+        WEBAPP[Web Application]
+        MINIAPP[Telegram Mini App]
+        INLINE[Inline Mode]
+    end
+
+    %% Core Bot Services
+    subgraph "Core Bot System"
+        MAIN[Main Bot Process]
+        subgraph "Request Processing"
+            QUEUE[Request Queue System]
+            ASYNC[Async Task Manager]
+            RATELIMIT[Rate Limiting]
+        end
+        subgraph "Service Container"
+            SC[Service Container]
+            DI[Dependency Injection]
+        end
+    end
+
+    %% AI Services Layer
+    subgraph "AI Processing Layer"
+        subgraph "Text AI Services"
+            AIRES[AI Response Handler]
+            CHAT[Chat Management]
+            TRANSLATE[Translation Service]
+            LANG[Language Detection]
+        end
+        subgraph "Image AI Services"
+            IMGGEN[Image Generation]
+            AUTOIMGGEN[Auto Image Detection]
+            INLINEIMG[Inline Image Gen]
+            IMG2TEXT[Image to Text]
+            VISION[Vision Analysis]
+        end
+        subgraph "Audio AI Services"
+            TTS[Text-to-Speech]
+            STT[Speech-to-Text]
+            VOICE[Voice Processing]
+        end
+        subgraph "Video AI Services"
+            VIDEOGEN[Video Generation]
+            VIDEOQUEUE[Video Queue]
+            VIDEOHANDLER[Video Handlers]
+        end
+    end
+
+    %% Business Logic Layer
+    subgraph "Business Logic"
+        subgraph "User Management"
+            USERMGMT[User Management]
+            PREMIUM[Premium Management]
+            BANS[Ban Management]
+            SETTINGS[User Settings]
+        end
+        subgraph "Group Management"
+            GROUPSET[Group Settings]
+            GROUPPERM[Group Permissions]
+            GROUPINFO[Group Information]
+        end
+        subgraph "Admin Tools"
+            ADMINCMD[Admin Commands]
+            STATS[Statistics]
+            LOGS[Logging System]
+            MAINTENANCE[Maintenance Mode]
+        end
+        subgraph "Content Management"
+            FEEDBACK[Feedback System]
+            RATING[Rating System]
+            FILEHANDLER[File Processing]
+        end
+    end
+
+    %% Data Layer
+    subgraph "Data Persistence"
+        subgraph "MongoDB Collections"
+            USERDB[(User Database)]
+            HISTORYDB[(Chat History)]
+            IMAGEDB[(Image Storage)]
+            STATSDB[(Statistics DB)]
+            FEEDBACKDB[(Feedback DB)]
+            INTERACTIONDB[(User Interactions)]
+        end
+        subgraph "File Storage"
+            GENIMAGES[Generated Images]
+            SESSIONS[Session Files]
+            LOGS_FILES[Log Files]
+            CACHE[Translation Cache]
+        end
+    end
+
+    %% Web Services
+    subgraph "Web Application Layer"
+        subgraph "Flask Web Server"
+            FLASK[Flask Application]
+            AUTH[Authentication Service]
+            WEBAPI[Web API Endpoints]
+        end
+        subgraph "Frontend"
+            HTML[HTML Templates]
+            CSS[Static Assets]
+            JS[JavaScript]
+        end
+    end
+
+    %% Deployment & Infrastructure
+    subgraph "Infrastructure"
+        subgraph "Runtime Environment"
+            PYTHON[Python Runtime]
+            VENV[Virtual Environment]
+            MULTIPROC[Multi-Processing]
+        end
+        subgraph "Deployment Options"
+            DOCKER[Docker Container]
+            SYSTEMD[Systemd Service]
+            VERCEL[Vercel Deployment]
+        end
+    end
+
+    %% Connections - User Interfaces
+    TGBOT --> TG
+    WEBAPP --> GOOGLE
+    MINIAPP --> TG
+    INLINE --> TG
+
+    %% Connections - Main Flow
+    TGBOT --> MAIN
+    WEBAPP --> FLASK
+    MINIAPP --> FLASK
+    INLINE --> MAIN
+
+    %% Connections - Core Processing
+    MAIN --> QUEUE
+    MAIN --> SC
+    QUEUE --> ASYNC
+    QUEUE --> RATELIMIT
+    SC --> DI
+
+    %% Connections - AI Services
+    MAIN --> AIRES
+    MAIN --> IMGGEN
+    MAIN --> TTS
+    MAIN --> VIDEOGEN
+
+    AIRES --> OPENAI
+    AIRES --> DEEPINFRA
+    AIRES --> AUTOIMGGEN
+
+    IMGGEN --> POLL
+    INLINEIMG --> POLL
+    IMG2TEXT --> OPENAI
+    VISION --> OPENAI
+
+    TTS --> OPENAI
+    STT --> OPENAI
+
+    VIDEOGEN --> POLL
+
+    %% Connections - Business Logic
+    MAIN --> USERMGMT
+    MAIN --> GROUPSET
+    MAIN --> ADMINCMD
+    MAIN --> FEEDBACK
+
+    FLASK --> AUTH
+    FLASK --> WEBAPI
+    AUTH --> USERMGMT
+    AUTH --> PREMIUM
+
+    %% Connections - Data Layer
+    AIRES --> HISTORYDB
+    USERMGMT --> USERDB
+    IMGGEN --> IMAGEDB
+    STATS --> STATSDB
+    FEEDBACK --> FEEDBACKDB
+    MAIN --> INTERACTIONDB
+
+    IMGGEN --> GENIMAGES
+    MAIN --> SESSIONS
+    LOGS --> LOGS_FILES
+    TRANSLATE --> CACHE
+
+    %% Connections - Infrastructure
+    MAIN --> PYTHON
+    FLASK --> PYTHON
+    PYTHON --> VENV
+    MAIN --> MULTIPROC
+
+    %% Styling
+    classDef external fill:#ff6b6b,stroke:#d63031,stroke-width:2px,color:#fff
+    classDef interface fill:#74b9ff,stroke:#0984e3,stroke-width:2px,color:#fff
+    classDef core fill:#55a3ff,stroke:#2d3436,stroke-width:2px,color:#fff
+    classDef ai fill:#fd79a8,stroke:#e84393,stroke-width:2px,color:#fff
+    classDef business fill:#fdcb6e,stroke:#e17055,stroke-width:2px,color:#333
+    classDef data fill:#6c5ce7,stroke:#5f3dc4,stroke-width:2px,color:#fff
+    classDef web fill:#00b894,stroke:#00cec9,stroke-width:2px,color:#fff
+    classDef infra fill:#636e72,stroke:#2d3436,stroke-width:2px,color:#fff
+
+    class TG,OPENAI,POLL,DEEPINFRA,GOOGLE external
+    class TGBOT,WEBAPP,MINIAPP,INLINE interface
+    class MAIN,QUEUE,ASYNC,RATELIMIT,SC,DI core
+    class AIRES,CHAT,TRANSLATE,LANG,IMGGEN,AUTOIMGGEN,INLINEIMG,IMG2TEXT,VISION,TTS,STT,VOICE,VIDEOGEN,VIDEOQUEUE,VIDEOHANDLER ai
+    class USERMGMT,PREMIUM,BANS,SETTINGS,GROUPSET,GROUPPERM,GROUPINFO,ADMINCMD,STATS,LOGS,MAINTENANCE,FEEDBACK,RATING,FILEHANDLER business
+    class USERDB,HISTORYDB,IMAGEDB,STATSDB,FEEDBACKDB,INTERACTIONDB,GENIMAGES,SESSIONS,LOGS_FILES,CACHE data
+    class FLASK,AUTH,WEBAPI,HTML,CSS,JS web
+    class PYTHON,VENV,MULTIPROC,DOCKER,SYSTEMD,VERCEL infra
+```
 
 ## 🛠️ Setup Guide
 
