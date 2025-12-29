@@ -11,13 +11,12 @@ import asyncio
 TEXT_MODEL_HEADING = "AI Text Generation Model"
 IMAGE_MODEL_HEADING = "Image Generation Model"
 
-# Text models - user-facing names (actual models are mapped in ai_res.py)
-# All models are served via Groq/Cerebras backends
+# Text models - user-facing names (actual models are mapped in ai_res.py via Groq)
 TEXT_MODELS = {
     "gpt-4o": "Llama 3.3 70B",           # Groq: llama-3.3-70b-versatile
-    "gpt-4.1": "Llama 3.1 70B",          # Groq: llama-3.1-70b-versatile  
-    "qwen3": "Llama 4 Scout",            # Cerebras: llama-4-scout-17b-16e-instruct
-    "deepseek-r1": "DeepSeek R1"         # Groq: deepseek-r1-distill-llama-70b
+    "gpt-4.1": "Llama 4 Scout",          # Groq: meta-llama/llama-4-scout-17b-16e-instruct  
+    "qwen3": "Qwen 3 32B",               # Groq: qwen/qwen3-32b
+    "deepseek-r1": "Kimi K2"             # Groq: moonshotai/kimi-k2-instruct
 }
 
 IMAGE_MODELS = {

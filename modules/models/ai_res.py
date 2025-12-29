@@ -8,8 +8,7 @@ from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 
-# Import Cerebras and Groq for AI text generation
-from cerebras.cloud.sdk import Cerebras
+# Import Groq for AI text generation
 from groq import Groq
 
 from modules.core.database import get_history_collection
@@ -17,7 +16,7 @@ from modules.chatlogs import user_log, error_log
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL, RESTRICTED_TEXT_MODELS
 from modules.user.premium_management import is_user_premium
-from config import ADMINS, CEREBRAS_API_KEY, GROQ_API_KEY
+from config import ADMINS, GROQ_API_KEY
 from pyrogram.errors import MessageTooLong
 from modules.image.image_generation import generate_images
 from pyrogram.types import InputMediaPhoto
@@ -29,42 +28,27 @@ from modules.core.request_queue import (
 )
 import uuid
 
-# --- Provider mapping ---
-# Maps user-selected models to the actual provider (cerebras or groq)
-PROVIDER_MAP = {
-    "gpt-4o": "groq",        # Use Groq for GPT-4o equivalent
-    "gpt-4.1": "groq",       # Use Groq for GPT-4.1 equivalent
-    "qwen3": "cerebras",     # Use Cerebras for Qwen3
-    "deepseek-r1": "groq"    # Use Groq for DeepSeek
-}
-
-# --- Model mapping for Cerebras ---
-CEREBRAS_MODEL_MAP = {
-    "qwen3": "qwen-3-32b",                  # Qwen 3 32B on Cerebras
-    "default": "llama-3.3-70b"              # Llama 3.3 70B as default
-}
-
 # --- Model mapping for Groq ---
+# All user-selected models are mapped to Groq models
 GROQ_MODEL_MAP = {
-    "gpt-4o": "llama-3.3-70b-versatile",      # High quality versatile model
-    "gpt-4.1": "llama-3.1-70b-versatile",     # Alternative high quality
-    "deepseek-r1": "deepseek-r1-distill-llama-70b",  # DeepSeek model on Groq
+    "gpt-4o": "llama-3.3-70b-versatile",                    # High quality versatile model
+    "gpt-4.1": "meta-llama/llama-4-scout-17b-16e-instruct", # Llama 4 Scout
+    "qwen3": "qwen/qwen3-32b",                               # Qwen 3 32B
+    "deepseek-r1": "moonshotai/kimi-k2-instruct",           # Kimi K2 (alternative to DeepSeek)
     "default": "llama-3.3-70b-versatile"
 }
 
-# Initialize clients
-cerebras_client = Cerebras(api_key=CEREBRAS_API_KEY) if CEREBRAS_API_KEY else None
+# Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
-def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider: str = "groq") -> str:
+def get_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> str:
     """
-    Get a non-streaming response from the AI model using Cerebras or Groq
+    Get a non-streaming response from the AI model using Groq
     
     Args:
         history: Conversation history in the format expected by the AI model
-        model: The user's selected model (mapped to actual provider model)
-        provider: The provider to use (cerebras or groq)
+        model: The user's selected model (mapped to actual Groq model)
         
     Returns:
         String response from the AI model
@@ -79,55 +63,34 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
         
-        # Try Groq first (primary provider), fallback to Cerebras
-        if groq_client:
-            try:
-                actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
-                print(f"Using Groq model: {actual_model} (requested: {model})")
-                
-                response = groq_client.chat.completions.create(
-                    model=actual_model,
-                    messages=history,
-                    temperature=0.7,
-                    max_completion_tokens=4096,
-                    top_p=1
-                )
-                return response.choices[0].message.content
-                
-            except Exception as groq_error:
-                print(f"Groq error: {groq_error}, trying Cerebras...")
-                
-                # Fallback to Cerebras
-                if cerebras_client:
-                    actual_model = CEREBRAS_MODEL_MAP.get(model, CEREBRAS_MODEL_MAP["default"])
-                    print(f"Fallback to Cerebras model: {actual_model}")
-                    
-                    response = cerebras_client.chat.completions.create(
-                        model=actual_model,
-                        messages=history,
-                        max_completion_tokens=4096,
-                        temperature=0.7,
-                        top_p=1
-                    )
-                    return response.choices[0].message.content
-                else:
-                    raise groq_error
-                    
-        elif cerebras_client:
-            # Only Cerebras available
-            actual_model = CEREBRAS_MODEL_MAP.get(model, CEREBRAS_MODEL_MAP["default"])
-            print(f"Using Cerebras model: {actual_model} (requested: {model})")
-            
-            response = cerebras_client.chat.completions.create(
+        if not groq_client:
+            raise Exception("Groq client not configured. Please set GROQ_API_KEY in environment.")
+        
+        # Get the actual Groq model
+        actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
+        print(f"Using Groq model: {actual_model} (requested: {model})")
+        
+        try:
+            response = groq_client.chat.completions.create(
                 model=actual_model,
                 messages=history,
-                max_completion_tokens=4096,
                 temperature=0.7,
+                max_completion_tokens=4096,
                 top_p=1
             )
             return response.choices[0].message.content
-        else:
-            raise Exception("No AI provider configured. Please set GROQ_API_KEY or CEREBRAS_API_KEY in environment.")
+            
+        except Exception as model_error:
+            # Fallback to default model if specific model fails
+            print(f"Model {actual_model} failed: {model_error}, trying default...")
+            response = groq_client.chat.completions.create(
+                model=GROQ_MODEL_MAP["default"],
+                messages=history,
+                temperature=0.7,
+                max_completion_tokens=4096,
+                top_p=1
+            )
+            return response.choices[0].message.content
             
     except Exception as e:
         print(f"Error generating response with model {model}: {e}")
@@ -136,7 +99,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o", provider:
 
 def get_streaming_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> Optional[Generator]:
     """
-    Get a streaming response from the AI model using Groq or Cerebras
+    Get a streaming response from the AI model using Groq
     
     Args:
         history: Conversation history in the format expected by the AI model
@@ -159,40 +122,26 @@ def get_streaming_response(history: List[Dict[str, str]], model: str = "gpt-4o")
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
         
-        # Try Groq for streaming (preferred)
-        if groq_client:
-            actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
-            print(f"Streaming with Groq model: {actual_model}")
-            
-            response = groq_client.chat.completions.create(
-                model=actual_model,
-                messages=history,
-                temperature=0.7,
-                max_completion_tokens=4096,
-                top_p=1,
-                stream=True
-            )
-            return response
-            
-        elif cerebras_client:
-            actual_model = CEREBRAS_MODEL_MAP.get(model, CEREBRAS_MODEL_MAP["default"])
-            print(f"Streaming with Cerebras model: {actual_model}")
-            
-            response = cerebras_client.chat.completions.create(
-                model=actual_model,
-                messages=history,
-                max_completion_tokens=4096,
-                temperature=0.7,
-                top_p=1,
-                stream=True
-            )
-            return response
-        else:
-            raise Exception("No AI provider configured for streaming.")
+        if not groq_client:
+            raise Exception("Groq client not configured.")
+        
+        actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
+        print(f"Streaming with Groq model: {actual_model}")
+        
+        response = groq_client.chat.completions.create(
+            model=actual_model,
+            messages=history,
+            temperature=0.7,
+            max_completion_tokens=4096,
+            top_p=1,
+            stream=True
+        )
+        return response
             
     except Exception as e:
         print(f"Error generating streaming response: {e}")
         return None
+
 
 def sanitize_markdown(text: str) -> str:
     """
@@ -1542,7 +1491,6 @@ async def aires(client: Client, message: Message) -> None:
         is_admin = user_id in ADMINS
         if not is_premium and not is_admin and user_model in RESTRICTED_TEXT_MODELS:
             user_model = DEFAULT_TEXT_MODEL
-        provider = PROVIDER_MAP.get(user_model, "groq")
         model_to_use = user_model
         fallback_used = False
         
@@ -1555,12 +1503,12 @@ async def aires(client: Client, message: Message) -> None:
                 print(f"[DEBUG] Image request detected, using model: {user_model}")
         
         try:
-            ai_response = get_response(history, model=model_to_use, provider=provider)
+            ai_response = get_response(history, model=model_to_use)
         except Exception as e:
             # fallback to default Groq model
             fallback_used = True
             print(f"[DEBUG] Primary model failed, using fallback: {e}")
-            ai_response = get_response(history, model="default", provider="groq")
+            ai_response = get_response(history, model="default")
         
         # Ensure ai_response is a string
         if not isinstance(ai_response, str):
