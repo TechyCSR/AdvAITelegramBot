@@ -27,6 +27,13 @@ MULTIPLE_BOTS = os.environ.get('MULTIPLE_BOTS') or os.getenv("MULTIPLE_BOTS") or
 MULTIPLE_BOTS = MULTIPLE_BOTS.lower() in ["true", "1", "yes", "y"]
 NUM_OF_BOTS = int(os.environ.get('NUM_OF_BOTS') or os.getenv("NUM_OF_BOTS") or "1")
 POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY') or os.getenv("POLLINATIONS_KEY") or "POLLINATIONS_KEY"
+
+# Cerebras API Key for AI text generation
+CEREBRAS_API_KEY = os.environ.get('CEREBRAS_API_KEY') or os.getenv("CEREBRAS_API_KEY") or ""
+
+# Groq API Key for AI text generation  
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY') or os.getenv("GROQ_API_KEY") or ""
+
 video_gen = True  # Set to True to enable video generation feature
 # Set up environment variables for Google GenAI
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT') or os.getenv("GOOGLE_CLOUD_PROJECT") or "GOOGLE_CLOUD_PROJECT"

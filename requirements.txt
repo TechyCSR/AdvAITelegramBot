@@ -17,6 +17,10 @@ pdfplumber>=0.10.0
 python-docx
 dotenv
 
+# AI Providers - Cerebras and Groq
+cerebras-cloud-sdk>=1.0.0
+groq>=0.4.0
+
 # Image and media processing
 Pillow>=10.0.0
 
