@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 AdvAI Image Generator Web Application
-Flask backend server with g4f integration - Serverless Compatible
+Flask backend server with Groq for AI and g4f for images - Serverless Compatible
 Now with Telegram Mini App Authentication
 """
 
@@ -14,13 +14,14 @@ from typing import List, Dict, Any, Optional
 
 # Import config for API keys with fallback
 try:
-    from config import POLLINATIONS_KEY, FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED
+    from config import POLLINATIONS_KEY, FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GROQ_API_KEY
 except ImportError:
     # Fallback for Vercel deployment - get from environment variables
     POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY', '')
     FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
     SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '86400'))
     TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 from flask import Flask, request, jsonify, send_from_directory, Response, session, redirect, url_for
 from flask_cors import CORS
@@ -45,12 +46,18 @@ from telegram_auth import (
 # Import Telegram logging system
 from telegram_logging import log_image_generation, log_error, log_user_activity
 
-# Import g4f directly
+# Import Groq for AI text generation (prompt enhancement)
+from groq import Groq
+
+# Import g4f for image generation
 from g4f.client import Client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize Groq client for prompt enhancement
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
@@ -66,15 +73,18 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Required for Telegram Mini App
 # Serverless-friendly configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
-def generate_ai_response(prompt: str, model: str = "gpt-4o") -> str:
-    """Generate AI response using g4f Client"""
+def generate_ai_response(prompt: str) -> str:
+    """Generate AI response using Groq with llama-3.3-70b-versatile"""
     try:
-        client = Client()
-        history = [{"role": "user", "content": prompt}]
+        if not groq_client:
+            raise Exception("Groq client not configured. Please set GROQ_API_KEY.")
         
-        response = client.chat.completions.create(
-            model=model,
-            messages=history
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_completion_tokens=1024,
+            top_p=1
         )
         return response.choices[0].message.content
     except Exception as e:

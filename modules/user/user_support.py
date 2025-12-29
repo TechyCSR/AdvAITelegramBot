@@ -16,7 +16,7 @@ This versatile AI assistant supports a wide range of capabilities:
 • 💬 Advanced Conversational AI
 • 🌐 Multi-language Support
 
-**Developed by:** [Chandan Singh](https://techycsr.me)
+**Developed by:** [Chandan Singh](https://techycsr.dev)
 **Technology:** Gpt-4, Qwen-3, DeepSeek-R1, Dall-E3, Flux, Flux-Pro
 **Version:** 2.1
 
@@ -84,7 +84,7 @@ async def support_admins_callback(client, callback: CallbackQuery):
 **Chandan Singh** (@techycsr)
 Tech Enthusiast & Student Developer
 
-• **Portfolio:** [techycsr.me](https://techycsr.me)
+• **Portfolio:** [techycsr.dev](https://techycsr.dev)
 • **GitHub:** [TechyCSR](https://github.com/TechyCSR)
 • **Email:** csr.info.in@gmail.com
 
@@ -108,7 +108,7 @@ Feel free to reach out for assistance, feature requests, or to report issues.
         [
             [
                 InlineKeyboardButton(contact_btn, url="https://t.me/techycsr"),
-                InlineKeyboardButton(website_btn, url="https://techycsr.me")
+                InlineKeyboardButton(website_btn, url="https://techycsr.dev")
             ],
             [
                 InlineKeyboardButton(back_btn, callback_data="support")

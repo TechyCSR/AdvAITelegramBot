@@ -27,6 +27,9 @@ LOG_CHANNEL = os.getenv('LOG_CHANNEL') or "-1002842298904"
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or ""
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET') or ""
 
+# Groq API Key for AI text generation (prompt enhancement)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY') or ""
+
 # Database Configuration (MongoDB - same as bot)
 DATABASE_URL = os.getenv('DATABASE_URL') or "mongodb://localhost:27017/"
 
@@ -51,6 +54,9 @@ if os.environ.get('GOOGLE_CLIENT_ID'):
     
 if os.environ.get('GOOGLE_CLIENT_SECRET'):
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+
+if os.environ.get('GROQ_API_KEY'):
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
 
 if os.environ.get('DATABASE_URL'):
     DATABASE_URL = os.environ.get('DATABASE_URL')
