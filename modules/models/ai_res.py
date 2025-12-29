@@ -1256,7 +1256,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
             "• Open Source Projects\n\n"
             "🔗 **Connect with the Developer**:\n"
             "• Telegram: @techycsr\n"
-            "• Website: techycsr.me\n"
+            "• Website: techycsr.dev\n"
             "• GitHub: github.com/techycsr\n\n"
             "• LinkedIn: linkedin.com/in/techycsr\n\n"
             "This bot is one of his many projects showcasing his expertise in AI and bot development."
@@ -1266,7 +1266,7 @@ DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
         "role": "system",
         "content": (
             "Remember: This bot was developed by Chandan Singh (@techycsr) as a demonstration of advanced AI "
-            "capabilities in Telegram. For support or to learn more about the developer, visit techycsr.me "
+            "capabilities in Telegram. For support or to learn more about the developer, visit techycsr.dev "
             "or contact @techycsr on Telegram."
         )
     }
@@ -1396,6 +1396,10 @@ async def aires(client: Client, message: Message) -> None:
         client: Pyrogram client instance
         message: Message from the user
     """
+    # Ignore messages from bots (including the bot itself)
+    if message.from_user and message.from_user.is_bot:
+        return
+    
     if await maintenance_check(message.from_user.id) or not await is_feature_enabled("ai_response"):
         maint_msg = await maintenance_message(message.from_user.id)
         await message.reply(maint_msg)

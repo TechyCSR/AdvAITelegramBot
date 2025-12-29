@@ -23,7 +23,7 @@ async def support_developers_callback(client, callback: CallbackQuery):
 **Chandan Singh** (@techycsr)
 Tech Enthusiast & Student Developer
 
-• **Portfolio:** [techycsr.me](https://techycsr.me)
+• **Portfolio:** [techycsr.dev](https://techycsr.dev)
 • **GitHub:** [TechyCSR](https://github.com/TechyCSR)
 • **Email:** csr.info.in@gmail.com
 • **Specializations:** Python, AI/ML, Telegram Bots, Web Development
@@ -51,7 +51,7 @@ Consider donating to help maintain and improve this bot.
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(portfolio_btn, url="https://techycsr.me"),
+                InlineKeyboardButton(portfolio_btn, url="https://techycsr.dev"),
                 InlineKeyboardButton(github_btn, url="https://github.com/TechyCSR/")
             ],
             [

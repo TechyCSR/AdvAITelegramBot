@@ -284,7 +284,7 @@ about_bot_text = """
 • Handles multiple conversations
 • Regular updates with new features
 
-**Created by [Chandan Singh](https://techycsr.me)** (@techycsr)
+**Created by [Chandan Singh](https://techycsr.dev)** (@techycsr)
 """
 
 group_settings_text = """
@@ -316,7 +316,7 @@ This versatile AI assistant offers numerous capabilities for groups:
 • 💬 Advanced Group Conversations
 • 🌐 Multi-language Support for diverse teams
 
-**Developed by:** [Chandan Singh](https://techycsr.me)
+**Developed by:** [Chandan Singh](https://techycsr.dev)
 **Technology:** GPT-4o and GPT-4o-mini
 **Version:** 2.0
 

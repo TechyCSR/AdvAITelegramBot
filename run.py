@@ -570,6 +570,9 @@ def create_bot_instance(bot_token, bot_index=1):
     # --- MESSAGE HANDLER ---
     @advAiBot.on_message(is_chat_text_filter() & filters.text & filters.private)
     async def handle_message(client, message):
+        # Ignore messages from the bot itself
+        if message.from_user and message.from_user.is_bot:
+            return
         set_last_interaction(message.from_user.id, "text", get_user_interactions_collection())
         if await check_if_banned_and_reply(client, message): # BAN CHECK
             return
@@ -948,6 +951,9 @@ def create_bot_instance(bot_token, bot_index=1):
     # --- VOICE MESSAGE HANDLER ---
     @advAiBot.on_message(filters.voice)
     async def voice(bot, message):
+        # Ignore messages from the bot itself
+        if message.from_user and message.from_user.is_bot:
+            return
         set_last_interaction(message.from_user.id, "voice", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, message): # BAN CHECK
             return
@@ -969,6 +975,9 @@ def create_bot_instance(bot_token, bot_index=1):
     # --- REPLY TO BOT MESSAGE HANDLER (GROUP) ---
     @advAiBot.on_message(is_reply_to_bot_filter() & filters.group & filters.text & is_not_command_filter())
     async def handle_reply_to_bot(bot, message):
+        # Ignore messages from the bot itself
+        if message.from_user and message.from_user.is_bot:
+            return
         set_last_interaction(message.from_user.id, "reply_to_bot", get_user_interactions_collection())
         if await check_if_banned_and_reply(bot, message): # BAN CHECK
             return

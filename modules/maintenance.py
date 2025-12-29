@@ -151,7 +151,7 @@ The system will be back online as soon as possible.
 
 For urgent inquiries, please contact:
 • Developer: @techycsr
-• Website: techycsr.me
+• Website: techycsr.dev
 """
     return await async_translate_to_lang(maintenance_text, user_id)
 

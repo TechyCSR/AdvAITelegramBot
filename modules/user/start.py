@@ -63,7 +63,7 @@ I'm here to make your life easier and more creative. Here's what we can do toget
 ⚙️ **Your Choice:** Switch between models anytime in Settings!
 
 ━━━━━━━━━━━━━━━━━━━━━
-**Built with ❤️ by [Chandan Singh](https://techycsr.me) (@techycsr)**
+**Built with ❤️ by [Chandan Singh](https://techycsr.dev) (@techycsr)**
 
 **Ready to explore? Pick an option below!**
 """
