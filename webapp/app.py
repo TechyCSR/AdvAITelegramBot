@@ -11,13 +11,13 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
+import time
 
 # Import config for API keys with fallback
 try:
-    from config import POLLINATIONS_KEY, FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GROQ_API_KEY
+    from config import FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GROQ_API_KEY
 except ImportError:
     # Fallback for Vercel deployment - get from environment variables
-    POLLINATIONS_KEY = os.environ.get('POLLINATIONS_KEY', '')
     FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
     SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '86400'))
     TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
@@ -49,8 +49,15 @@ from telegram_logging import log_image_generation, log_error, log_user_activity
 # Import Groq for AI text generation (prompt enhancement)
 from groq import Groq
 
-# Import g4f for image generation
-from g4f.client import Client
+# Import g4f for image generation with multi-provider support
+from g4f.client import Client, AsyncClient
+from g4f.Provider import (
+    BlackForestLabs_Flux1Dev,
+    StabilityAI_SD35Large,
+    HuggingFaceInference,
+    DeepseekAI_JanusPro7b,
+    AnyProvider,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -91,74 +98,257 @@ def generate_ai_response(prompt: str) -> str:
         logger.error(f"Error generating AI response: {e}")
         raise
 
-async def generate_images_standalone(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux") -> tuple:
-    """Generate images using g4f Client (async wrapper for sync call)"""
-    # Just call the sync version since g4f Client is synchronous
-    return generate_images_sync(prompt, style, max_images, width, height, model)
+async def generate_images_standalone(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux-dev") -> tuple:
+    """Generate images using multi-provider system (async version)"""
+    return await generate_images_multi_provider(prompt, style, max_images, width, height, model)
 
-def generate_images_sync(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux") -> tuple:
-    """Generate images using g4f Client with Pollinations (flux/dall-e-3)"""
+def generate_images_sync(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux-dev") -> tuple:
+    """Generate images using multi-provider system (sync wrapper)"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        # Style definitions
-        style_definitions = {
-            "default": {"prompt_additions": "ultra realistic, detailed, photographic quality"},
-            "photorealistic": {"prompt_additions": "photorealistic, ultra realistic, detailed, professional photography"},
-            "artistic": {"prompt_additions": "artistic, creative, expressive, painterly style"},
-            "anime": {"prompt_additions": "anime style, manga style, vibrant colors"},
-            "cartoon": {"prompt_additions": "cartoon style, animated, colorful, stylized"},
-            "digital-art": {"prompt_additions": "digital art, concept art, trending on artstation"},
-            "painting": {"prompt_additions": "oil painting, traditional art, brushstrokes, artistic"},
-            "sketch": {"prompt_additions": "pencil sketch, hand drawn, artistic sketch, detailed drawing"}
+        return loop.run_until_complete(
+            generate_images_multi_provider(prompt, style, max_images, width, height, model)
+        )
+    finally:
+        loop.close()
+
+
+# =============================================================================
+# MULTI-PROVIDER IMAGE GENERATION SYSTEM
+# =============================================================================
+
+# Provider configurations - auth-free providers only
+IMAGE_PROVIDERS = [
+    {
+        "name": "BlackForestLabs_Flux1Dev",
+        "provider": BlackForestLabs_Flux1Dev,
+        "models": ["flux-dev", "flux"],
+        "priority": 1,
+        "timeout": 60,
+    },
+    {
+        "name": "AnyProvider",
+        "provider": AnyProvider,
+        "models": ["flux", "flux-dev", "sdxl-turbo", "sd-3.5-large", "flux-schnell"],
+        "priority": 1,
+        "timeout": 60,
+    },
+    {
+        "name": "StabilityAI_SD35Large",
+        "provider": StabilityAI_SD35Large,
+        "models": ["sd-3.5-large"],
+        "priority": 2,
+        "timeout": 60,
+    },
+    {
+        "name": "HuggingFaceInference",
+        "provider": HuggingFaceInference,
+        "models": ["black-forest-labs/FLUX.1-dev", "black-forest-labs/FLUX.1-schnell"],
+        "priority": 2,
+        "timeout": 90,
+    },
+    {
+        "name": "DeepseekAI_JanusPro7b",
+        "provider": DeepseekAI_JanusPro7b,
+        "models": ["janus-pro-7b-image"],
+        "priority": 3,
+        "timeout": 90,
+    },
+]
+
+# Model mapping for legacy and alternative names
+MODEL_PROVIDER_MAP = {
+    "flux": ["BlackForestLabs_Flux1Dev", "AnyProvider"],
+    "flux-dev": ["BlackForestLabs_Flux1Dev", "AnyProvider"],
+    "sd-3.5-large": ["StabilityAI_SD35Large", "AnyProvider"],
+    "sdxl-turbo": ["AnyProvider"],
+    "flux-schnell": ["AnyProvider"],
+}
+
+# Legacy model mapping
+LEGACY_MODEL_MAP = {
+    "dall-e3": "flux-dev",
+    "dall-e-3": "flux-dev",
+    "flux-pro": "flux-dev",
+    "sdxl-1.0": "sd-3.5-large",
+    "turbo": "flux",
+}
+
+# Fallback chains
+MODEL_FALLBACK_CHAIN = {
+    "flux": ["flux-dev", "sd-3.5-large", "flux-schnell"],
+    "flux-dev": ["flux", "sd-3.5-large", "flux-schnell"],
+    "sd-3.5-large": ["flux-dev", "flux", "sdxl-turbo"],
+}
+
+DEFAULT_IMAGE_MODEL = "flux-dev"
+
+
+def normalize_model_name(model: str) -> str:
+    """Convert legacy model names to current equivalents"""
+    if model in LEGACY_MODEL_MAP:
+        new_model = LEGACY_MODEL_MAP[model]
+        logger.info(f"Mapping legacy model '{model}' to '{new_model}'")
+        return new_model
+    return model
+
+
+def get_providers_for_model(model: str) -> list:
+    """Get all provider configs that support a given model"""
+    provider_names = MODEL_PROVIDER_MAP.get(model, [])
+    providers = []
+    for p in IMAGE_PROVIDERS:
+        if p["name"] in provider_names:
+            providers.append(p)
+    return sorted(providers, key=lambda x: x["priority"])
+
+
+async def generate_with_single_provider(provider_config: dict, prompt: str, model: str, width: int, height: int) -> tuple:
+    """Generate image with a single provider"""
+    provider_name = provider_config["name"]
+    provider_class = provider_config["provider"]
+    timeout = provider_config["timeout"]
+    
+    logger.info(f"Trying provider: {provider_name} with model {model}")
+    
+    try:
+        client = AsyncClient(image_provider=provider_class)
+        
+        # Build generation kwargs
+        kwargs = {
+            "prompt": prompt,
+            "model": model,
+            "response_format": "url",
         }
         
-        # Get style info and enhance prompt
-        style_info = style_definitions.get(style or "default", style_definitions["default"])
-        enhanced_prompt = f"{prompt}, {style_info['prompt_additions']}"
+        # Add dimensions for providers that support them
+        if provider_name not in ["DeepseekAI_JanusPro7b"]:
+            kwargs["width"] = width
+            kwargs["height"] = height
         
-        logger.info(f"Generating {max_images} images with model '{model}', prompt: {enhanced_prompt[:100]}...")
+        # Generate with timeout
+        response = await asyncio.wait_for(
+            client.images.generate(**kwargs),
+            timeout=timeout
+        )
         
-        # Initialize g4f Client (uses Pollinations by default for image generation)
-        client = Client()
+        if not response or not response.data:
+            return None, f"{provider_name} returned empty response"
         
-        # Generate images one at a time and collect URLs
-        image_urls_list = []
+        # Extract URLs
+        image_urls = []
+        for img_data in response.data:
+            if hasattr(img_data, 'url') and img_data.url:
+                url = img_data.url
+                if url.startswith("http://") or url.startswith("https://"):
+                    image_urls.append(url)
         
-        for i in range(max_images):
-            try:
-                # Generate image using g4f Client
-                # Supported models: 'flux', 'dall-e-3', etc.
-                response = client.images.generate(
-                    model=model,
-                    prompt=enhanced_prompt,
-                    response_format="url"
-                )
-                
-                # Extract URL from response
-                if response and hasattr(response, 'data') and response.data:
-                    image_obj = response.data[0]
-                    if hasattr(image_obj, 'url') and image_obj.url:
-                        image_urls_list.append(image_obj.url)
-                        logger.info(f"Generated image {i+1}: {image_obj.url}")
-                    else:
-                        logger.warning(f"Image {i+1} has no valid URL")
-                else:
-                    logger.warning(f"No data returned for image {i+1}")
-                    
-            except Exception as img_error:
-                logger.error(f"Error generating image {i+1}: {img_error}")
-                # Continue trying to generate remaining images
-                continue
-        
-        if image_urls_list:
-            logger.info(f"Successfully generated {len(image_urls_list)} images")
-            return image_urls_list, None
+        if image_urls:
+            logger.info(f"{provider_name} generated {len(image_urls)} images successfully")
+            return image_urls, None
         else:
-            logger.error("No valid image URLs were returned")
-            return [], "No valid images were generated"
-        
+            return None, f"{provider_name} returned no valid URLs"
+            
+    except asyncio.TimeoutError:
+        logger.warning(f"{provider_name} timed out after {timeout}s")
+        return None, f"{provider_name} timed out"
     except Exception as e:
-        logger.error(f"Error in generate_images_sync: {e}")
-        return [], f"Image generation failed: {str(e)}"
+        logger.error(f"{provider_name} failed: {str(e)}")
+        return None, f"{provider_name} error: {str(e)}"
+
+
+async def generate_images_multi_provider(prompt: str, style: str = None, max_images: int = 1, width: int = 1024, height: int = 1024, model: str = "flux-dev") -> tuple:
+    """
+    Generate images using multi-provider system with automatic fallback.
+    Tries multiple providers concurrently for maximum success rate.
+    """
+    start_time = time.time()
+    
+    # Style definitions
+    style_definitions = {
+        "default": {"prompt_additions": "ultra realistic, detailed, photographic quality"},
+        "photorealistic": {"prompt_additions": "photorealistic, ultra realistic, detailed, professional photography"},
+        "artistic": {"prompt_additions": "artistic, creative, expressive, painterly style"},
+        "anime": {"prompt_additions": "anime style, manga style, vibrant colors"},
+        "cartoon": {"prompt_additions": "cartoon style, animated, colorful, stylized"},
+        "digital-art": {"prompt_additions": "digital art, concept art, trending on artstation"},
+        "painting": {"prompt_additions": "oil painting, traditional art, brushstrokes, artistic"},
+        "sketch": {"prompt_additions": "pencil sketch, hand drawn, artistic sketch, detailed drawing"}
+    }
+    
+    # Enhance prompt with style
+    style_info = style_definitions.get(style or "default", style_definitions["default"])
+    enhanced_prompt = f"{prompt}, {style_info['prompt_additions']}"
+    
+    # Normalize model name (handle legacy models)
+    model = normalize_model_name(model)
+    
+    logger.info(f"Generating {max_images} images with model '{model}', prompt: {enhanced_prompt[:100]}...")
+    
+    # Build list of models to try
+    models_to_try = [model]
+    fallbacks = MODEL_FALLBACK_CHAIN.get(model, [])
+    if not fallbacks and model != DEFAULT_IMAGE_MODEL:
+        models_to_try.append(DEFAULT_IMAGE_MODEL)
+        fallbacks = MODEL_FALLBACK_CHAIN.get(DEFAULT_IMAGE_MODEL, [])
+    models_to_try.extend(fallbacks)
+    
+    all_errors = []
+    
+    for try_model in models_to_try:
+        logger.info(f"Trying model: {try_model}")
+        
+        # Get providers for this model
+        providers = get_providers_for_model(try_model)
+        
+        if not providers:
+            logger.warning(f"No providers available for model {try_model}")
+            continue
+        
+        # Try providers concurrently
+        tasks = []
+        for provider_config in providers:
+            use_model = try_model if try_model in provider_config["models"] else provider_config["models"][0]
+            task = asyncio.create_task(
+                generate_with_single_provider(provider_config, enhanced_prompt, use_model, width, height)
+            )
+            tasks.append((provider_config["name"], task))
+        
+        # Wait for first successful result
+        pending_tasks = [t[1] for t in tasks]
+        task_to_name = {t[1]: t[0] for t in tasks}
+        
+        while pending_tasks:
+            done, pending_tasks = await asyncio.wait(
+                pending_tasks,
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            pending_tasks = list(pending_tasks)
+            
+            for completed_task in done:
+                provider_name = task_to_name.get(completed_task, "Unknown")
+                try:
+                    urls, error = completed_task.result()
+                    if urls:
+                        # Cancel remaining tasks
+                        for task in pending_tasks:
+                            task.cancel()
+                        elapsed = time.time() - start_time
+                        logger.info(f"Success with {provider_name} in {elapsed:.2f}s")
+                        return urls, None
+                    else:
+                        all_errors.append(f"{provider_name}: {error}")
+                except Exception as e:
+                    all_errors.append(f"{provider_name}: {str(e)}")
+    
+    # All providers failed
+    elapsed = time.time() - start_time
+    error_msg = f"All providers failed after {elapsed:.2f}s"
+    if all_errors:
+        error_msg += f". Errors: {'; '.join(all_errors[:3])}"
+    logger.error(error_msg)
+    return [], error_msg
 
 def clean_prompt(prompt: str, style: str = 'default') -> str:
     """Clean and enhance the prompt based on style"""
