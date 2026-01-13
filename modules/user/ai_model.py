@@ -20,17 +20,17 @@ TEXT_MODELS = {
 }
 
 IMAGE_MODELS = {
-    "dall-e3": "DALL-E 3",
-    "flux": "Flux",
-    "flux-pro": "Flux Pro"
+    "flux-dev": "Flux Dev (Quality)",
+    "flux": "Flux (Fast)",
+    "sd-3.5-large": "Stable Diffusion 3.5",
 }
 
 DEFAULT_TEXT_MODEL = "gpt-4o"
-DEFAULT_IMAGE_MODEL = "dall-e3"
+DEFAULT_IMAGE_MODEL = "flux-dev"
 
 # --- Restricted Models ---
 RESTRICTED_TEXT_MODELS = {"gpt-4.1", "qwen3"}
-RESTRICTED_IMAGE_MODELS = {"flux-pro"}
+RESTRICTED_IMAGE_MODELS = set()  # No restricted image models currently
 
 # --- Database Setup ---
 client = MongoClient(DATABASE_URL)

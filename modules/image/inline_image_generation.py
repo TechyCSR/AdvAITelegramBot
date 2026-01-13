@@ -22,8 +22,7 @@ from pyrogram.types import (
 )
 from pyrogram.errors import QueryIdInvalid, MessageNotModified
 
-from g4f.client import AsyncClient 
-from g4f.Provider import PollinationsAI
+from modules.image.multi_provider_image import generate_with_fallback, DEFAULT_IMAGE_MODEL
 from config import LOG_CHANNEL
 from modules.core.request_queue import (
     can_start_image_request, 
@@ -52,7 +51,7 @@ MAX_CACHE_PER_USER = 5  # Maximum number of cached images per user
 temp_query_cache = {}
 
 async def generate_inline_image(prompt: str) -> List[str]:
-    """Generate images for inline query
+    """Generate images for inline query using multi-provider system
     
     Args:
         prompt: The text prompt for image generation
@@ -66,69 +65,27 @@ async def generate_inline_image(prompt: str) -> List[str]:
     enhanced_prompt = f"{prompt}, ultra realistic, detailed, photographic quality"
     logger.info(f"Enhanced inline prompt: '{enhanced_prompt}'")
     
-    image_urls = []
-    max_images = 1  # Only generate one image for inline queries to keep it fast
+    # Use multi-provider system for generation
+    image_urls, error = await generate_with_fallback(
+        prompt=enhanced_prompt,
+        model=DEFAULT_IMAGE_MODEL,
+        width=512,  # Smaller for inline to be faster
+        height=512,
+        num_images=1,
+        try_concurrent=True,
+    )
     
-    # Try with PollinationsAI first, then fallback to default
-    providers = ["PollinationsAI", None]
+    if error:
+        logger.error(f"Inline image generation failed: {error}")
+        return []
     
-    for provider in providers:
-        client = AsyncClient()
-        try:
-            # Prepare provider configuration
-            provider_obj = None
-            model_name = "dall-e-3"  # Default model
-            
-            if provider == "PollinationsAI":
-                try:
-                    provider_obj = PollinationsAI
-                    model_name = None  # PollinationsAI uses its own model
-                    logger.info(f"Using PollinationsAI provider for inline query")
-                except Exception as e:
-                    logger.error(f"Failed to use PollinationsAI provider for inline: {str(e)}")
-                    continue
-            
-            # Standard image size - smaller for inline to be faster
-            width = 512
-            height = 512
-            
-            # Prepare generation parameters
-            generation_kwargs = {
-                "prompt": enhanced_prompt,
-                "n": max_images,
-                "provider": provider_obj,
-                "width": width,
-                "height": height,
-                "quality": "standard"
-            }
-            
-            # Only add model parameter if specified
-            if model_name:
-                generation_kwargs["model"] = model_name
-                
-            # Generate with timeout
-            logger.info(f"Sending inline generation request with provider {provider}")
-            response = await asyncio.wait_for(
-                client.images.async_generate(**generation_kwargs),
-                timeout=25  # Timeout for inline queries
-            )
-            
-            # Process response
-            for image_data in response.data:
-                image_urls.append(image_data.url)
-                
-            if image_urls:
-                logger.info(f"Successfully generated {len(image_urls)} images for inline query")
-                break
-                
-        except asyncio.TimeoutError:
-            logger.warning(f"Inline image generation timed out with provider {provider}")
-            continue
-        except Exception as e:
-            logger.error(f"Error generating inline image with provider {provider}: {str(e)}")
-            continue
+    if not image_urls:
+        logger.warning("No image URLs returned for inline generation")
+        return []
     
-    # Process URLs to local paths - same method as in image_generation.py
+    logger.info(f"Successfully generated {len(image_urls)} images for inline query")
+    
+    # Process URLs to local paths
     local_paths = []
     for url in image_urls:
         # Convert to local path
