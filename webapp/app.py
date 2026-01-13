@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 AdvAI Image Generator Web Application
-Flask backend server with Groq for AI and g4f for images - Serverless Compatible
+Flask backend server with g4f multi-provider system for AI and images - Serverless Compatible
 Now with Telegram Mini App Authentication
 """
 
 import os
+import sys
 import asyncio
 import logging
 import uuid
@@ -13,15 +14,17 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import time
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Import config for API keys with fallback
 try:
-    from config import FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED, GROQ_API_KEY
+    from config import FLASK_SECRET_KEY, SESSION_TIMEOUT, TELEGRAM_MINI_APP_REQUIRED
 except ImportError:
     # Fallback for Vercel deployment - get from environment variables
     FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
     SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '86400'))
     TELEGRAM_MINI_APP_REQUIRED = os.environ.get('TELEGRAM_MINI_APP_REQUIRED', 'True').lower() == 'true'
-    GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 from flask import Flask, request, jsonify, send_from_directory, Response, session, redirect, url_for
 from flask_cors import CORS
@@ -46,8 +49,12 @@ from telegram_auth import (
 # Import Telegram logging system
 from telegram_logging import log_image_generation, log_error, log_user_activity
 
-# Import Groq for AI text generation (prompt enhancement)
-from groq import Groq
+# Import multi-provider text generation system
+try:
+    from modules.models.multi_provider_text import generate_text_sync
+except ImportError:
+    # Fallback if import fails
+    generate_text_sync = None
 
 # Import g4f for image generation with multi-provider support
 from g4f.client import Client, AsyncClient
@@ -62,9 +69,6 @@ from g4f.Provider import (
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Initialize Groq client for prompt enhancement
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
@@ -81,19 +85,23 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Required for Telegram Mini App
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 def generate_ai_response(prompt: str) -> str:
-    """Generate AI response using Groq with llama-3.3-70b-versatile"""
+    """Generate AI response using g4f multi-provider system"""
     try:
-        if not groq_client:
-            raise Exception("Groq client not configured. Please set GROQ_API_KEY.")
+        if generate_text_sync is None:
+            raise Exception("Multi-provider text generation not available.")
         
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
+        messages = [{"role": "user", "content": prompt}]
+        response, error = generate_text_sync(
+            messages=messages,
+            model="qwen3",
             temperature=0.7,
-            max_completion_tokens=1024,
-            top_p=1
+            max_tokens=1024,
         )
-        return response.choices[0].message.content
+        
+        if error:
+            raise Exception(error)
+        
+        return response
     except Exception as e:
         logger.error(f"Error generating AI response: {e}")
         raise

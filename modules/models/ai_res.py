@@ -8,15 +8,21 @@ from typing import List, Dict, Any, Optional, Generator, Union, Tuple
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 
-# Import Groq for AI text generation
-from groq import Groq
+# Import multi-provider text generation system
+from modules.models.multi_provider_text import (
+    generate_text_sync,
+    generate_text_multi_provider,
+    get_streaming_response_multi_provider,
+    normalize_model_name,
+    DEFAULT_TEXT_MODEL as MULTI_PROVIDER_DEFAULT_MODEL,
+)
 
 from modules.core.database import get_history_collection
 from modules.chatlogs import user_log, error_log
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
 from modules.user.ai_model import get_user_ai_models, DEFAULT_TEXT_MODEL, RESTRICTED_TEXT_MODELS
 from modules.user.premium_management import is_user_premium
-from config import ADMINS, GROQ_API_KEY
+from config import ADMINS
 from pyrogram.errors import MessageTooLong
 from modules.image.image_generation import generate_images
 from pyrogram.types import InputMediaPhoto
@@ -28,27 +34,14 @@ from modules.core.request_queue import (
 )
 import uuid
 
-# --- Model mapping for Groq ---
-# All user-selected models are mapped to Groq models
-GROQ_MODEL_MAP = {
-    "gpt-4o": "llama-3.3-70b-versatile",                    # High quality versatile model
-    "gpt-4.1": "meta-llama/llama-4-scout-17b-16e-instruct", # Llama 4 Scout
-    "qwen3": "qwen/qwen3-32b",                               # Qwen 3 32B
-    "deepseek-r1": "moonshotai/kimi-k2-instruct",           # Kimi K2 (alternative to DeepSeek)
-    "default": "llama-3.3-70b-versatile"
-}
-
-# Initialize Groq client
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-
 
 def get_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> str:
     """
-    Get a non-streaming response from the AI model using Groq
+    Get a non-streaming response from the AI model using multi-provider system
     
     Args:
         history: Conversation history in the format expected by the AI model
-        model: The user's selected model (mapped to actual Groq model)
+        model: The user's selected model
         
     Returns:
         String response from the AI model
@@ -63,34 +56,19 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> str:
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
         
-        if not groq_client:
-            raise Exception("Groq client not configured. Please set GROQ_API_KEY in environment.")
+        print(f"Using multi-provider system for model: {model}")
         
-        # Get the actual Groq model
-        actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
-        print(f"Using Groq model: {actual_model} (requested: {model})")
+        response, error = generate_text_sync(
+            messages=history,
+            model=model,
+            temperature=0.7,
+            max_tokens=4096,
+        )
         
-        try:
-            response = groq_client.chat.completions.create(
-                model=actual_model,
-                messages=history,
-                temperature=0.7,
-                max_completion_tokens=4096,
-                top_p=1
-            )
-            return response.choices[0].message.content
-            
-        except Exception as model_error:
-            # Fallback to default model if specific model fails
-            print(f"Model {actual_model} failed: {model_error}, trying default...")
-            response = groq_client.chat.completions.create(
-                model=GROQ_MODEL_MAP["default"],
-                messages=history,
-                temperature=0.7,
-                max_completion_tokens=4096,
-                top_p=1
-            )
-            return response.choices[0].message.content
+        if error:
+            raise Exception(error)
+        
+        return response
             
     except Exception as e:
         print(f"Error generating response with model {model}: {e}")
@@ -99,7 +77,7 @@ def get_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> str:
 
 def get_streaming_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> Optional[Generator]:
     """
-    Get a streaming response from the AI model using Groq
+    Get a streaming response from the AI model using multi-provider system
     
     Args:
         history: Conversation history in the format expected by the AI model
@@ -122,19 +100,13 @@ def get_streaming_response(history: List[Dict[str, str]], model: str = "gpt-4o")
             if not isinstance(msg, dict):
                 history[i] = {"role": "user", "content": str(msg)}
         
-        if not groq_client:
-            raise Exception("Groq client not configured.")
+        print(f"Streaming with multi-provider system for model: {model}")
         
-        actual_model = GROQ_MODEL_MAP.get(model, GROQ_MODEL_MAP["default"])
-        print(f"Streaming with Groq model: {actual_model}")
-        
-        response = groq_client.chat.completions.create(
-            model=actual_model,
+        response = get_streaming_response_multi_provider(
             messages=history,
+            model=model,
             temperature=0.7,
-            max_completion_tokens=4096,
-            top_p=1,
-            stream=True
+            max_tokens=4096,
         )
         return response
             

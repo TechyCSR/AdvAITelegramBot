@@ -11,12 +11,12 @@ import asyncio
 TEXT_MODEL_HEADING = "AI Text Generation Model"
 IMAGE_MODEL_HEADING = "Image Generation Model"
 
-# Text models - user-facing names (actual models are mapped in ai_res.py via Groq)
+# Text models - user-facing names (actual models are mapped in multi_provider_text.py via g4f)
 TEXT_MODELS = {
-    "gpt-4o": "Llama 3.3 70B",           # Groq: llama-3.3-70b-versatile
-    "gpt-4.1": "Llama 4 Scout",          # Groq: meta-llama/llama-4-scout-17b-16e-instruct  
-    "qwen3": "Qwen 3 32B",               # Groq: qwen/qwen3-32b
-    "deepseek-r1": "Kimi K2"             # Groq: moonshotai/kimi-k2-instruct
+    "gpt-4o": "GPT-4o",                  # g4f: gpt-4o
+    "qwen3": "Qwen 3 235B",              # g4f: qwen3-235b-a22b
+    "llama-70b": "Llama 3.3 70B",        # g4f: llama-3.3-70b
+    "command-r": "Command R"             # g4f: command-r
 }
 
 IMAGE_MODELS = {
@@ -25,11 +25,11 @@ IMAGE_MODELS = {
     "sd-3.5-large": "Stable Diffusion 3.5",
 }
 
-DEFAULT_TEXT_MODEL = "gpt-4o"
+DEFAULT_TEXT_MODEL = "qwen3"
 DEFAULT_IMAGE_MODEL = "flux-dev"
 
 # --- Restricted Models ---
-RESTRICTED_TEXT_MODELS = {"gpt-4.1", "qwen3"}
+RESTRICTED_TEXT_MODELS = {"gpt-4o"}  # GPT-4o is premium only
 RESTRICTED_IMAGE_MODELS = set()  # No restricted image models currently
 
 # --- Database Setup ---
