@@ -10,7 +10,7 @@ import re
 import hashlib
 import urllib.parse
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
-from pyrogram import Client, filters
+from pyrogram import Client, filters, enums
 from pymongo import MongoClient
 from config import DATABASE_URL, LOG_CHANNEL, ADMINS
 from modules.maintenance import maintenance_check, maintenance_message, is_feature_enabled
@@ -376,7 +376,7 @@ async def handle_generate_command(client: Client, message: Message) -> None:
         
     except Exception as e:
         logger.error(f"Error in image generation command handler: {str(e)}")
-        await message.reply_text(f"❌ **Error**\n\nFailed to process image generation request: {str(e)}")
+        await message.reply_text(f"❌ <b>Error</b>\n\nFailed to process image generation request: {str(e)}", parse_mode=enums.ParseMode.HTML)
         # Reset user state in case of error
         finish_image_request(user_id)
         if user_id in user_states:

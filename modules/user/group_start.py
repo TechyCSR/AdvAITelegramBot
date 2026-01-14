@@ -1,5 +1,5 @@
 import pyrogram
-from pyrogram import filters
+from pyrogram import filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.types import Message
 from pyrogram.types import CallbackQuery
@@ -36,7 +36,7 @@ I'm now ready to assist everyone in this group with:
 Group admins can manage my permissions and settings using the buttons below.
 """
 
-group_tip_text = "💡 **Group Tip:** use /ai with your question or reply to my messages to interact with me.OR\nuse /img with your prompt to generate images!\n**For more commands use /help.**"
+group_tip_text = "💡 <b>Group Tip:</b> use /ai with your question or reply to my messages to interact with me.\nOR use /img with your prompt to generate images!\n<b>For more commands use /help.</b>"
 
 LOGO = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnp4MnR0YXk3ZGNjenR6NGRoaDNkc2h2NDgxa285NnExaGM1MTZmYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/S60CrN9iMxFlyp7uM8/giphy.gif"
 
@@ -170,7 +170,7 @@ async def group_start(client, message):
         reply_markup=keyboard
     )
     
-    await message.reply_text(translated_tip)
+    await message.reply_text(translated_tip, parse_mode=enums.ParseMode.HTML)
     
     # Check bot permissions and update group stats
     from modules.group.group_permissions import check_bot_permissions, update_group_stats, send_permissions_message

@@ -149,13 +149,71 @@ def sanitize_markdown(text: str) -> str:
     
     return text
 
+def markdown_to_html(text):
+    """
+    Convert markdown formatting to Telegram-compatible HTML.
+    Handles: code blocks, inline code, bold, italic, strikethrough, headers, links
+    """
+    if not text or not isinstance(text, str):
+        return text or ""
+    
+    # First, protect code blocks (triple backticks) by replacing with placeholders
+    code_blocks = []
+    def save_code_block(match):
+        code_blocks.append(match.group(0))
+        return f"__CODE_BLOCK_{len(code_blocks) - 1}__"
+    
+    text = re.sub(r'```[\s\S]*?```', save_code_block, text)
+    
+    # Protect inline code (single backticks)
+    inline_codes = []
+    def save_inline_code(match):
+        inline_codes.append(match.group(0))
+        return f"__INLINE_CODE_{len(inline_codes) - 1}__"
+    
+    text = re.sub(r'`[^`]+`', save_inline_code, text)
+    
+    # Escape HTML special characters in the main text
+    text = html.escape(text)
+    
+    # Convert headers (### Header -> <b>Header</b>)
+    text = re.sub(r'^#{1,6}\s*(.+)$', r'<b>\1</b>', text, flags=re.MULTILINE)
+    
+    # Convert bold (**text** or __text__ -> <b>text</b>)
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    text = re.sub(r'__(.+?)__', r'<b>\1</b>', text)
+    
+    # Convert italic (*text* or _text_ -> <i>text</i>) - be careful not to match bold
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
+    text = re.sub(r'(?<!_)_(?!_)(.+?)(?<!_)_(?!_)', r'<i>\1</i>', text)
+    
+    # Convert strikethrough (~~text~~ -> <s>text</s>)
+    text = re.sub(r'~~(.+?)~~', r'<s>\1</s>', text)
+    
+    # Convert links [text](url) -> <a href="url">text</a>
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
+    
+    # Restore inline code
+    for i, code in enumerate(inline_codes):
+        # Extract just the code (remove backticks)
+        code_content = code[1:-1]
+        text = text.replace(f"__INLINE_CODE_{i}__", f"<code>{html.escape(code_content)}</code>")
+    
+    # Restore code blocks
+    for i, block in enumerate(code_blocks):
+        # Extract the code (remove triple backticks and optional language)
+        match = re.match(r'```(?:\w+)?\n?([\s\S]*?)```', block)
+        if match:
+            code_content = match.group(1).strip()
+        else:
+            code_content = block[3:-3].strip()
+        text = text.replace(f"__CODE_BLOCK_{i}__", f"<pre><code>{html.escape(code_content)}</code></pre>")
+    
+    return text
+
 def markdown_code_to_html(text):
-    # Replace ```...``` with <pre><code>...</code></pre>
-    def replacer(match):
-        code = match.group(1)
-        return f'<pre><code>{html.escape(code)}</code></pre>'
-    # Replace all triple-backtick code blocks
-    return re.sub(r'```([\s\S]*?)```', replacer, text)
+    """Legacy function - now calls the full markdown_to_html converter"""
+    return markdown_to_html(text)
 
 def validate_image_url(url: str) -> bool:
     """Validate if the URL is a proper image URL"""
@@ -1567,10 +1625,16 @@ async def aires(client: Client, message: Message) -> None:
         except Exception as e:
             # Log the error to log channel
             await error_log(client, "MESSAGE_SEND", str(e), f"Failed to send text response, falling back to plain text", user_id)
-            # Fallback: send as plain text
+            # Fallback: send as plain text (still try markdown conversion)
             try:
                 await temp.delete()
-                await message.reply_text(processed_response)
+                # Try with markdown to HTML conversion, fallback to truly plain text if needed
+                try:
+                    plain_html = markdown_to_html(processed_response)
+                    await message.reply_text(plain_html, disable_web_page_preview=True, parse_mode=enums.ParseMode.HTML)
+                except:
+                    # Truly plain text as last resort
+                    await message.reply_text(processed_response)
                 
                 # Still try to generate images in background if requested
                 if image_tasks:
@@ -1623,7 +1687,7 @@ async def new_chat(client: Client, message: Message) -> None:
         })
 
         # Send confirmation message with modern UI
-        await message.reply_text("🔄 **Conversation Reset**\n\nYour chat history has been cleared. Ready for a fresh conversation!")
+        await message.reply_text("🔄 <b>Conversation Reset</b>\n\nYour chat history has been cleared. Ready for a fresh conversation!", parse_mode=enums.ParseMode.HTML)
 
     except Exception as e:
         # Log the error to log channel

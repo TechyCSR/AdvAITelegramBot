@@ -396,7 +396,7 @@ async def handle_vision_followup(client, message):
     start_image_request(user_id, f"Image follow-up analysis: {prompt[:30]}...")
     
     # Add the latest user prompt to history before sending to g4f
-    wat = await message.reply_text(f"🔍 **Analyzing Image with AI...**\n\nThis may take a few seconds.")
+    wat = await message.reply_text(f"🔍 <b>Analyzing Image with AI...</b>\n\nThis may take a few seconds.", parse_mode=enums.ParseMode.HTML)
     history.append({"role": "user", "content": prompt})
     try:
         with open(image_context['file_path'], "rb") as img_f:
@@ -416,7 +416,7 @@ async def handle_vision_followup(client, message):
         logger.exception(f"Error in g4f vision followup: {str(e)}")
         # Finish the image request in queue system even on error
         finish_image_request(user_id)
-        await message.reply_text(f"❌ **AI Vision Error**\n\n{str(e)}")
+        await message.reply_text(f"❌ <b>AI Vision Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
         return True
     # Update uses_left
     image_context['uses_left'] -= 1
