@@ -24,14 +24,14 @@ async def get_bot_username(client):
         return "AdvChatGptBot"  # Fallback
 
 # Import for benefits display
-# Define button texts with emojis - NO premium button here
+# Define button texts with emojis
 button_list = [
     "➕ Add to Group",
     "🛠️ Commands",
     "❓ Help",
     "⚙️ Settings",
     "📞 Support",
-    "💎 Get Premium Subscription"
+    "🎨 Image Generator App"
 ]
 
 welcome_text = """
@@ -99,7 +99,7 @@ async def start(client, message: Message):
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
          InlineKeyboardButton(translated_buttons[4], callback_data="support")],
-        [InlineKeyboardButton(translated_buttons[5], callback_data="premium_info")]
+        [InlineKeyboardButton(translated_buttons[5], url="https://t.me/AdvChatGptbot/ImageGenerator")]
     ]
     keyboard = InlineKeyboardMarkup(keyboard_layout)
 
@@ -110,11 +110,11 @@ async def start(client, message: Message):
     #     await message.reply_text(translated_tip)
     
     # Send mini app promotion message with inline button
-    mini_app_button_text = await async_translate_to_lang("🚀 Try Mini App", user_id)
-    mini_app_keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(mini_app_button_text, url="https://t.me/AdvChatGptbot/ImageGenerator")]
-    ])
-    await message.reply_text(translated_mini_app, reply_markup=mini_app_keyboard)
+    # mini_app_button_text = await async_translate_to_lang("🚀 Try Mini App", user_id)
+    # mini_app_keyboard = InlineKeyboardMarkup([
+    #     [InlineKeyboardButton(mini_app_button_text, url="https://t.me/AdvChatGptbot/ImageGenerator")]
+    # ])
+    # await message.reply_text(translated_mini_app, reply_markup=mini_app_keyboard)
 
 async def start_inline(bot, callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -132,7 +132,7 @@ async def start_inline(bot, callback: CallbackQuery):
          InlineKeyboardButton(translated_buttons[2], callback_data="help_start")],
         [InlineKeyboardButton(translated_buttons[3], callback_data="settings"),
          InlineKeyboardButton(translated_buttons[4], callback_data="support")],
-        [InlineKeyboardButton(translated_buttons[5], callback_data="premium_info")]
+        [InlineKeyboardButton(translated_buttons[5], url="https://t.me/AdvChatGptbot/ImageGenerator")]
     ]
     keyboard = InlineKeyboardMarkup(keyboard_layout)
 

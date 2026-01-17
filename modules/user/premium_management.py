@@ -175,8 +175,8 @@ async def get_premium_benefits_message(user_id: int) -> str:
 
     # --- Feature Comparison (Compact, Card Style) ---
     features = [
-        ("🧠 AI Text Models", "GPT-4o", "GPT-4o, GPT-4.1, Qwen3, DeepSeek-R1"),
-        ("🖼️ Image Models", "DALL-E 3, Flux", "DALL-E 3, Flux, Flux Pro"),
+        ("🧠 AI Text Models", "Qwen3, Llama 70B", "GPT-4o, Qwen3, Llama 70B, Command R"),
+        ("🖼️ Image Models", "Flux Dev, Flux", "Flux Dev, Flux, SD 3.5"),
         ("🖼️ Images per Request", "1", "Up to 4"),
         ("⚡ Image Speed", "Standard", "Priority (Faster)"),
         ("🚀 AI Response Time", "Standard", "Enhanced"),
@@ -189,7 +189,7 @@ async def get_premium_benefits_message(user_id: int) -> str:
     ])
 
     # --- Premium-Only Models ---
-    premium_models = [TEXT_MODELS['gpt-4.1'], TEXT_MODELS['qwen3'], IMAGE_MODELS['flux-pro']]
+    premium_models = [TEXT_MODELS.get('gpt-4o', 'GPT-4o'), TEXT_MODELS.get('qwen3', 'Qwen 3 235B')]
     premium_models_section = (
         "\n<b>✨ Premium-Only Models:</b> <code>" + ", ".join(premium_models) + "</code>\n"
         "<i>\nAccess the most advanced AI and image models, only for Premium users.</i>"
