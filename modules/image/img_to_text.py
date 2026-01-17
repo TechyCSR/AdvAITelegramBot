@@ -16,9 +16,97 @@ from modules.core.request_queue import (
 )
 import g4f
 import g4f.Provider
+from g4f.client import Client as G4FClient
 import base64
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# VISION PROVIDER CONFIGURATIONS - All Auth-Free
+# ============================================================================
+VISION_PROVIDERS = [
+    {
+        "name": "DeepInfra",
+        "provider": g4f.Provider.DeepInfra,
+        "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
+        "timeout": 60,
+    },
+    {
+        "name": "Qwen",
+        "provider": g4f.Provider.Qwen,
+        "model": "qwen2.5-vl-32b-instruct",
+        "timeout": 60,
+    },
+    {
+        "name": "HuggingFace",
+        "provider": g4f.Provider.HuggingFace,
+        "model": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "timeout": 90,
+    },
+    {
+        "name": "DeepseekAI_JanusPro7b",
+        "provider": g4f.Provider.DeepseekAI_JanusPro7b,
+        "model": "janus-pro-7b",
+        "timeout": 90,
+    },
+    {
+        "name": "PollinationsAI",
+        "provider": g4f.Provider.PollinationsAI,
+        "model": "openai",
+        "timeout": 60,
+    },
+]
+
+async def analyze_image_with_providers(images: list, user_question: str) -> tuple:
+    """
+    Try multiple vision providers until one succeeds.
+    Returns (response_text, provider_name) or (None, error_message)
+    """
+    last_error = None
+    
+    for provider_config in VISION_PROVIDERS:
+        provider_name = provider_config["name"]
+        provider = provider_config["provider"]
+        model = provider_config["model"]
+        timeout = provider_config["timeout"]
+        
+        try:
+            logger.info(f"Trying vision provider: {provider_name} with model: {model}")
+            
+            loop = asyncio.get_event_loop()
+            
+            def sync_vision():
+                g4f_client = G4FClient(provider=provider)
+                response = g4f_client.chat.completions.create(
+                    messages=[{"content": user_question, "role": "user"}],
+                    images=images,
+                    model=model
+                )
+                return response.choices[0].message.content
+            
+            # Run with timeout
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, sync_vision),
+                timeout=timeout
+            )
+            
+            if response and len(response) > 10:
+                logger.info(f"Vision provider {provider_name} succeeded")
+                return response, provider_name
+            else:
+                logger.warning(f"Vision provider {provider_name} returned empty/short response")
+                continue
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"Vision provider {provider_name} timed out")
+            last_error = f"{provider_name} timed out"
+            continue
+        except Exception as e:
+            logger.error(f"Vision provider {provider_name} failed: {str(e)}")
+            last_error = f"{provider_name}: {str(e)}"
+            continue
+    
+    return None, f"All vision providers failed. Last error: {last_error}"
 
 # Helper to manage image context in user session/history
 IMAGE_CONTEXT_KEY = "vision_image_context"
@@ -216,7 +304,7 @@ async def extract_text_res(bot, update):
             )
 
         await processing_msg.edit_text(
-            "🧠 **Analyzing Image with AI...**\n\nThis may take a few seconds."
+            "🧠 **Analyzing Image with AI...**\n\nTrying multiple providers for best results..."
         )
 
         # Prepare image for g4f: read as bytes, encode as base64, and create data URI
@@ -229,17 +317,15 @@ async def extract_text_res(bot, update):
             data_uri = f"data:image/{detected_type};base64,{img_b64}"
         images = [[data_uri, os.path.basename(file)]]
 
-        # Send image to g4f vision
-        try:
-            g4f_client = g4f.Client(provider=g4f.Provider.PollinationsAI)
-            response = g4f_client.chat.completions.create(
-                [{"content": user_question, "role": "user"}], images=images, model="gpt-4o"
-            )
-            ai_response = response.choices[0].message.content
-        except Exception as e:
-            logger.exception(f"Error in g4f vision: {str(e)}")
-            await processing_msg.edit_text(f"❌ **AI Vision Error**\n\n{str(e)}")
+        # Send image to multi-provider vision system
+        ai_response, provider_info = await analyze_image_with_providers(images, user_question)
+        
+        if ai_response is None:
+            logger.error(f"All vision providers failed: {provider_info}")
+            await processing_msg.edit_text(f"❌ **AI Vision Error**\n\n{provider_info}")
             return
+        
+        logger.info(f"Vision analysis successful using provider: {provider_info}")
 
         # Save image context for next MAX_IMAGE_USES responses
         user_id = update.from_user.id
