@@ -33,6 +33,51 @@ from modules.core.request_queue import (
     get_user_request_status
 )
 import uuid
+import random
+
+
+async def send_interactive_waiting_message(message: Message) -> Message:
+    """
+    Send an engaging, interactive waiting message that cycles through different statuses
+    to show what's happening in the backend while processing the AI response.
+    
+    Args:
+        message: The user's message to reply to
+        
+    Returns:
+        The waiting message object that can be edited/deleted later
+    """
+    # Creative status messages that explain what's happening
+    status_messages = [
+        "🔍 Reading your message...",
+        "🧠 Understanding your request...",
+        "💭 Thinking about the best response...",
+        "✨ Crafting something helpful...",
+        "📝 Putting thoughts into words...",
+        "🎯 Almost ready with your answer..."
+    ]
+    
+    # Send initial message
+    temp_msg = await message.reply_text(status_messages[0])
+    
+    # Create background task to cycle through messages
+    async def cycle_messages():
+        try:
+            for i in range(1, len(status_messages)):
+                await asyncio.sleep(1.5)  # Wait 1.5 seconds between each update
+                try:
+                    await temp_msg.edit_text(status_messages[i])
+                except Exception:
+                    # Message might be deleted if response is ready
+                    break
+        except Exception as e:
+            # Silently handle any errors (message might be deleted)
+            pass
+    
+    # Start the cycling task in background (non-blocking)
+    asyncio.create_task(cycle_messages())
+    
+    return temp_msg
 
 
 def get_response(history: List[Dict[str, str]], model: str = "gpt-4o") -> str:
@@ -1448,7 +1493,7 @@ async def aires(client: Client, message: Message) -> None:
         start_text_request(user_id, f"Processing message: {(message.text or 'media')[:30]}...")
         
         await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
-        temp = await message.reply_text("⏳")
+        temp = await send_interactive_waiting_message(message)
         
         # Safely extract the message text
         ask = ""
