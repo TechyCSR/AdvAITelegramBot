@@ -494,15 +494,19 @@ async def handle_vision_followup(client, message):
             img_b64 = base64.b64encode(img_bytes).decode("utf-8")
             data_uri = f"data:image/{detected_type};base64,{img_b64}"
         images = [[data_uri, os.path.basename(image_context['file_path'])]]
-        g4f_client = g4f.Client(provider=g4f.Provider.PollinationsAI)
-        response = g4f_client.chat.completions.create(
-            history, images=images, model="gpt-4o"
-        )
-        ai_response = response.choices[0].message.content
+        
+        # Use multi-provider system for vision follow-up (same as initial analysis)
+        ai_response, provider_name = await analyze_image_with_providers(images, prompt)
+        
+        if not ai_response:
+            raise Exception(f"All vision providers failed: {provider_name}")
+        
+        logger.info(f"Vision follow-up succeeded with provider: {provider_name}")
     except Exception as e:
         logger.exception(f"Error in g4f vision followup: {str(e)}")
         # Finish the image request in queue system even on error
         finish_image_request(user_id)
+        await wat.delete()
         await message.reply_text(f"❌ <b>AI Vision Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
         return True
     # Update uses_left
