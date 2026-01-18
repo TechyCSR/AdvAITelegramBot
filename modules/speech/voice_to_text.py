@@ -8,7 +8,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from config import LOG_CHANNEL
 
 from modules.speech.text_to_voice import handle_text_message 
-from modules.models.ai_res import get_response, get_streaming_response
+from modules.models.ai_res import get_response, get_streaming_response, check_and_update_system_prompt, DEFAULT_SYSTEM_MESSAGE
 from modules.chatlogs import user_log
 from modules.core.database import db_service
 from modules.core.request_queue import (
@@ -88,7 +88,12 @@ async def handle_voice_message(client, message):
             user_settings = user_voice_setting_collection.find_one({"user_id": user_id})
             response_mode = user_settings.get("voice", "text") if user_settings else "text"
             user_history = history_collection.find_one({"user_id": user_id})
-            history = user_history['history'] if user_history else [{"role": "assistant", "content": "I'm your AI assistant."}]
+            if user_history and 'history' in user_history:
+                history = user_history['history']
+                # Check and update system prompt if outdated
+                history = check_and_update_system_prompt(history, user_id)
+            else:
+                history = DEFAULT_SYSTEM_MESSAGE.copy()
             history.append({"role": "user", "content": recognized_text})
             ai_response = get_response(history)
             history.append({"role": "assistant", "content": ai_response})

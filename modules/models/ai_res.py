@@ -1029,11 +1029,75 @@ async def generate_images_in_background(client: Client, message: Message, image_
         except:
             pass
 
+# System prompt version - INCREMENT THIS when you update the system prompt
+# This ensures all users (including old ones) get the updated system prompt
+SYSTEM_PROMPT_VERSION = "2.0.0"  # Update this version when you change DEFAULT_SYSTEM_MESSAGE
+
+def get_system_prompt_version_marker() -> str:
+    """Get the version marker string that's included in system prompts"""
+    return f"[SPV:{SYSTEM_PROMPT_VERSION}]"
+
+def check_and_update_system_prompt(history: List[Dict[str, str]], user_id: int = None) -> List[Dict[str, str]]:
+    """
+    Check if the user's history has an outdated system prompt and update it.
+    This ensures all users always use the latest system prompt.
+    
+    Args:
+        history: User's conversation history
+        user_id: User ID for database update (optional)
+        
+    Returns:
+        Updated history with latest system prompt
+    """
+    if not history or not isinstance(history, list):
+        return DEFAULT_SYSTEM_MESSAGE.copy()
+    
+    current_version_marker = get_system_prompt_version_marker()
+    
+    # Check if the first message is a system message with version marker
+    needs_update = True
+    
+    for msg in history:
+        if msg.get('role') == 'system':
+            content = msg.get('content', '')
+            # Check if this system message has the current version marker
+            if current_version_marker in content:
+                needs_update = False
+                break
+            # If it has an old version marker or no marker, we need to update
+            if '[SPV:' in content or 'You are @AdvChatGptBot' in content:
+                break
+    
+    if needs_update:
+        # Remove all old system messages (keep user/assistant messages)
+        user_messages = [msg for msg in history if msg.get('role') != 'system']
+        
+        # Combine new system message with user's conversation history
+        updated_history = DEFAULT_SYSTEM_MESSAGE.copy() + user_messages
+        
+        # Update in database if user_id provided
+        if user_id:
+            try:
+                history_collection = get_history_collection()
+                history_collection.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"history": updated_history}},
+                    upsert=True
+                )
+                print(f"[SYSTEM_PROMPT] Updated system prompt for user {user_id} to version {SYSTEM_PROMPT_VERSION}")
+            except Exception as e:
+                print(f"[SYSTEM_PROMPT] Error updating database for user {user_id}: {e}")
+        
+        return updated_history
+    
+    return history
+
 # Default system message with modern, professional tone
 DEFAULT_SYSTEM_MESSAGE: List[Dict[str, str]] = [
     {
         "role": "system",
         "content": (
+            f"[SPV:{SYSTEM_PROMPT_VERSION}] "  # Version marker - DO NOT REMOVE
             "You are @AdvChatGptBot (https://t.me/AdvChatGptBot), an advanced multi-modal AI assistant developed by Chandan Singh (@techycsr). "
             "You can: \n"
             "• Answer questions, chat, and help with any topic\n"
@@ -1548,6 +1612,8 @@ async def aires(client: Client, message: Message) -> None:
             history = user_history['history']
             if not isinstance(history, list):
                 history = [history]
+            # Check and update system prompt if outdated
+            history = check_and_update_system_prompt(history, user_id)
         else: 
             # Use a copy of the default system message
             history = DEFAULT_SYSTEM_MESSAGE.copy()

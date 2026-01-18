@@ -4,7 +4,7 @@ import pdfplumber
 import json
 import csv
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from modules.models.ai_res import DEFAULT_SYSTEM_MESSAGE
+from modules.models.ai_res import DEFAULT_SYSTEM_MESSAGE, check_and_update_system_prompt
 from modules.core.database import get_history_collection
 from modules.user.premium_management import is_user_premium
 from config import ADMINS
@@ -90,6 +90,8 @@ async def handle_file_upload(client, message: Message):
         history = user_history['history']
         if not isinstance(history, list):
             history = [history]
+        # Check and update system prompt if outdated
+        history = check_and_update_system_prompt(history, user_id)
     else:
         history = DEFAULT_SYSTEM_MESSAGE.copy()
     prompt = f"A file was uploaded: {filename}. Extracted text is below."
@@ -157,6 +159,8 @@ async def handle_file_question(client, message: Message):
             history = user_history['history']
             if not isinstance(history, list):
                 history = [history]
+            # Check and update system prompt if outdated
+            history = check_and_update_system_prompt(history, user_id)
         else:
             history = DEFAULT_SYSTEM_MESSAGE.copy()
         history.append({"role": "user", "content": user_question})

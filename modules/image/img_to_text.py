@@ -7,7 +7,7 @@ from pyrogram import enums
 from pyrogram.types import InputMediaPhoto
 from pyrogram.errors import MediaCaptionTooLong
 from config import LOG_CHANNEL
-from modules.models.ai_res import get_history_collection
+from modules.models.ai_res import get_history_collection, check_and_update_system_prompt, DEFAULT_SYSTEM_MESSAGE
 from modules.chatlogs import user_log
 from modules.core.request_queue import (
     can_start_image_request, 
@@ -335,8 +335,9 @@ async def extract_text_res(bot, update):
             history = user_history['history']
             if not isinstance(history, list):
                 history = [history]
+            # Check and update system prompt if outdated
+            history = check_and_update_system_prompt(history, user_id)
         else:
-            from modules.models.ai_res import DEFAULT_SYSTEM_MESSAGE
             history = DEFAULT_SYSTEM_MESSAGE.copy()
         image_context = {
             "file_path": file,
