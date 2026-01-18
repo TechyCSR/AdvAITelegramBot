@@ -40,6 +40,7 @@ async def send_interactive_waiting_message(message: Message) -> Message:
     """
     Send an engaging, interactive waiting message that cycles through different statuses
     to show what's happening in the backend while processing the AI response.
+    Also continuously shows "typing" action to indicate active processing.
     
     Args:
         message: The user's message to reply to
@@ -47,6 +48,8 @@ async def send_interactive_waiting_message(message: Message) -> Message:
     Returns:
         The waiting message object that can be edited/deleted later
     """
+    from pyrogram.enums import ChatAction
+    
     # Creative status messages that explain what's happening
     status_messages = [
         "🔍 Reading your message...",
@@ -57,25 +60,46 @@ async def send_interactive_waiting_message(message: Message) -> Message:
         "🎯 Almost ready with your answer..."
     ]
     
+    # Send initial typing action
+    try:
+        await message._client.send_chat_action(message.chat.id, ChatAction.TYPING)
+    except Exception:
+        pass
+    
     # Send initial message
     temp_msg = await message.reply_text(status_messages[0])
     
-    # Create background task to cycle through messages
+    # Create background task to cycle through messages and keep typing action
     async def cycle_messages():
         try:
             for i in range(1, len(status_messages)):
                 await asyncio.sleep(1.5)  # Wait 1.5 seconds between each update
                 try:
+                    # Send typing action to keep it visible
+                    await message._client.send_chat_action(message.chat.id, ChatAction.TYPING)
                     await temp_msg.edit_text(status_messages[i])
                 except Exception:
                     # Message might be deleted if response is ready
                     break
-        except Exception as e:
+            
+            # Continue sending typing action every 4 seconds until response is ready
+            while True:
+                await asyncio.sleep(4)
+                try:
+                    await message._client.send_chat_action(message.chat.id, ChatAction.TYPING)
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+        except Exception:
             # Silently handle any errors (message might be deleted)
             pass
     
     # Start the cycling task in background (non-blocking)
-    asyncio.create_task(cycle_messages())
+    typing_task = asyncio.create_task(cycle_messages())
+    
+    # Store the task reference on the message for later cancellation
+    temp_msg._typing_task = typing_task
     
     return temp_msg
 
@@ -1657,7 +1681,9 @@ async def aires(client: Client, message: Message) -> None:
                 full_response = processed_response
             html_response = markdown_code_to_html(full_response)
             
-            # Delete the temporary message
+            # Cancel typing task and delete the temporary message
+            if hasattr(temp, '_typing_task'):
+                temp._typing_task.cancel()
             await temp.delete()
             
             # Send text response immediately
@@ -1679,6 +1705,9 @@ async def aires(client: Client, message: Message) -> None:
             await error_log(client, "MESSAGE_SEND", str(e), f"Failed to send text response, falling back to plain text", user_id)
             # Fallback: send as plain text (still try markdown conversion)
             try:
+                # Cancel typing task and delete temp message
+                if hasattr(temp, '_typing_task'):
+                    temp._typing_task.cancel()
                 await temp.delete()
                 # Try with markdown to HTML conversion, fallback to truly plain text if needed
                 try:
