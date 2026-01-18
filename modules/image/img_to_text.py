@@ -110,20 +110,67 @@ async def analyze_image_with_providers(images: list, user_question: str) -> tupl
 
 # ============================================================================
 # IMAGE EDITING PROVIDER CONFIGURATIONS - For image-to-image modifications
+# All providers are FREE and AUTH-FREE with automatic fallback
+# Ordered by reliability: most stable providers first
 # ============================================================================
 IMAGE_EDIT_PROVIDERS = [
+    # Most reliable - Pollinations (kontext model for image editing)
+    {
+        "name": "PollinationsImage_Kontext",
+        "provider": g4f.Provider.PollinationsImage,
+        "model": "kontext",
+        "timeout": 120,
+    },
+    # OpenAI Chat - gpt-image model
+    {
+        "name": "OpenaiChat_GPTImage",
+        "provider": g4f.Provider.OpenaiChat,
+        "model": "gpt-image",
+        "timeout": 120,
+    },
+    # BlackForest Labs Kontext
     {
         "name": "BlackForestLabs_Flux1KontextDev",
         "provider": g4f.Provider.BlackForestLabs_Flux1KontextDev,
         "model": "flux-kontext-dev",
         "timeout": 120,
     },
+    # Pollinations Flux as backup
     {
-        "name": "HuggingFaceInference",
-        "provider": g4f.Provider.HuggingFaceInference,
-        "model": "black-forest-labs/FLUX.1-dev",
+        "name": "PollinationsImage_Flux",
+        "provider": g4f.Provider.PollinationsImage,
+        "model": "flux",
         "timeout": 120,
     },
+    # Azure Flux Kontext
+    {
+        "name": "Azure_FluxKontext",
+        "provider": g4f.Provider.Azure,
+        "model": "flux.1-kontext-pro",
+        "timeout": 120,
+    },
+    # LMArena as fallback
+    {
+        "name": "LMArena_FluxKontext",
+        "provider": g4f.Provider.LMArena,
+        "model": "flux-1-kontext-dev",
+        "timeout": 120,
+    },
+    # BlackForest Labs standard Flux
+    {
+        "name": "BlackForestLabs_Flux1Dev",
+        "provider": g4f.Provider.BlackForestLabs_Flux1Dev,
+        "model": "flux-dev",
+        "timeout": 120,
+    },
+    # Stability AI SD 3.5
+    {
+        "name": "StabilityAI_SD35Large",
+        "provider": g4f.Provider.StabilityAI_SD35Large,
+        "model": "sd-3.5-large",
+        "timeout": 120,
+    },
+    # DeepSeek Janus as last resort (has GPU quota limits)
     {
         "name": "DeepseekAI_JanusPro7b",
         "provider": g4f.Provider.DeepseekAI_JanusPro7b,
@@ -316,6 +363,7 @@ async def edit_image_with_providers(image_bytes: bytes, image_name: str, prompt:
             loop = asyncio.get_event_loop()
             
             def sync_edit():
+                from urllib.parse import urlparse, parse_qs, unquote
                 g4f_client = G4FClient(provider=provider)
                 response = g4f_client.images.create_variation(
                     image=image_bytes,
@@ -333,7 +381,20 @@ async def edit_image_with_providers(image_bytes: bytes, image_name: str, prompt:
                     elif hasattr(img_data, 'url') and img_data.url:
                         # If URL is returned, download it
                         import urllib.request
-                        with urllib.request.urlopen(img_data.url, timeout=30) as resp:
+                        url = img_data.url
+                        
+                        # Handle relative URLs
+                        if url.startswith('/'):
+                            url = f"https://image.pollinations.ai{url}"
+                        
+                        # Check if URL has ?url= parameter (Pollinations format)
+                        if '?url=' in url:
+                            parsed = urlparse(url)
+                            query_params = parse_qs(parsed.query)
+                            if 'url' in query_params:
+                                url = unquote(query_params['url'][0])
+                        
+                        with urllib.request.urlopen(url, timeout=30) as resp:
                             return resp.read()
                 return None
             
