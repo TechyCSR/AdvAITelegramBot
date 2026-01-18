@@ -114,13 +114,6 @@ async def analyze_image_with_providers(images: list, user_question: str) -> tupl
 # Ordered by reliability: most stable providers first
 # ============================================================================
 IMAGE_EDIT_PROVIDERS = [
-    # Most reliable - Pollinations (kontext model for image editing)
-    {
-        "name": "PollinationsImage_Kontext",
-        "provider": g4f.Provider.PollinationsImage,
-        "model": "kontext",
-        "timeout": 120,
-    },
     # OpenAI Chat - gpt-image model
     {
         "name": "OpenaiChat_GPTImage",
@@ -128,18 +121,18 @@ IMAGE_EDIT_PROVIDERS = [
         "model": "gpt-image",
         "timeout": 120,
     },
+    # Opera Aria - untested but auth-free
+    {
+        "name": "OperaAria",
+        "provider": g4f.Provider.OperaAria,
+        "model": "aria",
+        "timeout": 120,
+    },
     # BlackForest Labs Kontext
     {
         "name": "BlackForestLabs_Flux1KontextDev",
         "provider": g4f.Provider.BlackForestLabs_Flux1KontextDev,
         "model": "flux-kontext-dev",
-        "timeout": 120,
-    },
-    # Pollinations Flux as backup
-    {
-        "name": "PollinationsImage_Flux",
-        "provider": g4f.Provider.PollinationsImage,
-        "model": "flux",
         "timeout": 120,
     },
     # Azure Flux Kontext
