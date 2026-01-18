@@ -613,7 +613,11 @@ async def extract_text_res(bot, update):
             except Exception:
                 pass
             
-            caption = f"✨ **Edited Image**\n\n🎨 Request: `{user_question[:100]}{'...' if len(user_question) > 100 else ''}`\n\n🤖 AI: {intent_result.get('provider', 'unknown')} + {provider_info}"
+            # Build caption with bot username, show prompt only if not too long
+            if len(user_question) <= 120:
+                caption = f"✨ **Edited Image**\n\n🎨 Request: `{user_question}`\n\n🤖 **@AdvChatGptbot**"
+            else:
+                caption = f"✨ **Edited Image**\n\n🤖 **@AdvChatGptbot**"
             
             try:
                 await bot.send_photo(
@@ -892,7 +896,11 @@ async def handle_vision_followup(client, message):
             
             await wat.delete()
             
-            caption = f"✨ **Edited Image**\n\n🎨 Request: `{prompt[:100]}{'...' if len(prompt) > 100 else ''}`\n\n🤖 AI: {intent_result.get('provider', 'unknown')} + {provider_info}"
+            # Build caption with bot username, show prompt only if not too long
+            if len(prompt) <= 150:
+                caption = f"✨ **Edited Image**\n\n🎨 Request: `{prompt}`\n\n🤖 **@AdvChatGptbot**"
+            else:
+                caption = f"✨ **Edited Image**\n\n🤖 **@AdvChatGptbot**"
             
             await client.send_photo(
                 chat_id=message.chat.id,
