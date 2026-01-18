@@ -203,10 +203,11 @@ def markdown_to_html(text):
         return text or ""
     
     # First, protect code blocks (triple backticks) by replacing with placeholders
+    # Use angle brackets that won't conflict with any markdown patterns
     code_blocks = []
     def save_code_block(match):
         code_blocks.append(match.group(0))
-        return f"__CODE_BLOCK_{len(code_blocks) - 1}__"
+        return f"<<<CODEBLOCK{len(code_blocks) - 1}>>>"
     
     text = re.sub(r'```[\s\S]*?```', save_code_block, text)
     
@@ -214,7 +215,7 @@ def markdown_to_html(text):
     inline_codes = []
     def save_inline_code(match):
         inline_codes.append(match.group(0))
-        return f"__INLINE_CODE_{len(inline_codes) - 1}__"
+        return f"<<<INLINECODE{len(inline_codes) - 1}>>>"
     
     text = re.sub(r'`[^`]+`', save_inline_code, text)
     
@@ -238,13 +239,16 @@ def markdown_to_html(text):
     # Convert links [text](url) -> <a href="url">text</a>
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
     
-    # Restore inline code
+    # Restore inline code - need to handle both escaped and unescaped versions
     for i, code in enumerate(inline_codes):
         # Extract just the code (remove backticks)
         code_content = code[1:-1]
-        text = text.replace(f"__INLINE_CODE_{i}__", f"<code>{html.escape(code_content)}</code>")
+        html_code = f"<code>{html.escape(code_content)}</code>"
+        # Replace both escaped version (after html.escape) and original
+        text = text.replace(f"&lt;&lt;&lt;INLINECODE{i}&gt;&gt;&gt;", html_code)
+        text = text.replace(f"<<<INLINECODE{i}>>>", html_code)
     
-    # Restore code blocks
+    # Restore code blocks - need to handle both escaped and unescaped versions
     for i, block in enumerate(code_blocks):
         # Extract the code (remove triple backticks and optional language)
         match = re.match(r'```(?:\w+)?\n?([\s\S]*?)```', block)
@@ -252,7 +256,10 @@ def markdown_to_html(text):
             code_content = match.group(1).strip()
         else:
             code_content = block[3:-3].strip()
-        text = text.replace(f"__CODE_BLOCK_{i}__", f"<pre><code>{html.escape(code_content)}</code></pre>")
+        html_code = f"<pre><code>{html.escape(code_content)}</code></pre>"
+        # Replace both escaped version (after html.escape) and original
+        text = text.replace(f"&lt;&lt;&lt;CODEBLOCK{i}&gt;&gt;&gt;", html_code)
+        text = text.replace(f"<<<CODEBLOCK{i}>>>", html_code)
     
     return text
 
