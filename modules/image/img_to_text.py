@@ -132,44 +132,162 @@ IMAGE_EDIT_PROVIDERS = [
     },
 ]
 
-# Keywords that indicate user wants image modification/editing
-IMAGE_EDIT_KEYWORDS = [
-    "edit", "change", "modify", "transform", "convert", "make it", "make this",
-    "turn it", "turn this", "add", "remove", "replace", "swap", "put",
-    "change the", "make the", "add a", "remove the", "give it", "give this",
-    "colorize", "recolor", "style", "stylize", "enhance", "improve",
-    "cartoon", "anime", "realistic", "artistic", "vintage", "modern",
-    "black and white", "sepia", "blur", "sharpen", "crop", "resize",
-    "rotate", "flip", "mirror", "invert", "brighten", "darken",
-    "saturate", "desaturate", "contrast", "vibrant", "muted",
-    "background", "foreground", "object", "person", "face",
-    "color", "colour", "paint", "draw", "sketch", "render",
-    "generate", "create", "produce", "show me", "can you make",
-    "i want", "please make", "could you", "would you",
-]
+# ============================================================================
+# AI-DRIVEN INTENT DETECTION - Let AI decide if image editing is needed
+# ============================================================================
 
-def is_image_edit_request(text: str) -> bool:
+INTENT_DETECTION_PROMPT = """You are an AI assistant that analyzes user requests about images.
+Analyze the user's message and the image to determine what they want:
+
+1. IMAGE_EDIT - User wants to MODIFY/EDIT/TRANSFORM the image (e.g., "make it cartoon", "add sunglasses", "change background to beach", "remove the person", "make it look vintage")
+2. TEXT_RESPONSE - User wants INFORMATION/ANALYSIS about the image (e.g., "what is this?", "describe this", "solve this question", "read the text", "how many people are there?")
+
+IMPORTANT RULES:
+- If user wants ANY visual change to the image → IMAGE_EDIT
+- If user asks questions, wants descriptions, or needs text extraction → TEXT_RESPONSE
+- If unclear, default to TEXT_RESPONSE
+
+Respond in this EXACT format (no extra text):
+INTENT: [IMAGE_EDIT or TEXT_RESPONSE]
+EDIT_PROMPT: [If IMAGE_EDIT, provide a clear, detailed prompt for image generation describing the desired result. If TEXT_RESPONSE, write "N/A"]
+TEXT_RESPONSE: [If TEXT_RESPONSE, provide your helpful response to the user. If IMAGE_EDIT, write "N/A"]
+"""
+
+async def detect_intent_with_ai(images: list, user_message: str) -> dict:
     """
-    Check if the user's message indicates they want to edit/modify the image
-    rather than just analyze it.
+    Use AI to analyze the image and user's message to determine intent.
+    
+    Returns:
+        dict with keys:
+        - intent: "IMAGE_EDIT" or "TEXT_RESPONSE"
+        - edit_prompt: Optimized prompt for image editing (if IMAGE_EDIT)
+        - text_response: Text response (if TEXT_RESPONSE)
+        - provider: Which provider succeeded
+    """
+    combined_prompt = f"{INTENT_DETECTION_PROMPT}\n\nUser's message: {user_message}"
+    
+    # Try vision providers to analyze intent
+    for provider_config in VISION_PROVIDERS:
+        provider_name = provider_config["name"]
+        provider = provider_config["provider"]
+        model = provider_config["model"]
+        timeout = provider_config["timeout"]
+        
+        try:
+            logger.info(f"Trying intent detection with provider: {provider_name}")
+            
+            loop = asyncio.get_event_loop()
+            
+            def sync_intent():
+                g4f_client = G4FClient(provider=provider)
+                response = g4f_client.chat.completions.create(
+                    messages=[{"content": combined_prompt, "role": "user"}],
+                    images=images,
+                    model=model
+                )
+                return response.choices[0].message.content
+            
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, sync_intent),
+                timeout=timeout
+            )
+            
+            if response and len(response) > 10:
+                # Parse the response
+                result = parse_intent_response(response, user_message)
+                result["provider"] = provider_name
+                logger.info(f"Intent detected: {result['intent']} by {provider_name}")
+                return result
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"Intent detection timeout with {provider_name}")
+            continue
+        except Exception as e:
+            logger.error(f"Intent detection failed with {provider_name}: {str(e)}")
+            continue
+    
+    # Fallback to TEXT_RESPONSE if all providers fail
+    logger.warning("All intent detection providers failed, defaulting to TEXT_RESPONSE")
+    return {
+        "intent": "TEXT_RESPONSE",
+        "edit_prompt": None,
+        "text_response": None,
+        "provider": None,
+        "error": "Could not detect intent, please try again"
+    }
+
+def parse_intent_response(response: str, original_message: str) -> dict:
+    """
+    Parse the AI's intent detection response.
     
     Args:
-        text: User's message text
+        response: Raw AI response
+        original_message: Original user message (fallback for edit prompt)
         
     Returns:
-        True if it looks like an image edit request
+        Parsed intent dict
     """
-    if not text:
-        return False
+    result = {
+        "intent": "TEXT_RESPONSE",
+        "edit_prompt": None,
+        "text_response": None
+    }
     
-    text_lower = text.lower().strip()
+    lines = response.strip().split('\n')
+    current_field = None
+    current_value = []
     
-    # Check for explicit edit keywords
-    for keyword in IMAGE_EDIT_KEYWORDS:
-        if keyword in text_lower:
-            return True
+    for line in lines:
+        line = line.strip()
+        
+        if line.startswith("INTENT:"):
+            if current_field and current_value:
+                result[current_field] = '\n'.join(current_value).strip()
+            current_field = None
+            intent_value = line.replace("INTENT:", "").strip().upper()
+            if "IMAGE_EDIT" in intent_value or "EDIT" in intent_value:
+                result["intent"] = "IMAGE_EDIT"
+            else:
+                result["intent"] = "TEXT_RESPONSE"
+                
+        elif line.startswith("EDIT_PROMPT:"):
+            if current_field and current_value:
+                result[current_field] = '\n'.join(current_value).strip()
+            current_field = "edit_prompt"
+            value = line.replace("EDIT_PROMPT:", "").strip()
+            if value and value.upper() != "N/A":
+                current_value = [value]
+            else:
+                current_value = []
+                
+        elif line.startswith("TEXT_RESPONSE:"):
+            if current_field and current_value:
+                result[current_field] = '\n'.join(current_value).strip()
+            current_field = "text_response"
+            value = line.replace("TEXT_RESPONSE:", "").strip()
+            if value and value.upper() != "N/A":
+                current_value = [value]
+            else:
+                current_value = []
+        else:
+            if current_field:
+                current_value.append(line)
     
-    return False
+    # Don't forget the last field
+    if current_field and current_value:
+        result[current_field] = '\n'.join(current_value).strip()
+    
+    # If IMAGE_EDIT but no edit_prompt, use original message
+    if result["intent"] == "IMAGE_EDIT" and not result["edit_prompt"]:
+        result["edit_prompt"] = original_message
+    
+    # Clean up N/A values
+    if result["edit_prompt"] and result["edit_prompt"].upper() == "N/A":
+        result["edit_prompt"] = None
+    if result["text_response"] and result["text_response"].upper() == "N/A":
+        result["text_response"] = None
+    
+    return result
 
 async def edit_image_with_providers(image_bytes: bytes, image_name: str, prompt: str) -> tuple:
     """
@@ -427,44 +545,55 @@ async def extract_text_res(bot, update):
 
         # Smart caption parsing
         if update.caption:
-            prompt = update.caption
-            user_question = prompt
+            user_question = update.caption
         else:
-            user_question = (
-                "System: You are @AdvChatGptBot (https://t.me/AdvChatGptBot) , an expert at reading and understanding images. "
-                "If the image contains a question (including MCQs), answer it directly and help the user to understand the question and answer it. "
-                "If it is a multiple choice question (MCQ), answer with the correct option (e.g., 'The correct answer is: B'). "
-                "If there is no question, describe and explain the image in detail. "
-                "If there is text, read it and use it to help answer or explain the image."
-            )
+            user_question = "Describe this image in detail. If there's text or a question in the image, read and answer it."
 
-        # Check if user wants to edit/modify the image
-        is_edit_request = is_image_edit_request(user_question) if update.caption else False
+        await processing_msg.edit_text(
+            "🧠 **Analyzing your request...**\n\nAI is understanding what you want..."
+        )
+
+        # Prepare image for AI analysis
+        with open(file, "rb") as img_f:
+            img_bytes = img_f.read()
+            detected_type = imghdr.what(file)
+            if not detected_type:
+                detected_type = "jpeg"
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            data_uri = f"data:image/{detected_type};base64,{img_b64}"
+        images = [[data_uri, os.path.basename(file)]]
+
+        # Use AI to detect intent - should we edit the image or respond with text?
+        intent_result = await detect_intent_with_ai(images, user_question)
         
-        if is_edit_request:
+        if intent_result.get("error"):
+            # If intent detection failed, try direct analysis as fallback
+            logger.warning(f"Intent detection failed: {intent_result.get('error')}, falling back to vision analysis")
+            intent_result["intent"] = "TEXT_RESPONSE"
+        
+        logger.info(f"AI Intent: {intent_result['intent']} (detected by {intent_result.get('provider', 'unknown')})")
+
+        if intent_result["intent"] == "IMAGE_EDIT":
             # ============== IMAGE EDITING MODE ==============
-            await processing_msg.edit_text(
-                "🎨 **Editing your image...**\n\nTrying multiple AI providers for best results..."
-            )
+            edit_prompt = intent_result.get("edit_prompt") or user_question
             
-            # Read image bytes for editing
-            with open(file, "rb") as img_f:
-                img_bytes = img_f.read()
+            await processing_msg.edit_text(
+                f"🎨 **Editing your image...**\n\n📝 Edit: _{edit_prompt[:80]}{'...' if len(edit_prompt) > 80 else ''}_\n\nTrying multiple AI providers..."
+            )
             
             # Try to edit the image with multiple providers
             edited_image_bytes, provider_info = await edit_image_with_providers(
                 img_bytes, 
                 os.path.basename(file), 
-                user_question
+                edit_prompt
             )
             
             if edited_image_bytes is None:
                 logger.error(f"All image edit providers failed: {provider_info}")
                 await processing_msg.edit_text(
                     f"❌ **Image Editing Failed**\n\n{provider_info}\n\n"
-                    "💡 Tip: Try a simpler edit request or analyze the image instead."
+                    "💡 Tip: Try describing the change differently or ask a question about the image instead."
                 )
-                # Cleanup
                 try:
                     os.remove(file)
                 except Exception:
@@ -479,13 +608,12 @@ async def extract_text_res(bot, update):
             with open(edited_file, "wb") as f:
                 f.write(edited_image_bytes)
             
-            # Send the edited image
             try:
                 await processing_msg.delete()
             except Exception:
                 pass
             
-            caption = f"✨ **Edited Image**\n\n🎨 Edit: `{user_question[:100]}{'...' if len(user_question) > 100 else ''}`\n\n🤖 Provider: {provider_info}"
+            caption = f"✨ **Edited Image**\n\n🎨 Request: `{user_question[:100]}{'...' if len(user_question) > 100 else ''}`\n\n🤖 AI: {intent_result.get('provider', 'unknown')} + {provider_info}"
             
             try:
                 await bot.send_photo(
@@ -499,7 +627,6 @@ async def extract_text_res(bot, update):
                 await update.reply_text(f"❌ Failed to send edited image: {str(e)}")
             
             # Save to history
-            user_id = update.from_user.id
             history_collection = get_history_collection()
             user_history = history_collection.find_one({"user_id": user_id})
             if user_history and 'history' in user_history:
@@ -510,21 +637,29 @@ async def extract_text_res(bot, update):
             else:
                 history = DEFAULT_SYSTEM_MESSAGE.copy()
             
-            history.append({"role": "user", "content": f"[Image edit request: {os.path.basename(file)}] {user_question}"})
-            history.append({"role": "assistant", "content": f"[Edited image generated using {provider_info}]"})
+            # Store image context for follow-up edits
+            image_context = {
+                "file_path": edited_file,
+                "uses_left": MAX_IMAGE_USES,
+                "prompt": user_question,
+                "message_id": update.id if hasattr(update, 'id') else None
+            }
+            
+            history.append({"role": "user", "content": f"[Image edit request] {user_question}"})
+            history.append({"role": "assistant", "content": f"[Edited image generated: {edit_prompt}]"})
             history_collection.update_one(
                 {"user_id": user_id},
-                {"$set": {"history": history}},
+                {"$set": {"history": history, IMAGE_CONTEXT_KEY: image_context}},
                 upsert=True
             )
             
             # Log to channel
             try:
-                await user_log(bot, update, f"#ImageEdit\nPrompt: {user_question}", f"Edited with {provider_info}")
+                await user_log(bot, update, f"#ImageEdit\nPrompt: {user_question}\nEdit: {edit_prompt}", f"Edited with {provider_info}")
             except Exception as e:
                 logger.error(f"Error logging image edit: {str(e)}")
             
-            # Cleanup original file, keep edited
+            # Cleanup original file
             try:
                 os.remove(file)
             except Exception:
@@ -532,45 +667,37 @@ async def extract_text_res(bot, update):
             
             # Schedule cleanup for edited image
             await schedule_image_cleanup(bot, user_id, update.chat.id, edited_file)
-            
-            # Finish the image request
             finish_image_request(user_id)
             return
         
-        # ============== VISION ANALYSIS MODE (existing logic) ==============
+        # ============== TEXT RESPONSE MODE ==============
         await processing_msg.edit_text(
-            "🧠 **Analyzing Image with AI...**\n\nTrying multiple providers for best results..."
+            "📝 **Generating response...**\n\nAI is analyzing your image..."
         )
-
-        # Prepare image for g4f: read as bytes, encode as base64, and create data URI
-        with open(file, "rb") as img_f:
-            img_bytes = img_f.read()
-            detected_type = imghdr.what(file)
-            if not detected_type:
-                detected_type = "jpeg"  # fallback
-            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-            data_uri = f"data:image/{detected_type};base64,{img_b64}"
-        images = [[data_uri, os.path.basename(file)]]
-
-        # Send image to multi-provider vision system
-        ai_response, provider_info = await analyze_image_with_providers(images, user_question)
+        
+        # Use the text response from intent detection if available, otherwise analyze again
+        if intent_result.get("text_response"):
+            ai_response = intent_result["text_response"]
+            provider_info = intent_result.get("provider", "unknown")
+        else:
+            # Analyze image with vision providers
+            ai_response, provider_info = await analyze_image_with_providers(images, user_question)
         
         if ai_response is None:
             logger.error(f"All vision providers failed: {provider_info}")
             await processing_msg.edit_text(f"❌ **AI Vision Error**\n\n{provider_info}")
+            finish_image_request(user_id)
             return
         
         logger.info(f"Vision analysis successful using provider: {provider_info}")
 
-        # Save image context for next MAX_IMAGE_USES responses
-        user_id = update.from_user.id
+        # Save image context for follow-up questions
         history_collection = get_history_collection()
         user_history = history_collection.find_one({"user_id": user_id})
         if user_history and 'history' in user_history:
             history = user_history['history']
             if not isinstance(history, list):
                 history = [history]
-            # Check and update system prompt if outdated
             history = check_and_update_system_prompt(history, user_id)
         else:
             history = DEFAULT_SYSTEM_MESSAGE.copy()
@@ -715,24 +842,42 @@ async def handle_vision_followup(client, message):
         await message.reply_text("⚠️ The image file for your last context is no longer available. Please send a new image to continue vision analysis.")
         return True
     
-    # Check if user wants to edit the image instead of analyzing it
-    is_edit_request = is_image_edit_request(prompt)
+    # Start the request
+    start_image_request(user_id, f"Image follow-up: {prompt[:30]}...")
     
-    if is_edit_request:
-        # ============== IMAGE EDITING MODE FOR FOLLOW-UP ==============
-        start_image_request(user_id, f"Image edit follow-up: {prompt[:30]}...")
+    wat = await message.reply_text(f"🧠 <b>Analyzing your request...</b>\n\nAI is understanding what you want...", parse_mode=enums.ParseMode.HTML)
+    
+    try:
+        # Prepare image for AI
+        with open(image_context['file_path'], "rb") as img_f:
+            img_bytes = img_f.read()
+            detected_type = imghdr.what(image_context['file_path'])
+            if not detected_type:
+                detected_type = "jpeg"
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            data_uri = f"data:image/{detected_type};base64,{img_b64}"
+        images = [[data_uri, os.path.basename(image_context['file_path'])]]
         
-        wat = await message.reply_text(f"🎨 <b>Editing your image...</b>\n\nTrying multiple AI providers...", parse_mode=enums.ParseMode.HTML)
+        # Use AI to detect intent - should we edit the image or respond with text?
+        intent_result = await detect_intent_with_ai(images, prompt)
         
-        try:
-            with open(image_context['file_path'], "rb") as img_f:
-                img_bytes = img_f.read()
+        if intent_result.get("error"):
+            logger.warning(f"Intent detection failed in follow-up: {intent_result.get('error')}")
+            intent_result["intent"] = "TEXT_RESPONSE"
+        
+        logger.info(f"Follow-up AI Intent: {intent_result['intent']} (detected by {intent_result.get('provider', 'unknown')})")
+        
+        if intent_result["intent"] == "IMAGE_EDIT":
+            # ============== IMAGE EDITING MODE FOR FOLLOW-UP ==============
+            edit_prompt = intent_result.get("edit_prompt") or prompt
+            
+            await wat.edit_text(f"🎨 <b>Editing your image...</b>\n\n📝 _{edit_prompt[:60]}{'...' if len(edit_prompt) > 60 else ''}_", parse_mode=enums.ParseMode.HTML)
             
             # Try to edit the image with multiple providers
             edited_image_bytes, provider_info = await edit_image_with_providers(
                 img_bytes, 
                 os.path.basename(image_context['file_path']), 
-                prompt
+                edit_prompt
             )
             
             if edited_image_bytes is None:
@@ -745,11 +890,9 @@ async def handle_vision_followup(client, message):
             with open(edited_file, "wb") as f:
                 f.write(edited_image_bytes)
             
-            # Delete waiting message
             await wat.delete()
             
-            # Send the edited image
-            caption = f"✨ **Edited Image**\n\n🎨 Edit: `{prompt[:100]}{'...' if len(prompt) > 100 else ''}`\n\n🤖 Provider: {provider_info}"
+            caption = f"✨ **Edited Image**\n\n🎨 Request: `{prompt[:100]}{'...' if len(prompt) > 100 else ''}`\n\n🤖 AI: {intent_result.get('provider', 'unknown')} + {provider_info}"
             
             await client.send_photo(
                 chat_id=message.chat.id,
@@ -758,141 +901,106 @@ async def handle_vision_followup(client, message):
                 reply_to_message_id=message.id if hasattr(message, 'id') else None
             )
             
-            # Update uses_left
+            # Update uses_left and context to point to edited image
             image_context['uses_left'] -= 1
+            image_context['file_path'] = edited_file
             uses_left = image_context['uses_left']
             
-            # Update history
             history.append({"role": "user", "content": f"[Image edit request] {prompt}"})
-            history.append({"role": "assistant", "content": f"[Edited image generated using {provider_info}]"})
+            history.append({"role": "assistant", "content": f"[Edited image: {edit_prompt}]"})
             
             if uses_left <= 0:
-                # Clean up if no more uses
                 if user_id in image_cleanup_tasks:
                     image_cleanup_tasks[user_id]["task"].cancel()
                     del image_cleanup_tasks[user_id]
-                try:
-                    os.remove(image_context['file_path'])
-                except Exception:
-                    pass
                 history_collection.update_one(
                     {"user_id": user_id},
                     {"$set": {"history": history}, "$unset": {IMAGE_CONTEXT_KEY: ""}},
                     upsert=True
                 )
-                await message.reply_text("🗑️ Image context cleared. Send a new image for more edits.")
+                await message.reply_text("🗑️ Image context cleared. Send a new image for more edits or questions.")
             else:
                 history_collection.update_one(
                     {"user_id": user_id},
                     {"$set": {"history": history, IMAGE_CONTEXT_KEY: image_context}},
                     upsert=True
                 )
-                await message.reply_text(f"✅ You have {uses_left} more follow-up(s) left for this image.")
+                await message.reply_text(f"✅ You have {uses_left} more follow-up(s) left. You can ask questions or request more edits!")
             
-            # Log and cleanup
             try:
                 await user_log(client, message, f"#ImageEdit-Followup\nPrompt: {prompt}", f"Edited with {provider_info}")
             except Exception as e:
-                logger.error(f"Error logging image edit: {str(e)}")
-            
-            try:
-                os.remove(edited_file)
-            except Exception:
-                pass
+                logger.error(f"Error logging: {str(e)}")
             
             finish_image_request(user_id)
             return True
-            
-        except Exception as e:
-            logger.exception(f"Error in image edit followup: {str(e)}")
-            finish_image_request(user_id)
-            await wat.delete()
-            await message.reply_text(f"❌ <b>Image Edit Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
-            return True
-    
-    # ============== VISION ANALYSIS MODE FOR FOLLOW-UP ==============
-    # Start the image request in queue system for followup
-    start_image_request(user_id, f"Image follow-up analysis: {prompt[:30]}...")
-    
-    # Add the latest user prompt to history before sending to g4f
-    wat = await message.reply_text(f"🔍 <b>Analyzing Image with AI...</b>\n\nThis may take a few seconds.", parse_mode=enums.ParseMode.HTML)
-    history.append({"role": "user", "content": prompt})
-    try:
-        with open(image_context['file_path'], "rb") as img_f:
-            img_bytes = img_f.read()
-            detected_type = imghdr.what(image_context['file_path'])
-            if not detected_type:
-                detected_type = "jpeg"
-            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-            data_uri = f"data:image/{detected_type};base64,{img_b64}"
-        images = [[data_uri, os.path.basename(image_context['file_path'])]]
         
-        # Use multi-provider system for vision follow-up (same as initial analysis)
-        ai_response, provider_name = await analyze_image_with_providers(images, prompt)
+        # ============== TEXT RESPONSE MODE FOR FOLLOW-UP ==============
+        await wat.edit_text(f"📝 <b>Generating response...</b>", parse_mode=enums.ParseMode.HTML)
+        
+        # Use text response from intent detection if available
+        if intent_result.get("text_response"):
+            ai_response = intent_result["text_response"]
+            provider_name = intent_result.get("provider", "unknown")
+        else:
+            # Analyze with vision providers
+            ai_response, provider_name = await analyze_image_with_providers(images, prompt)
         
         if not ai_response:
             raise Exception(f"All vision providers failed: {provider_name}")
         
         logger.info(f"Vision follow-up succeeded with provider: {provider_name}")
-    except Exception as e:
-        logger.exception(f"Error in g4f vision followup: {str(e)}")
-        # Finish the image request in queue system even on error
-        finish_image_request(user_id)
-        await wat.delete()
-        await message.reply_text(f"❌ <b>AI Vision Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
-        return True
-    # Update uses_left
-    image_context['uses_left'] -= 1
-    uses_left = image_context['uses_left']
-    # Remove image if done
-    if image_context['uses_left'] <= 0:
-        if user_id in image_cleanup_tasks:
-            image_cleanup_tasks[user_id]["task"].cancel()
-            file_path = image_cleanup_tasks[user_id]["file_path"]
+        
+        # Update uses_left
+        image_context['uses_left'] -= 1
+        uses_left = image_context['uses_left']
+        
+        history.append({"role": "user", "content": prompt})
+        history.append({"role": "assistant", "content": ai_response})
+        
+        if uses_left <= 0:
+            if user_id in image_cleanup_tasks:
+                image_cleanup_tasks[user_id]["task"].cancel()
+                del image_cleanup_tasks[user_id]
             try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                os.remove(image_context['file_path'])
             except Exception:
                 pass
-            del image_cleanup_tasks[user_id]
+            history_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"history": history}, "$unset": {IMAGE_CONTEXT_KEY: ""}},
+                upsert=True
+            )
+        else:
+            history_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"history": history, IMAGE_CONTEXT_KEY: image_context}},
+                upsert=True
+            )
+        
+        await message.reply_text(
+            f"📝 **AI Vision Response**\n\n{ai_response}\n\n__You can ask {uses_left} more follow-up question(s) about the last image, or type /endimage to clear the context.__",
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        await wat.delete()
+        
+        # Log to channel
         try:
-            if os.path.exists(image_context['file_path']):
-                os.remove(image_context['file_path'])
-        except Exception:
-            pass
-        history_collection.update_one(
-            {"user_id": user_id},
-            {"$unset": {IMAGE_CONTEXT_KEY: ""}},
-            upsert=True
-        )
-        await message.reply_text("🗑️ The last image context has been cleared. If you want to analyze another image, please send a new one.")
-    else:
-        history_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {IMAGE_CONTEXT_KEY: image_context}},
-            upsert=True
-        )
-    # Add to history
-    history.append({"role": "user", "content": prompt})
-    history.append({"role": "assistant", "content": ai_response})
-    history_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {"history": history}},
-        upsert=True
-    )
-    await message.reply_text(
-        f"📝 **AI Vision Response**\n\n{ai_response}\n\n__You can ask {uses_left} more follow-up question(s) about the last image, or type /endimage to clear the context.__",
-        parse_mode=enums.ParseMode.MARKDOWN
-    )
-    await wat.delete()
-    # Log to channel
-    try:
-        await user_log(client, message, f"#VisionAI-Followup\nPrompt: {prompt}", ai_response)
+            await user_log(client, message, f"#VisionAI-Followup\nPrompt: {prompt}", ai_response)
+        except Exception as e:
+            logger.error(f"Error logging followup: {str(e)}")
+        
+        finish_image_request(user_id)
+        return True
+        
     except Exception as e:
-        logger.error(f"Error logging followup: {str(e)}")
-    
-    # Finish the image request in queue system
-    finish_image_request(user_id)
-    return True
+        logger.exception(f"Error in vision followup: {str(e)}")
+        finish_image_request(user_id)
+        try:
+            await wat.delete()
+        except:
+            pass
+        await message.reply_text(f"❌ <b>AI Vision Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
+        return True
 
 
