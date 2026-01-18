@@ -108,6 +108,141 @@ async def analyze_image_with_providers(images: list, user_question: str) -> tupl
     
     return None, f"All vision providers failed. Last error: {last_error}"
 
+# ============================================================================
+# IMAGE EDITING PROVIDER CONFIGURATIONS - For image-to-image modifications
+# ============================================================================
+IMAGE_EDIT_PROVIDERS = [
+    {
+        "name": "BlackForestLabs_Flux1KontextDev",
+        "provider": g4f.Provider.BlackForestLabs_Flux1KontextDev,
+        "model": "flux-kontext-dev",
+        "timeout": 120,
+    },
+    {
+        "name": "HuggingFaceInference",
+        "provider": g4f.Provider.HuggingFaceInference,
+        "model": "black-forest-labs/FLUX.1-dev",
+        "timeout": 120,
+    },
+    {
+        "name": "DeepseekAI_JanusPro7b",
+        "provider": g4f.Provider.DeepseekAI_JanusPro7b,
+        "model": "janus-pro-7b-image",
+        "timeout": 120,
+    },
+]
+
+# Keywords that indicate user wants image modification/editing
+IMAGE_EDIT_KEYWORDS = [
+    "edit", "change", "modify", "transform", "convert", "make it", "make this",
+    "turn it", "turn this", "add", "remove", "replace", "swap", "put",
+    "change the", "make the", "add a", "remove the", "give it", "give this",
+    "colorize", "recolor", "style", "stylize", "enhance", "improve",
+    "cartoon", "anime", "realistic", "artistic", "vintage", "modern",
+    "black and white", "sepia", "blur", "sharpen", "crop", "resize",
+    "rotate", "flip", "mirror", "invert", "brighten", "darken",
+    "saturate", "desaturate", "contrast", "vibrant", "muted",
+    "background", "foreground", "object", "person", "face",
+    "color", "colour", "paint", "draw", "sketch", "render",
+    "generate", "create", "produce", "show me", "can you make",
+    "i want", "please make", "could you", "would you",
+]
+
+def is_image_edit_request(text: str) -> bool:
+    """
+    Check if the user's message indicates they want to edit/modify the image
+    rather than just analyze it.
+    
+    Args:
+        text: User's message text
+        
+    Returns:
+        True if it looks like an image edit request
+    """
+    if not text:
+        return False
+    
+    text_lower = text.lower().strip()
+    
+    # Check for explicit edit keywords
+    for keyword in IMAGE_EDIT_KEYWORDS:
+        if keyword in text_lower:
+            return True
+    
+    return False
+
+async def edit_image_with_providers(image_bytes: bytes, image_name: str, prompt: str) -> tuple:
+    """
+    Try multiple image editing providers until one succeeds.
+    Returns (edited_image_bytes, provider_name) or (None, error_message)
+    
+    Args:
+        image_bytes: The original image as bytes
+        image_name: Name/filename of the image
+        prompt: The edit instruction from user
+        
+    Returns:
+        Tuple of (image_bytes, provider_name) on success, or (None, error_message) on failure
+    """
+    last_error = None
+    
+    for provider_config in IMAGE_EDIT_PROVIDERS:
+        provider_name = provider_config["name"]
+        provider = provider_config["provider"]
+        model = provider_config["model"]
+        timeout = provider_config["timeout"]
+        
+        try:
+            logger.info(f"Trying image edit provider: {provider_name} with model: {model}")
+            
+            loop = asyncio.get_event_loop()
+            
+            def sync_edit():
+                g4f_client = G4FClient(provider=provider)
+                response = g4f_client.images.create_variation(
+                    image=image_bytes,
+                    image_name=image_name,
+                    prompt=prompt,
+                    model=model,
+                    response_format="b64_json"
+                )
+                # Response should contain the edited image
+                if hasattr(response, 'data') and response.data:
+                    # Get base64 image data
+                    img_data = response.data[0]
+                    if hasattr(img_data, 'b64_json') and img_data.b64_json:
+                        return base64.b64decode(img_data.b64_json)
+                    elif hasattr(img_data, 'url') and img_data.url:
+                        # If URL is returned, download it
+                        import urllib.request
+                        with urllib.request.urlopen(img_data.url, timeout=30) as resp:
+                            return resp.read()
+                return None
+            
+            # Run with timeout
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, sync_edit),
+                timeout=timeout
+            )
+            
+            if result and len(result) > 1000:  # Valid image should be > 1KB
+                logger.info(f"Image edit provider {provider_name} succeeded")
+                return result, provider_name
+            else:
+                logger.warning(f"Image edit provider {provider_name} returned empty/invalid result")
+                continue
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"Image edit provider {provider_name} timed out")
+            last_error = f"{provider_name} timed out"
+            continue
+        except Exception as e:
+            logger.error(f"Image edit provider {provider_name} failed: {str(e)}")
+            last_error = f"{provider_name}: {str(e)}"
+            continue
+    
+    return None, f"All image edit providers failed. Last error: {last_error}"
+
 # Helper to manage image context in user session/history
 IMAGE_CONTEXT_KEY = "vision_image_context"
 MAX_IMAGE_USES = 3
@@ -303,6 +438,106 @@ async def extract_text_res(bot, update):
                 "If there is text, read it and use it to help answer or explain the image."
             )
 
+        # Check if user wants to edit/modify the image
+        is_edit_request = is_image_edit_request(user_question) if update.caption else False
+        
+        if is_edit_request:
+            # ============== IMAGE EDITING MODE ==============
+            await processing_msg.edit_text(
+                "🎨 **Editing your image...**\n\nTrying multiple AI providers for best results..."
+            )
+            
+            # Read image bytes for editing
+            with open(file, "rb") as img_f:
+                img_bytes = img_f.read()
+            
+            # Try to edit the image with multiple providers
+            edited_image_bytes, provider_info = await edit_image_with_providers(
+                img_bytes, 
+                os.path.basename(file), 
+                user_question
+            )
+            
+            if edited_image_bytes is None:
+                logger.error(f"All image edit providers failed: {provider_info}")
+                await processing_msg.edit_text(
+                    f"❌ **Image Editing Failed**\n\n{provider_info}\n\n"
+                    "💡 Tip: Try a simpler edit request or analyze the image instead."
+                )
+                # Cleanup
+                try:
+                    os.remove(file)
+                except Exception:
+                    pass
+                finish_image_request(user_id)
+                return
+            
+            logger.info(f"Image editing successful using provider: {provider_info}")
+            
+            # Save edited image
+            edited_file = file.replace(".", "_edited.")
+            with open(edited_file, "wb") as f:
+                f.write(edited_image_bytes)
+            
+            # Send the edited image
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass
+            
+            caption = f"✨ **Edited Image**\n\n🎨 Edit: `{user_question[:100]}{'...' if len(user_question) > 100 else ''}`\n\n🤖 Provider: {provider_info}"
+            
+            try:
+                await bot.send_photo(
+                    chat_id=update.chat.id,
+                    photo=edited_file,
+                    caption=caption,
+                    reply_to_message_id=update.id if hasattr(update, 'id') else None
+                )
+            except Exception as e:
+                logger.error(f"Failed to send edited image: {e}")
+                await update.reply_text(f"❌ Failed to send edited image: {str(e)}")
+            
+            # Save to history
+            user_id = update.from_user.id
+            history_collection = get_history_collection()
+            user_history = history_collection.find_one({"user_id": user_id})
+            if user_history and 'history' in user_history:
+                history = user_history['history']
+                if not isinstance(history, list):
+                    history = [history]
+                history = check_and_update_system_prompt(history, user_id)
+            else:
+                history = DEFAULT_SYSTEM_MESSAGE.copy()
+            
+            history.append({"role": "user", "content": f"[Image edit request: {os.path.basename(file)}] {user_question}"})
+            history.append({"role": "assistant", "content": f"[Edited image generated using {provider_info}]"})
+            history_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"history": history}},
+                upsert=True
+            )
+            
+            # Log to channel
+            try:
+                await user_log(bot, update, f"#ImageEdit\nPrompt: {user_question}", f"Edited with {provider_info}")
+            except Exception as e:
+                logger.error(f"Error logging image edit: {str(e)}")
+            
+            # Cleanup original file, keep edited
+            try:
+                os.remove(file)
+            except Exception:
+                pass
+            
+            # Schedule cleanup for edited image
+            await schedule_image_cleanup(bot, user_id, update.chat.id, edited_file)
+            
+            # Finish the image request
+            finish_image_request(user_id)
+            return
+        
+        # ============== VISION ANALYSIS MODE (existing logic) ==============
         await processing_msg.edit_text(
             "🧠 **Analyzing Image with AI...**\n\nTrying multiple providers for best results..."
         )
@@ -479,6 +714,103 @@ async def handle_vision_followup(client, message):
         )
         await message.reply_text("⚠️ The image file for your last context is no longer available. Please send a new image to continue vision analysis.")
         return True
+    
+    # Check if user wants to edit the image instead of analyzing it
+    is_edit_request = is_image_edit_request(prompt)
+    
+    if is_edit_request:
+        # ============== IMAGE EDITING MODE FOR FOLLOW-UP ==============
+        start_image_request(user_id, f"Image edit follow-up: {prompt[:30]}...")
+        
+        wat = await message.reply_text(f"🎨 <b>Editing your image...</b>\n\nTrying multiple AI providers...", parse_mode=enums.ParseMode.HTML)
+        
+        try:
+            with open(image_context['file_path'], "rb") as img_f:
+                img_bytes = img_f.read()
+            
+            # Try to edit the image with multiple providers
+            edited_image_bytes, provider_info = await edit_image_with_providers(
+                img_bytes, 
+                os.path.basename(image_context['file_path']), 
+                prompt
+            )
+            
+            if edited_image_bytes is None:
+                raise Exception(f"All image edit providers failed: {provider_info}")
+            
+            logger.info(f"Image editing follow-up succeeded with provider: {provider_info}")
+            
+            # Save edited image
+            edited_file = image_context['file_path'].replace(".", "_edited_followup.")
+            with open(edited_file, "wb") as f:
+                f.write(edited_image_bytes)
+            
+            # Delete waiting message
+            await wat.delete()
+            
+            # Send the edited image
+            caption = f"✨ **Edited Image**\n\n🎨 Edit: `{prompt[:100]}{'...' if len(prompt) > 100 else ''}`\n\n🤖 Provider: {provider_info}"
+            
+            await client.send_photo(
+                chat_id=message.chat.id,
+                photo=edited_file,
+                caption=caption,
+                reply_to_message_id=message.id if hasattr(message, 'id') else None
+            )
+            
+            # Update uses_left
+            image_context['uses_left'] -= 1
+            uses_left = image_context['uses_left']
+            
+            # Update history
+            history.append({"role": "user", "content": f"[Image edit request] {prompt}"})
+            history.append({"role": "assistant", "content": f"[Edited image generated using {provider_info}]"})
+            
+            if uses_left <= 0:
+                # Clean up if no more uses
+                if user_id in image_cleanup_tasks:
+                    image_cleanup_tasks[user_id]["task"].cancel()
+                    del image_cleanup_tasks[user_id]
+                try:
+                    os.remove(image_context['file_path'])
+                except Exception:
+                    pass
+                history_collection.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"history": history}, "$unset": {IMAGE_CONTEXT_KEY: ""}},
+                    upsert=True
+                )
+                await message.reply_text("🗑️ Image context cleared. Send a new image for more edits.")
+            else:
+                history_collection.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"history": history, IMAGE_CONTEXT_KEY: image_context}},
+                    upsert=True
+                )
+                await message.reply_text(f"✅ You have {uses_left} more follow-up(s) left for this image.")
+            
+            # Log and cleanup
+            try:
+                await user_log(client, message, f"#ImageEdit-Followup\nPrompt: {prompt}", f"Edited with {provider_info}")
+            except Exception as e:
+                logger.error(f"Error logging image edit: {str(e)}")
+            
+            try:
+                os.remove(edited_file)
+            except Exception:
+                pass
+            
+            finish_image_request(user_id)
+            return True
+            
+        except Exception as e:
+            logger.exception(f"Error in image edit followup: {str(e)}")
+            finish_image_request(user_id)
+            await wat.delete()
+            await message.reply_text(f"❌ <b>Image Edit Error</b>\n\n{str(e)}", parse_mode=enums.ParseMode.HTML)
+            return True
+    
+    # ============== VISION ANALYSIS MODE FOR FOLLOW-UP ==============
     # Start the image request in queue system for followup
     start_image_request(user_id, f"Image follow-up analysis: {prompt[:30]}...")
     
